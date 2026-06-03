@@ -1,0 +1,178 @@
+:root {
+  color-scheme: light;
+  --ink: #202124;
+  --muted: #667085;
+  --line: #d8dee4;
+  --surface: #ffffff;
+  --wash: #f5f7f8;
+  --accent: #0f766e;
+  --accent-strong: #115e59;
+  --danger: #b42318;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--wash);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.shell {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+form {
+  display: grid;
+  gap: 14px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea,
+button {
+  width: 100%;
+  border-radius: 8px;
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #b8c2cc;
+  background: #fff;
+  color: var(--ink);
+  padding: 12px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  padding: 12px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-strong);
+}
+
+#refreshButton {
+  width: auto;
+  min-width: 92px;
+  background: #344054;
+}
+
+#message {
+  min-height: 20px;
+  margin: 0;
+  color: var(--muted);
+}
+
+#message.error {
+  color: var(--danger);
+}
+
+.list-section {
+  margin-top: 22px;
+}
+
+.request-list {
+  display: grid;
+  gap: 10px;
+}
+
+.request {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.request strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.request span {
+  color: var(--muted);
+  display: block;
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .shell {
+    padding: 14px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

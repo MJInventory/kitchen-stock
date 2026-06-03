@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Kitchen Stock">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Kitchen Requests</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Kitchen Stock</h1>
+        </div>
+        <button id="refreshButton" type="button">Refresh</button>
+      </header>
+
+      <section class="panel">
+        <form id="requestForm">
+          <h2>Request Missing Item</h2>
+          <label>
+            Item
+            <select id="itemSelect" required></select>
+          </label>
+
+          <div class="row">
+            <label>
+              Quantity
+              <input id="quantityInput" type="number" min="1" step="1" required>
+            </label>
+            <label>
+              Urgency
+              <select id="urgencySelect">
+                <option>Medium</option>
+                <option>High</option>
+                <option>Critical</option>
+                <option>Low</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Requested by
+            <input id="requestedByInput" type="text" value="Kitchen" autocomplete="name">
+          </label>
+
+          <label>
+            Notes
+            <textarea id="notesInput" rows="3"></textarea>
+          </label>
+
+          <button id="submitButton" type="submit">Submit Request</button>
+          <p id="message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="list-section">
+        <h2>Recent Requests</h2>
+        <div id="requestList" class="request-list"></div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

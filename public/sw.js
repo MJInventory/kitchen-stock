@@ -1,9 +1,11 @@
-const CACHE_NAME = "kitchen-stock-v1";
+const CACHE_NAME = "kitchen-stock-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
+  "/driver-sheet.html",
   "/styles.css",
   "/app.js",
+  "/driver-sheet.js",
   "/manifest.webmanifest",
   "/icon.svg"
 ];

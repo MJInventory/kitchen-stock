@@ -37,6 +37,8 @@ Root directory: kitchen-web
 Build command: npm install
 Start command: npm start
 Environment variable: AIRTABLE_TOKEN=your_new_airtable_token
+Environment variable: APP_USERS=Enno:2044,Harm:1234,Pena:8899,Freddy:6884
+Environment variable: AUTH_SECRET=use-a-long-random-value
 Environment variable: ITEM_CACHE_MS=600000
 Environment variable: REQUEST_CACHE_MS=20000
 ```

@@ -8,6 +8,10 @@ services:
     envVars:
       - key: AIRTABLE_TOKEN
         sync: false
+      - key: APP_USERS
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
       - key: ITEM_CACHE_MS
         value: "600000"
       - key: REQUEST_CACHE_MS

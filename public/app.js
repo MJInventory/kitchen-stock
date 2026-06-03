@@ -1,4 +1,13 @@
 const itemSelect = document.querySelector("#itemSelect");
+const loginScreen = document.querySelector("#loginScreen");
+const loginForm = document.querySelector("#loginForm");
+const usernameInput = document.querySelector("#usernameInput");
+const passwordInput = document.querySelector("#passwordInput");
+const loginMessage = document.querySelector("#loginMessage");
+const currentUser = document.querySelector("#currentUser");
+const logoutButton = document.querySelector("#logoutButton");
+const areaFilter = document.querySelector("#areaFilter");
+const locationFilter = document.querySelector("#locationFilter");
 const requestForm = document.querySelector("#requestForm");
 const quantityInput = document.querySelector("#quantityInput");
 const urgencySelect = document.querySelector("#urgencySelect");
@@ -11,6 +20,9 @@ const requestList = document.querySelector("#requestList");
 
 let itemNameById = new Map();
 let recentRequests = [];
+let allItems = [];
+let sessionToken = localStorage.getItem("kitchenStockToken") || "";
+let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -21,24 +33,64 @@ function setMessage(text, isError = false) {
   message.classList.toggle("error", isError);
 }
 
+function setLoginMessage(text, isError = false) {
+  loginMessage.textContent = text;
+  loginMessage.classList.toggle("error", isError);
+}
+
+function showApp() {
+  loginScreen.hidden = true;
+  currentUser.textContent = sessionUser;
+  requestedByInput.value = sessionUser || "Kitchen";
+}
+
+function showLogin() {
+  loginScreen.hidden = false;
+  currentUser.textContent = "";
+  sessionToken = "";
+  sessionUser = "";
+  localStorage.removeItem("kitchenStockToken");
+  localStorage.removeItem("kitchenStockUser");
+}
+
 async function api(path, options) {
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+    },
     ...options
   });
   const data = await response.json();
+  if (response.status === 401) {
+    showLogin();
+  }
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
 }
 
 function renderItems(items) {
+  allItems = items;
   itemNameById = new Map(items.map((item) => [item.id, item.name]));
-  itemSelect.innerHTML = items
+  const area = areaFilter.value;
+  const location = locationFilter.value;
+  const filtered = items.filter((item) => {
+    const areaMatches = !area || !item.inventoryArea || item.inventoryArea === area;
+    const locationMatches = !location || !item.storageLocation || item.storageLocation === location;
+    return areaMatches && locationMatches;
+  });
+
+  itemSelect.innerHTML = filtered
     .map((item) => {
-      const detail = [item.quantity, item.unit].filter(Boolean).join(" ");
+      const quantity = [item.quantity, item.unit].filter(Boolean).join(" ");
+      const detail = [quantity, item.storageLocation, item.inventoryArea].filter(Boolean).join(" / ");
       return `<option value="${item.id}">${item.name}${detail ? ` (${detail})` : ""}</option>`;
     })
     .join("");
+
+  if (!filtered.length) {
+    itemSelect.innerHTML = '<option value="">No matching items</option>';
+  }
 }
 
 function renderRequests(requests) {
@@ -50,6 +102,7 @@ function renderRequests(requests) {
         <article class="request">
           <strong>${itemName}</strong>
           <span>${qty} needed - ${request.urgency || "Medium"} - ${request.status || "Pending"}</span>
+          <span>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</span>
           <span>${request.requestedBy || "Kitchen"}</span>
         </article>
       `;
@@ -78,6 +131,8 @@ requestForm.addEventListener("submit", async (event) => {
         itemId: itemSelect.value,
         quantityNeeded: quantityInput.value,
         urgencyLevel: urgencySelect.value,
+        storageLocation: allItems.find((item) => item.id === itemSelect.value)?.storageLocation || "",
+        inventoryArea: allItems.find((item) => item.id === itemSelect.value)?.inventoryArea || areaFilter.value || "",
         requestedBy: requestedByInput.value,
         notes: notesInput.value
       })
@@ -99,4 +154,45 @@ refreshButton.addEventListener("click", () => {
   refresh().catch((error) => setMessage(error.message, true));
 });
 
-refresh().catch((error) => setMessage(error.message, true));
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setLoginMessage("Logging in...");
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: usernameInput.value,
+        password: passwordInput.value
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not log in.");
+
+    sessionToken = data.token;
+    sessionUser = data.user.name;
+    localStorage.setItem("kitchenStockToken", sessionToken);
+    localStorage.setItem("kitchenStockUser", sessionUser);
+    passwordInput.value = "";
+    setLoginMessage("");
+    showApp();
+    await refresh();
+  } catch (error) {
+    setLoginMessage(error.message, true);
+  }
+});
+
+logoutButton.addEventListener("click", () => {
+  showLogin();
+});
+
+areaFilter.addEventListener("change", () => renderItems(allItems));
+locationFilter.addEventListener("change", () => renderItems(allItems));
+
+if (sessionToken && sessionUser) {
+  showApp();
+  refresh().catch((error) => setMessage(error.message, true));
+} else {
+  showLogin();
+}

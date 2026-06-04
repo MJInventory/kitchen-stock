@@ -27,6 +27,7 @@ const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === 
 const smtpUser = process.env.SMTP_USER || "";
 const smtpPass = process.env.SMTP_PASS || "";
 const mailFrom = process.env.MAIL_FROM || smtpUser;
+const brevoApiKey = process.env.BREVO_API_KEY || "";
 const ocrSpaceApiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
 
 const cache = {
@@ -148,14 +149,19 @@ async function readJson(req) {
   return body ? JSON.parse(body) : {};
 }
 
-function requireSmtpConfig() {
+function requireEmailConfig() {
+  if (brevoApiKey) {
+    if (!mailFrom) throw new Error("Email is not configured yet. Add MAIL_FROM in Render.");
+    return;
+  }
+
   const missing = [];
   if (!smtpHost) missing.push("SMTP_HOST");
   if (!smtpUser) missing.push("SMTP_USER");
   if (!smtpPass) missing.push("SMTP_PASS");
   if (!mailFrom) missing.push("MAIL_FROM");
   if (missing.length) {
-    throw new Error(`Email is not configured yet. Add these Render environment variables: ${missing.join(", ")}.`);
+    throw new Error(`Email is not configured yet. Add BREVO_API_KEY and MAIL_FROM, or add SMTP settings: ${missing.join(", ")}.`);
   }
 }
 
@@ -798,7 +804,7 @@ async function createInvoiceLine(payload, userName) {
 }
 
 async function emailInvoicePicture(payload, userName) {
-  requireSmtpConfig();
+  requireEmailConfig();
 
   const attachment = attachmentFromDataUrl(payload.dataUrl, payload.fileName);
   const supplier = String(payload.supplierName || "").trim();
@@ -807,6 +813,51 @@ async function emailInvoicePicture(payload, userName) {
   const subjectParts = ["Invoice"];
   if (supplier) subjectParts.push(supplier);
   if (invoiceNumber) subjectParts.push(`#${invoiceNumber}`);
+
+  const text = [
+    "Invoice photo sent from Kitchen Stock.",
+    "",
+    `Sent by: ${userName}`,
+    `Supplier: ${supplier || "(not entered)"}`,
+    `Invoice number: ${invoiceNumber || "(not entered)"}`,
+    notes ? `Notes: ${notes}` : ""
+  ].filter(Boolean).join("\n");
+
+  if (brevoApiKey) {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "Kitchen Stock",
+          email: mailFrom
+        },
+        to: [{ email: accountingInbox }],
+        subject: subjectParts.join(" - "),
+        textContent: text,
+        attachment: [{
+          name: attachment.filename,
+          content: attachment.content.toString("base64")
+        }]
+      })
+    });
+
+    const responseText = await response.text();
+    const responseData = responseText ? JSON.parse(responseText) : {};
+    if (!response.ok) {
+      throw new Error(`Brevo email failed: ${responseData.message || response.statusText}`);
+    }
+
+    return {
+      to: accountingInbox,
+      messageId: responseData.messageId || "",
+      provider: "Brevo API"
+    };
+  }
 
   const transporter = nodemailer.createTransport({
     host: smtpHost,
@@ -825,20 +876,14 @@ async function emailInvoicePicture(payload, userName) {
     from: mailFrom,
     to: accountingInbox,
     subject: subjectParts.join(" - "),
-    text: [
-      "Invoice photo sent from Kitchen Stock.",
-      "",
-      `Sent by: ${userName}`,
-      `Supplier: ${supplier || "(not entered)"}`,
-      `Invoice number: ${invoiceNumber || "(not entered)"}`,
-      notes ? `Notes: ${notes}` : ""
-    ].filter(Boolean).join("\n"),
+    text,
     attachments: [attachment]
   });
 
   return {
     to: accountingInbox,
-    messageId: info.messageId || ""
+    messageId: info.messageId || "",
+    provider: "SMTP"
   };
 }
 

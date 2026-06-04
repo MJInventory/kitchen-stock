@@ -29,6 +29,7 @@ const smtpPass = process.env.SMTP_PASS || "";
 const mailFrom = process.env.MAIL_FROM || smtpUser;
 const brevoApiKey = process.env.BREVO_API_KEY || "";
 const ocrSpaceApiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
+const isRender = Boolean(process.env.RENDER);
 
 const cache = {
   items: { expiresAt: 0, value: null, pending: null },
@@ -153,6 +154,10 @@ function requireEmailConfig() {
   if (brevoApiKey) {
     if (!mailFrom) throw new Error("Email is not configured yet. Add MAIL_FROM in Render.");
     return;
+  }
+
+  if (isRender) {
+    throw new Error("Email is not configured for Render. Add BREVO_API_KEY and MAIL_FROM in Render environment variables. SMTP ports time out on Render.");
   }
 
   const missing = [];
@@ -979,6 +984,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url.startsWith("/api/health")) {
       send(res, 200, {
         ok: true,
+        email: {
+          provider: brevoApiKey ? "Brevo API" : "SMTP",
+          hasBrevoApiKey: Boolean(brevoApiKey),
+          hasMailFrom: Boolean(mailFrom),
+          hasAccountingInbox: Boolean(accountingInbox),
+          smtpConfigured: Boolean(smtpHost && smtpUser && smtpPass),
+          render: isRender
+        },
         metrics,
         cache: {
           itemsCached: Boolean(cache.items.value),

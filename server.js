@@ -665,21 +665,9 @@ async function createRequestsBatch(payload) {
   if (!requestedItems.length) throw new Error("Select at least one item.");
   if (requestedItems.length > 50) throw new Error("Submit 50 items or fewer at a time.");
 
-  const schema = await getSchema();
-  const records = [];
-
-  for (const request of requestedItems) {
-    records.push({ fields: createRequestFields(request, schema) });
-  }
-
   const created = [];
-  for (let index = 0; index < records.length; index += 10) {
-    const chunk = records.slice(index, index + 10);
-    const data = await airtable(requestsTableId, {
-      method: "POST",
-      body: JSON.stringify({ records: chunk })
-    });
-    created.push(...data.records.map(normalizeCreatedRequest));
+  for (const request of requestedItems) {
+    created.push(await createRequest(request));
   }
 
   cache.requests.expiresAt = 0;

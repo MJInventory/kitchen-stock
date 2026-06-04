@@ -509,7 +509,8 @@ body.order-app {
 .order-topbar {
   min-height: 92px;
   border-bottom: 1px solid var(--order-line-soft);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
   justify-content: space-between;
   align-items: center;
   gap: 18px;
@@ -552,6 +553,41 @@ body.order-app {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.order-nav {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--order-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.order-nav a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--order-muted);
+  padding: 8px 12px;
+  text-decoration: none;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.order-nav a:hover,
+.order-nav a:focus-visible {
+  background: rgba(212, 173, 67, 0.14);
+  color: var(--order-gold-strong);
+  outline: none;
 }
 
 .order-app .user-chip {
@@ -975,30 +1011,6 @@ body.order-app {
   font-size: 12px;
 }
 
-.utility-links {
-  max-width: 680px;
-  margin: 8px auto 0;
-  padding: 0 18px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.utility-links a {
-  color: var(--order-muted);
-  border: 1px solid var(--order-line);
-  border-radius: 999px;
-  padding: 8px 12px;
-  text-decoration: none;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 11px;
-}
-
-.utility-links a:hover {
-  color: var(--order-ink);
-  border-color: var(--order-gold);
-}
 
 @media (max-width: 560px) {
   .shell {
@@ -1044,6 +1056,18 @@ body.order-app {
     min-height: auto;
     padding: 14px 12px;
     align-items: flex-start;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand actions"
+      "nav nav";
+  }
+
+  .brand-block {
+    grid-area: brand;
+  }
+
+  .order-app .top-actions {
+    grid-area: actions;
   }
 
   .brand-mark {
@@ -1063,10 +1087,31 @@ body.order-app {
     font-size: 8px;
   }
 
+  .order-nav {
+    grid-area: nav;
+    justify-self: stretch;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-top: 8px;
+  }
+
   .order-app .top-actions {
     flex-direction: column;
     align-items: flex-end;
     gap: 6px;
+  }
+
+  .order-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .order-nav a {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 7px 10px;
+    font-size: 10px;
   }
 
   .save-pill {

@@ -23,6 +23,8 @@ const ocrMode = document.querySelector("#ocrMode");
 const ocrRotation = document.querySelector("#ocrRotation");
 const ocrTextType = document.querySelector("#ocrTextType");
 const buildLinesButton = document.querySelector("#buildLinesButton");
+const teachHeaderButton = document.querySelector("#teachHeaderButton");
+const teachLinesButton = document.querySelector("#teachLinesButton");
 const invoiceLines = document.querySelector("#invoiceLines");
 const ocrProgress = document.querySelector("#ocrProgress");
 
@@ -30,6 +32,7 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let items = [];
 let parsedLines = [];
+let ocrRules = [];
 
 function message(target, text, isError = false) {
   target.textContent = text;
@@ -99,6 +102,63 @@ function findBestItem(lineText) {
   return bestScore ? best : null;
 }
 
+function simplifyMatchText(text) {
+  return String(text || "")
+    .replace(/\d+(?:[.,]\d+)?/g, " ")
+    .replace(/[^a-zA-Z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((word) => word.length > 2)
+    .slice(0, 6)
+    .join(" ");
+}
+
+function findMappedItem(lineText) {
+  const line = normalize(lineText);
+  const matchingRule = ocrRules
+    .filter((rule) => rule.ruleType === "Line Item" && rule.inventoryItemId && rule.ocrMatchText)
+    .map((rule) => ({ rule, match: normalize(rule.ocrMatchText) }))
+    .filter(({ match }) => match && line.includes(match))
+    .sort((a, b) => b.match.length - a.match.length)[0]?.rule;
+
+  if (!matchingRule) return null;
+  return items.find((item) => item.id === matchingRule.inventoryItemId) || null;
+}
+
+function extractValueAfterMatch(line, matchText, targetField) {
+  const lowerLine = String(line || "").toLowerCase();
+  const lowerMatch = String(matchText || "").toLowerCase();
+  const index = lowerLine.indexOf(lowerMatch);
+  if (index < 0) return "";
+
+  let value = String(line || "").slice(index + String(matchText || "").length);
+  value = value.replace(/^[\s:;#-]+/, "").trim();
+
+  if (targetField === "Invoice Total") {
+    const money = value.match(/\d+(?:[.,]\d{2})?/);
+    return money ? money[0].replace(",", ".") : "";
+  }
+
+  return value;
+}
+
+function applyHeaderRules(text) {
+  const lines = String(text || "").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const headerRules = ocrRules.filter((rule) => rule.ruleType === "Header Field" && rule.ocrMatchText);
+
+  for (const rule of headerRules) {
+    const line = lines.find((candidate) => normalize(candidate).includes(normalize(rule.ocrMatchText)));
+    if (!line) continue;
+
+    const value = extractValueAfterMatch(line, rule.ocrMatchText, rule.targetField);
+    if (!value) continue;
+
+    if (rule.targetField === "Invoice Number" && !invoiceNumber.value) invoiceNumber.value = value;
+    if (rule.targetField === "Invoice Total" && !invoiceTotal.value) invoiceTotal.value = value;
+  }
+}
+
 function parseInvoiceText(text) {
   return String(text || "")
     .split(/\r?\n/)
@@ -110,7 +170,7 @@ function parseInvoiceText(text) {
       const numbers = line.match(/\d+(?:[.,]\d+)?/g) || [];
       const firstNumber = numbers.length ? Number(numbers[0].replace(",", ".")) : 1;
       const lastNumber = numbers.length ? Number(numbers[numbers.length - 1].replace(",", ".")) : "";
-      const matchedItem = findBestItem(line);
+      const matchedItem = findMappedItem(line) || findBestItem(line);
       return {
         id: `line-${Date.now()}-${index}`,
         text: line,
@@ -379,6 +439,46 @@ async function loadItems() {
   message(invoiceMessage, "");
 }
 
+async function loadOcrRules() {
+  const supplier = supplierName.value.trim();
+  if (!supplier) {
+    ocrRules = [];
+    return;
+  }
+
+  const query = new URLSearchParams({ supplier });
+  const data = await api(`/api/ocr-rules?${query}`);
+  ocrRules = data.rules || [];
+}
+
+async function saveOcrRule(rule) {
+  const data = await api("/api/ocr-rules", {
+    method: "POST",
+    body: JSON.stringify({
+      supplierName: supplierName.value.trim(),
+      ...rule
+    })
+  });
+  return data.rule;
+}
+
+function findLineContaining(value) {
+  const needle = normalize(value);
+  if (!needle) return "";
+  return String(extractedText.value || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .find((line) => normalize(line).includes(needle)) || "";
+}
+
+function labelBeforeValue(line, value) {
+  const lowerLine = String(line || "").toLowerCase();
+  const lowerValue = String(value || "").toLowerCase();
+  const index = lowerLine.indexOf(lowerValue);
+  if (index <= 0) return "";
+  return String(line || "").slice(0, index).replace(/[:;#-]+$/g, "").trim();
+}
+
 async function saveInvoiceCapture(statusNote = "") {
   const data = await api("/api/invoice-captures", {
     method: "POST",
@@ -450,9 +550,11 @@ ocrButton.addEventListener("click", async () => {
 
   try {
     ocrProgress.textContent = "hosted OCR";
+    await loadOcrRules();
     const text = await runCloudOcr(file);
 
     extractedText.value = text.trim();
+    applyHeaderRules(extractedText.value);
     parsedLines = parseInvoiceText(extractedText.value);
     renderInvoiceLines();
     if (textLooksGarbled(extractedText.value)) {
@@ -469,9 +571,96 @@ ocrButton.addEventListener("click", async () => {
 });
 
 buildLinesButton.addEventListener("click", () => {
+  loadOcrRules()
+    .catch(() => {})
+    .finally(() => {
   parsedLines = parseInvoiceText(extractedText.value);
   renderInvoiceLines();
   message(invoiceMessage, `Built ${parsedLines.length} line(s) from the text box.`);
+    });
+});
+
+teachHeaderButton.addEventListener("click", async () => {
+  if (!supplierName.value.trim()) {
+    message(invoiceMessage, "Enter the supplier before teaching OCR.", true);
+    return;
+  }
+
+  const candidates = [
+    { value: invoiceNumber.value.trim(), targetField: "Invoice Number" },
+    { value: invoiceTotal.value.trim(), targetField: "Invoice Total" }
+  ].filter((candidate) => candidate.value);
+
+  if (!candidates.length) {
+    message(invoiceMessage, "Enter an invoice number or total first.", true);
+    return;
+  }
+
+  teachHeaderButton.disabled = true;
+  try {
+    let saved = 0;
+    for (const candidate of candidates) {
+      const line = findLineContaining(candidate.value);
+      const matchText = labelBeforeValue(line, candidate.value);
+      if (!matchText || matchText.length < 3) continue;
+      await saveOcrRule({
+        ruleType: "Header Field",
+        ocrMatchText: matchText,
+        targetField: candidate.targetField,
+        notes: `Learned from OCR line: ${line}`
+      });
+      saved += 1;
+    }
+
+    await loadOcrRules();
+    message(invoiceMessage, saved ? `Saved ${saved} header OCR rule(s).` : "Could not find those values in the OCR text.", !saved);
+  } catch (error) {
+    message(invoiceMessage, error.message, true);
+  } finally {
+    teachHeaderButton.disabled = false;
+  }
+});
+
+teachLinesButton.addEventListener("click", async () => {
+  const articles = [...invoiceLines.querySelectorAll(".invoice-line")];
+  articles.forEach(syncLineFromArticle);
+
+  if (!supplierName.value.trim()) {
+    message(invoiceMessage, "Enter the supplier before teaching OCR.", true);
+    return;
+  }
+
+  const selected = parsedLines.filter((line) => line.selected && line.itemId);
+  if (!selected.length) {
+    message(invoiceMessage, "Select corrected lines with inventory items first.", true);
+    return;
+  }
+
+  teachLinesButton.disabled = true;
+  try {
+    let saved = 0;
+    for (const line of selected) {
+      const item = items.find((candidate) => candidate.id === line.itemId);
+      const matchText = simplifyMatchText(line.text);
+      if (!item || matchText.length < 3) continue;
+      await saveOcrRule({
+        ruleType: "Line Item",
+        ocrMatchText: matchText,
+        targetField: "Inventory Item",
+        inventoryItemId: item.id,
+        inventoryItemName: item.name,
+        notes: `Learned from OCR line: ${line.text}`
+      });
+      saved += 1;
+    }
+
+    await loadOcrRules();
+    message(invoiceMessage, saved ? `Saved ${saved} line OCR rule(s).` : "No usable line rules were saved.", !saved);
+  } catch (error) {
+    message(invoiceMessage, error.message, true);
+  } finally {
+    teachLinesButton.disabled = false;
+  }
 });
 
 emailInvoiceButton.addEventListener("click", async () => {

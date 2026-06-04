@@ -12,6 +12,7 @@ const baseId = "appAFvMwWZb2PPWUz";
 const inventoryTableId = "tblEuIXG6gxEiD5oU";
 const requestsTableId = "tblUHh1jWhqMFEfjd";
 const suppliersTableId = "tbl2YP7EpUpk3Ug6f";
+const invoiceOcrRulesTableId = process.env.INVOICE_OCR_RULES_TABLE_ID || "tblW611UMHnm9LUeb";
 const token = process.env.AIRTABLE_TOKEN;
 const port = Number(process.env.PORT || 3000);
 const itemCacheMs = Number(process.env.ITEM_CACHE_MS || 10 * 60 * 1000);
@@ -626,6 +627,65 @@ async function createRequest(payload) {
   return normalizeCreatedRequest(record);
 }
 
+function createRequestFields(payload, schema) {
+  const itemId = String(payload.itemId || "");
+  const quantity = Number(payload.quantityNeeded || 0);
+  const urgency = String(payload.urgencyLevel || "Medium");
+  const requestedBy = String(payload.requestedBy || "Kitchen");
+  const notes = String(payload.notes || "");
+  const storageLocation = String(payload.storageLocation || "");
+  const inventoryArea = String(payload.inventoryArea || "");
+  const inventorySubgroup = String(payload.inventorySubgroup || "");
+  const shelfCode = String(payload.shelfCode || "");
+
+  if (!itemId) throw new Error("Choose an item.");
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
+  if (!["Low", "Medium", "High", "Critical"].includes(urgency)) throw new Error("Invalid urgency level.");
+
+  const fields = {
+    "Requested Item": [itemId],
+    "Quantity Needed": quantity,
+    "Urgency Level": urgency,
+    "Requested By": requestedBy,
+    "Request Date/Time": new Date().toISOString(),
+    Status: "Pending",
+    Notes: notes
+  };
+
+  if (schema.requests.hasStorageLocation && storageLocation) fields["Storage Location"] = storageLocation;
+  if (schema.requests.hasInventoryArea && inventoryArea) fields["Inventory Area"] = inventoryArea;
+  if (inventorySubgroup) fields["Inventory Subgroup"] = inventorySubgroup;
+  if (shelfCode) fields["Shelf Code"] = shelfCode;
+
+  return fields;
+}
+
+async function createRequestsBatch(payload) {
+  const requestedItems = Array.isArray(payload.requests) ? payload.requests : [];
+  if (!requestedItems.length) throw new Error("Select at least one item.");
+  if (requestedItems.length > 50) throw new Error("Submit 50 items or fewer at a time.");
+
+  const schema = await getSchema();
+  const records = [];
+
+  for (const request of requestedItems) {
+    records.push({ fields: createRequestFields(request, schema) });
+  }
+
+  const created = [];
+  for (let index = 0; index < records.length; index += 10) {
+    const chunk = records.slice(index, index + 10);
+    const data = await airtable(requestsTableId, {
+      method: "POST",
+      body: JSON.stringify({ records: chunk })
+    });
+    created.push(...data.records.map(normalizeCreatedRequest));
+  }
+
+  cache.requests.expiresAt = 0;
+  return created;
+}
+
 async function updateItemSettings(recordId, payload) {
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid item record.");
@@ -810,6 +870,85 @@ async function createInvoiceLine(payload, userName) {
   });
 
   return { id: record.id, fields: record.fields };
+}
+
+function normalizeOcrRule(record) {
+  return {
+    id: record.id,
+    supplierName: record.fields["Supplier Name"] || "",
+    ruleType: record.fields["Rule Type"] || "",
+    ocrMatchText: record.fields["OCR Match Text"] || "",
+    targetField: record.fields["Target Field"] || "",
+    inventoryItemId: record.fields["Inventory Item Record ID"] || "",
+    inventoryItemName: record.fields["Inventory Item Name"] || "",
+    active: Boolean(record.fields.Active),
+    notes: record.fields.Notes || ""
+  };
+}
+
+function airtableFormulaText(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+async function listOcrRules(supplierName) {
+  const supplier = String(supplierName || "").trim().toLowerCase();
+  const formula = supplier
+    ? `AND({Active}=1, LOWER({Supplier Name})='${airtableFormulaText(supplier)}')`
+    : "{Active}=1";
+  const query = new URLSearchParams({
+    pageSize: "100",
+    filterByFormula: formula,
+    "sort[0][field]": "Supplier Name",
+    "sort[0][direction]": "asc"
+  });
+  const data = await airtable(`${invoiceOcrRulesTableId}?${query}`);
+  return data.records.map(normalizeOcrRule);
+}
+
+async function createOcrRule(payload, userName) {
+  const supplierName = String(payload.supplierName || "").trim();
+  const ruleType = String(payload.ruleType || "").trim();
+  const ocrMatchText = String(payload.ocrMatchText || "").replace(/\s+/g, " ").trim();
+  const targetField = String(payload.targetField || "").trim();
+  const inventoryItemId = String(payload.inventoryItemId || "").trim();
+  const inventoryItemName = String(payload.inventoryItemName || "").trim();
+  const notes = String(payload.notes || "").trim();
+
+  if (!supplierName) throw new Error("Enter the supplier before teaching OCR.");
+  if (!["Header Field", "Line Item"].includes(ruleType)) throw new Error("Invalid OCR rule type.");
+  if (!ocrMatchText || ocrMatchText.length < 3) throw new Error("OCR match text is too short.");
+  if (!["Supplier", "Invoice Number", "Invoice Total", "Inventory Item"].includes(targetField)) {
+    throw new Error("Invalid OCR target field.");
+  }
+  if (ruleType === "Line Item" && !inventoryItemId) throw new Error("Choose an inventory item for line-item rules.");
+
+  const existing = await listOcrRules(supplierName);
+  const duplicate = existing.find((rule) =>
+    rule.ruleType === ruleType
+    && rule.targetField === targetField
+    && rule.inventoryItemId === inventoryItemId
+    && rule.ocrMatchText.toLowerCase() === ocrMatchText.toLowerCase()
+  );
+  if (duplicate) return duplicate;
+
+  const record = await airtable(invoiceOcrRulesTableId, {
+    method: "POST",
+    body: JSON.stringify({
+      fields: {
+        "Rule Name": `${supplierName} - ${targetField} - ${ocrMatchText.slice(0, 40)}`,
+        "Supplier Name": supplierName,
+        "Rule Type": ruleType,
+        "OCR Match Text": ocrMatchText,
+        "Target Field": targetField,
+        "Inventory Item Record ID": inventoryItemId,
+        "Inventory Item Name": inventoryItemName,
+        Active: true,
+        Notes: [notes, `Created from web app by ${userName}`].filter(Boolean).join("\n")
+      }
+    })
+  });
+
+  return normalizeOcrRule(record);
 }
 
 async function emailInvoicePicture(payload, userName) {
@@ -1016,6 +1155,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "POST" && req.url === "/api/requests/batch") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const requests = await createRequestsBatch(await readJson(req));
+      send(res, 201, { requests });
+      return;
+    }
+
     if (req.method === "PATCH" && req.url.startsWith("/api/items/")) {
       if (!requireUser(req, res)) return;
       const recordId = req.url.split("/")[3];
@@ -1045,6 +1192,23 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const invoiceLine = await createInvoiceLine(await readJson(req), user.name);
       send(res, 201, { invoiceLine });
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/ocr-rules")) {
+      if (!requireUser(req, res)) return;
+      const url = new URL(req.url, "http://localhost");
+      const rules = await listOcrRules(url.searchParams.get("supplier"));
+      send(res, 200, { rules });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/ocr-rules") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const payload = await readJson(req);
+      const rule = await createOcrRule(payload, user.name);
+      send(res, 201, { rule });
       return;
     }
 

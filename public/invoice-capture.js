@@ -458,7 +458,7 @@ emailInvoiceButton.addEventListener("click", async () => {
 
   try {
     const attachment = await fileToEmailDataUrl(file);
-    await api("/api/email-invoice", {
+    const response = await api("/api/email-invoice", {
       method: "POST",
       body: JSON.stringify({
         ...attachment,
@@ -468,7 +468,14 @@ emailInvoiceButton.addEventListener("click", async () => {
       })
     });
 
-    message(invoiceMessage, "Invoice picture sent to accounting.");
+    const sent = response.result || {};
+    const details = [
+      "Invoice picture accepted by email service.",
+      sent.to ? `To: ${sent.to}` : "",
+      sent.provider ? `Via: ${sent.provider}` : "",
+      sent.messageId ? `ID: ${sent.messageId}` : ""
+    ].filter(Boolean).join(" ");
+    message(invoiceMessage, details);
   } catch (error) {
     message(invoiceMessage, error.message, true);
   } finally {

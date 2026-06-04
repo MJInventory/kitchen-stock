@@ -1,5 +1,6 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import nodemailer from "nodemailer";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,13 @@ const authSecret = process.env.AUTH_SECRET || "change-this-secret-in-render";
 const sessionMaxAgeMs = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
 const userConfig = process.env.APP_USERS || "";
 const allowedUnits = new Set(["box", "bag", "item", "bottle"]);
+const accountingInbox = process.env.ACCOUNTING_INBOX || "bills.madameja.23d9599b@billfiles.com";
+const smtpHost = process.env.SMTP_HOST || "";
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+const smtpUser = process.env.SMTP_USER || "";
+const smtpPass = process.env.SMTP_PASS || "";
+const mailFrom = process.env.MAIL_FROM || smtpUser;
 
 const cache = {
   items: { expiresAt: 0, value: null, pending: null },
@@ -137,6 +145,32 @@ async function readJson(req) {
   let body = "";
   for await (const chunk of req) body += chunk;
   return body ? JSON.parse(body) : {};
+}
+
+function requireSmtpConfig() {
+  const missing = [];
+  if (!smtpHost) missing.push("SMTP_HOST");
+  if (!smtpUser) missing.push("SMTP_USER");
+  if (!smtpPass) missing.push("SMTP_PASS");
+  if (!mailFrom) missing.push("MAIL_FROM");
+  if (missing.length) {
+    throw new Error(`Email is not configured yet. Add these Render environment variables: ${missing.join(", ")}.`);
+  }
+}
+
+function attachmentFromDataUrl(dataUrl, fileName) {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) throw new Error("Invoice image data was not valid.");
+
+  const content = Buffer.from(match[2], "base64");
+  if (!content.length) throw new Error("Invoice image was empty.");
+  if (content.length > 12 * 1024 * 1024) throw new Error("Invoice image is too large to email. Retake a smaller photo.");
+
+  return {
+    filename: String(fileName || "invoice.jpg").replace(/[^\w.\- ]+/g, "_"),
+    contentType: match[1],
+    content
+  };
 }
 
 async function airtable(path, options = {}) {
@@ -714,6 +748,48 @@ async function createInvoiceLine(payload, userName) {
   return { id: record.id, fields: record.fields };
 }
 
+async function emailInvoicePicture(payload, userName) {
+  requireSmtpConfig();
+
+  const attachment = attachmentFromDataUrl(payload.dataUrl, payload.fileName);
+  const supplier = String(payload.supplierName || "").trim();
+  const invoiceNumber = String(payload.invoiceNumber || "").trim();
+  const notes = String(payload.notes || "").trim();
+  const subjectParts = ["Invoice"];
+  if (supplier) subjectParts.push(supplier);
+  if (invoiceNumber) subjectParts.push(`#${invoiceNumber}`);
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    }
+  });
+
+  const info = await transporter.sendMail({
+    from: mailFrom,
+    to: accountingInbox,
+    subject: subjectParts.join(" - "),
+    text: [
+      "Invoice photo sent from Kitchen Stock.",
+      "",
+      `Sent by: ${userName}`,
+      `Supplier: ${supplier || "(not entered)"}`,
+      `Invoice number: ${invoiceNumber || "(not entered)"}`,
+      notes ? `Notes: ${notes}` : ""
+    ].filter(Boolean).join("\n"),
+    attachments: [attachment]
+  });
+
+  return {
+    to: accountingInbox,
+    messageId: info.messageId || ""
+  };
+}
+
 async function markRequestReceived(recordId, userName) {
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid request record.");
@@ -855,6 +931,14 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const invoiceLine = await createInvoiceLine(await readJson(req), user.name);
       send(res, 201, { invoiceLine });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/email-invoice") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const result = await emailInvoicePicture(await readJson(req), user.name);
+      send(res, 200, { result });
       return;
     }
 

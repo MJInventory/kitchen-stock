@@ -188,12 +188,13 @@ function attachmentFromDataUrl(dataUrl, fileName) {
 async function ocrSpaceParseImage(payload) {
   const dataUrl = String(payload.dataUrl || "");
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) throw new Error("OCR image data was not valid.");
+  if (!match) throw new Error("OCR file data was not valid.");
 
-  const imageBytes = Buffer.from(match[2], "base64");
-  if (!imageBytes.length) throw new Error("OCR image was empty.");
-  if (imageBytes.length > 1024 * 1024) {
-    throw new Error("OCR.space free API accepts images up to 1 MB. Retake or use a smaller image.");
+  const mimeType = match[1].toLowerCase();
+  const fileBytes = Buffer.from(match[2], "base64");
+  if (!fileBytes.length) throw new Error("OCR file was empty.");
+  if (fileBytes.length > 1024 * 1024) {
+    throw new Error("OCR.space free API accepts files up to 1 MB. Use a smaller PDF/photo or split the invoice.");
   }
 
   const form = new FormData();
@@ -204,6 +205,9 @@ async function ocrSpaceParseImage(payload) {
   form.set("scale", "true");
   form.set("isTable", "true");
   form.set("OCREngine", String(payload.engine || "2"));
+  if (mimeType === "application/pdf") {
+    form.set("filetype", "PDF");
+  }
 
   const response = await fetch("https://api.ocr.space/parse/image", {
     method: "POST",

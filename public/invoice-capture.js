@@ -207,6 +207,15 @@ async function fileToEmailDataUrl(file) {
   return { dataUrl: await canvasToSizedDataUrl(canvas, 1250 * 1024), fileName: `${baseName}.jpg` };
 }
 
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Could not read invoice file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function prepareImageForOcr(file) {
   const image = await fileToImage(file);
   const maxWidth = ocrTextType.value === "dense" ? 2200 : 1800;
@@ -279,6 +288,24 @@ async function prepareImageForOcr(file) {
 }
 
 async function runCloudOcr(file) {
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  if (isPdf) {
+    if (file.size > 1024 * 1024) {
+      throw new Error("PDF is too large for the free OCR limit. Use a PDF under 1 MB or split/compress it first.");
+    }
+
+    const dataUrl = await fileToDataUrl(file);
+    const data = await api("/api/ocr-invoice", {
+      method: "POST",
+      body: JSON.stringify({
+        dataUrl,
+        engine: ocrTextType.value === "dense" ? "3" : "2"
+      })
+    });
+
+    return data.result.text || "";
+  }
+
   const canvas = await prepareImageForOcr(file);
   const dataUrl = await canvasToSizedDataUrl(canvas);
   const data = await api("/api/ocr-invoice", {
@@ -296,7 +323,7 @@ function renderInvoiceLines() {
   applyLinesButton.disabled = !parsedLines.length;
 
   if (!parsedLines.length) {
-    invoiceLines.innerHTML = '<p class="empty-sheet">OCR a photo to build invoice lines.</p>';
+    invoiceLines.innerHTML = '<p class="empty-sheet">OCR a photo or PDF to build invoice lines.</p>';
     return;
   }
 
@@ -407,18 +434,19 @@ invoicePhoto.addEventListener("change", () => {
 ocrButton.addEventListener("click", async () => {
   const file = invoicePhoto.files[0];
   if (!file) {
-    message(invoiceMessage, "Choose or take an invoice photo first.", true);
+    message(invoiceMessage, "Choose or take an invoice file first.", true);
     return;
   }
 
-  if (!file.type.startsWith("image/")) {
-    message(invoiceMessage, "For this first OCR version, use a photo/image file instead of a PDF.", true);
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  if (!file.type.startsWith("image/") && !isPdf) {
+    message(invoiceMessage, "Use a photo/image file or PDF for OCR.", true);
     return;
   }
 
   ocrButton.disabled = true;
   applyLinesButton.disabled = true;
-  message(invoiceMessage, "Sending photo to hosted OCR...");
+  message(invoiceMessage, `Sending ${isPdf ? "PDF" : "photo"} to hosted OCR...`);
 
   try {
     ocrProgress.textContent = "hosted OCR";

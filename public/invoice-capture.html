@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <title>Invoice Capture</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Invoice Capture</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Invoice Capture</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Requests</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <form id="invoiceForm">
+          <label>
+            Supplier
+            <input id="supplierName" type="text" autocomplete="organization">
+          </label>
+          <div class="row">
+            <label>
+              Invoice number
+              <input id="invoiceNumber" type="text">
+            </label>
+            <label>
+              Invoice total
+              <input id="invoiceTotal" type="number" min="0" step="0.01">
+            </label>
+          </div>
+          <label>
+            Photo URL
+            <input id="photoUrl" type="url" placeholder="https://...">
+          </label>
+          <label>
+            Invoice photo
+            <input id="invoicePhoto" type="file" accept="image/*,.pdf" capture="environment">
+          </label>
+          <p class="helper-text">For now, the file picker helps take/select a photo. To save the actual photo in Airtable, paste a public file URL above.</p>
+          <label>
+            Extracted text / line notes
+            <textarea id="extractedText" rows="5"></textarea>
+          </label>
+          <label>
+            Notes
+            <textarea id="invoiceNotes" rows="3"></textarea>
+          </label>
+          <button type="submit">Save Invoice Capture</button>
+          <p id="invoiceMessage" role="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="/invoice-capture.js" type="module"></script>
+  </body>
+</html>

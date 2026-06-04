@@ -10,6 +10,7 @@ const publicDir = join(__dirname, "public");
 const baseId = "appAFvMwWZb2PPWUz";
 const inventoryTableId = "tblEuIXG6gxEiD5oU";
 const requestsTableId = "tblUHh1jWhqMFEfjd";
+const suppliersTableId = "tbl2YP7EpUpk3Ug6f";
 const token = process.env.AIRTABLE_TOKEN;
 const port = Number(process.env.PORT || 3000);
 const itemCacheMs = Number(process.env.ITEM_CACHE_MS || 10 * 60 * 1000);
@@ -17,16 +18,18 @@ const requestCacheMs = Number(process.env.REQUEST_CACHE_MS || 20 * 1000);
 const authSecret = process.env.AUTH_SECRET || "change-this-secret-in-render";
 const sessionMaxAgeMs = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
 const userConfig = process.env.APP_USERS || "";
+const allowedUnits = new Set(["box", "bag", "item", "bottle"]);
 
 const cache = {
   items: { expiresAt: 0, value: null, pending: null },
   requests: { expiresAt: 0, value: null, pending: null },
+  suppliers: { expiresAt: 0, value: null, pending: null },
   schema: { expiresAt: 0, value: null, pending: null }
 };
 
 const metrics = {
   airtableCalls: 0,
-  cacheHits: { items: 0, requests: 0, schema: 0 }
+  cacheHits: { items: 0, requests: 0, suppliers: 0, schema: 0 }
 };
 
 const mimeTypes = {
@@ -158,17 +161,38 @@ async function airtable(path, options = {}) {
 }
 
 async function listItems() {
+  const suppliers = await getSuppliers();
+  const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
   const data = await airtable(`${inventoryTableId}?pageSize=100`);
+  return data.records
+    .map((record) => {
+      const supplierId = record.fields["Supplier/Vendor"]?.[0] || "";
+      const supplier = supplierById.get(supplierId);
+
+      return {
+        id: record.id,
+        name: record.fields["Item Name"] || "",
+        category: record.fields.Category || "",
+        storageLocation: record.fields["Storage Location"] || "",
+        inventoryArea: record.fields["Inventory Area"] || "",
+        supplierId,
+        supplierName: supplier?.name || "Unassigned Supplier",
+        supplierContact: supplier?.contact || "",
+        quantity: record.fields["Current Quantity"] ?? null,
+        unit: record.fields["Unit of Measure"] || "",
+        minimum: record.fields["Minimum Threshold"] ?? null
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function listSuppliers() {
+  const data = await airtable(`${suppliersTableId}?pageSize=100`);
   return data.records
     .map((record) => ({
       id: record.id,
-      name: record.fields["Item Name"] || "",
-      category: record.fields.Category || "",
-      storageLocation: record.fields["Storage Location"] || "",
-      inventoryArea: record.fields["Inventory Area"] || "",
-      quantity: record.fields["Current Quantity"] ?? null,
-      unit: record.fields["Unit of Measure"] || "",
-      minimum: record.fields["Minimum Threshold"] ?? null
+      name: record.fields["Supplier Name"] || "",
+      contact: record.fields["Contact Information"] || ""
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -185,6 +209,9 @@ async function listRequests() {
     inventoryArea: record.fields["Inventory Area"] || "",
     requestedBy: record.fields["Requested By"] || "",
     status: record.fields.Status || "",
+    received: Boolean(record.fields.Received),
+    receivedAt: record.fields["Received Date/Time"] || "",
+    receivedBy: record.fields["Received By"] || "",
     notes: record.fields.Notes || "",
     requestedAt: record.fields["Request Date/Time"] || ""
   }));
@@ -218,6 +245,10 @@ async function getItems() {
   return cached("items", itemCacheMs, listItems);
 }
 
+async function getSuppliers() {
+  return cached("suppliers", itemCacheMs, listSuppliers);
+}
+
 async function getRequests() {
   return cached("requests", requestCacheMs, listRequests);
 }
@@ -226,8 +257,14 @@ async function listSchema() {
   const data = await airtable("tables", { meta: true });
   const requests = data.tables.find((table) => table.id === requestsTableId);
   const requestFields = new Set((requests?.fields || []).map((field) => field.name));
+  const tableByName = new Map(data.tables.map((table) => [table.name, table.id]));
 
   return {
+    tables: {
+      driverSheetLines: tableByName.get("Driver Sheet Lines") || "",
+      stockCounts: tableByName.get("Stock Counts") || "",
+      invoiceCaptures: tableByName.get("Invoice Captures") || ""
+    },
     requests: {
       hasStorageLocation: requestFields.has("Storage Location"),
       hasInventoryArea: requestFields.has("Inventory Area")
@@ -250,6 +287,9 @@ function normalizeCreatedRequest(record) {
     inventoryArea: record.fields["Inventory Area"] || "",
     requestedBy: record.fields["Requested By"] || "",
     status: record.fields.Status || "",
+    received: Boolean(record.fields.Received),
+    receivedAt: record.fields["Received Date/Time"] || "",
+    receivedBy: record.fields["Received By"] || "",
     notes: record.fields.Notes || "",
     requestedAt: record.fields["Request Date/Time"] || ""
   };
@@ -266,16 +306,21 @@ function normalizeRequest(record) {
     inventoryArea: record.fields["Inventory Area"] || "",
     requestedBy: record.fields["Requested By"] || "",
     status: record.fields.Status || "",
+    received: Boolean(record.fields.Received),
+    receivedAt: record.fields["Received Date/Time"] || "",
+    receivedBy: record.fields["Received By"] || "",
     notes: record.fields.Notes || "",
     requestedAt: record.fields["Request Date/Time"] || ""
   };
 }
 
 async function listDriverSheet(date) {
+  const schema = await getSchema();
+  const driverLinesTableId = schema.tables.driverSheetLines;
   const items = await getItems();
   const itemById = new Map(items.map((item) => [item.id, item]));
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
-  const formula = `AND(IS_SAME({Request Date/Time}, '${selectedDate}', 'day'), OR({Status}='Pending', {Status}='Approved'))`;
+  const formula = "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))";
   const query = new URLSearchParams({
     pageSize: "100",
     filterByFormula: formula,
@@ -294,12 +339,55 @@ async function listDriverSheet(date) {
       ...request,
       itemName: item?.name || "Requested item",
       unit: item?.unit || "",
+      supplierName: item?.supplierName || "Unassigned Supplier",
+      supplierContact: item?.supplierContact || "",
       storageLocation: request.storageLocation || item?.storageLocation || "",
       inventoryArea: request.inventoryArea || item?.inventoryArea || ""
     };
   });
 
+  if (driverLinesTableId) {
+    await persistDriverSheetLines(driverLinesTableId, selectedDate, requests);
+  }
+
   return { date: selectedDate, requests };
+}
+
+async function persistDriverSheetLines(tableId, sheetDate, requests) {
+  const formula = `IS_SAME({Sheet Date}, '${sheetDate}', 'day')`;
+  const existingQuery = new URLSearchParams({ pageSize: "100", filterByFormula: formula });
+  const existing = await airtable(`${tableId}?${existingQuery}`);
+  const existingKeys = new Set(
+    existing.records.map((record) => `${record.fields["Item Request Record ID"] || ""}|${record.fields["Sheet Date"] || ""}`)
+  );
+
+  for (const request of requests) {
+    const key = `${request.id}|${sheetDate}`;
+    if (existingKeys.has(key)) continue;
+
+    await airtable(tableId, {
+      method: "POST",
+      body: JSON.stringify({
+        fields: {
+          "Sheet Line": `${sheetDate} - ${request.requestId || request.id}`,
+          "Sheet Date": sheetDate,
+          "Item Request Record ID": request.id,
+          "Request ID": request.requestId || 0,
+          "Inventory Item Record ID": request.itemId,
+          "Item Name": request.itemName,
+          "Supplier Name": request.supplierName,
+          "Supplier Contact": request.supplierContact,
+          Quantity: request.quantity || 0,
+          Unit: request.unit,
+          "Inventory Area": request.inventoryArea || undefined,
+          "Storage Location": request.storageLocation || undefined,
+          "Request Status": request.status,
+          Received: Boolean(request.received),
+          Notes: request.notes || ""
+        }
+      })
+    });
+  }
 }
 
 async function createRequest(payload) {
@@ -341,6 +429,169 @@ async function createRequest(payload) {
 
   cache.requests.expiresAt = 0;
   return normalizeCreatedRequest(record);
+}
+
+async function updateItemSettings(recordId, payload) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid item record.");
+  }
+
+  const minimum = Number(payload.minimumThreshold);
+  const unit = String(payload.unit || "").trim().toLowerCase();
+
+  if (!Number.isFinite(minimum) || minimum < 0) {
+    throw new Error("Minimum stock must be zero or greater.");
+  }
+
+  if (!allowedUnits.has(unit)) {
+    throw new Error("Unit must be box, bag, item, or bottle.");
+  }
+
+  const record = await airtable(`${inventoryTableId}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        "Minimum Threshold": minimum,
+        "Unit of Measure": unit
+      }
+    })
+  });
+
+  cache.items.expiresAt = 0;
+
+  return {
+    id: record.id,
+    name: record.fields["Item Name"] || "",
+    category: record.fields.Category || "",
+    storageLocation: record.fields["Storage Location"] || "",
+    inventoryArea: record.fields["Inventory Area"] || "",
+    supplierId: record.fields["Supplier/Vendor"]?.[0] || "",
+    supplierName: "Unassigned Supplier",
+    supplierContact: "",
+    quantity: record.fields["Current Quantity"] ?? null,
+    unit: record.fields["Unit of Measure"] || "",
+    minimum: record.fields["Minimum Threshold"] ?? null
+  };
+}
+
+async function createStockCount(payload, userName) {
+  const schema = await getSchema();
+  const tableId = schema.tables.stockCounts;
+  if (!tableId) throw new Error("Stock Counts table was not found.");
+
+  const itemId = String(payload.itemId || "");
+  const countedQuantity = Number(payload.countedQuantity);
+  const notes = String(payload.notes || "");
+
+  if (!/^rec[a-zA-Z0-9]+$/.test(itemId)) throw new Error("Choose an item.");
+  if (!Number.isFinite(countedQuantity) || countedQuantity < 0) {
+    throw new Error("Counted quantity must be zero or greater.");
+  }
+
+  const items = await getItems();
+  const item = items.find((candidate) => candidate.id === itemId);
+  if (!item) throw new Error("Item not found.");
+
+  const countedAt = new Date().toISOString();
+  const countRecord = await airtable(tableId, {
+    method: "POST",
+    body: JSON.stringify({
+      fields: {
+        "Count Line": `${item.name} - ${countedAt.slice(0, 10)}`,
+        "Count Date/Time": countedAt,
+        "Inventory Item Record ID": item.id,
+        "Item Name": item.name,
+        "Counted Quantity": countedQuantity,
+        "Previous Quantity": item.quantity || 0,
+        Unit: item.unit || "",
+        "Inventory Area": item.inventoryArea || undefined,
+        "Storage Location": item.storageLocation || undefined,
+        "Counted By": userName,
+        Notes: notes
+      }
+    })
+  });
+
+  const updatedItem = await airtable(`${inventoryTableId}/${item.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        "Current Quantity": countedQuantity,
+        "Last Updated Date": countedAt
+      }
+    })
+  });
+
+  cache.items.expiresAt = 0;
+
+  return {
+    count: { id: countRecord.id, fields: countRecord.fields },
+    item: {
+      id: updatedItem.id,
+      name: updatedItem.fields["Item Name"] || "",
+      quantity: updatedItem.fields["Current Quantity"] ?? null,
+      unit: updatedItem.fields["Unit of Measure"] || ""
+    }
+  };
+}
+
+async function createInvoiceCapture(payload, userName) {
+  const schema = await getSchema();
+  const tableId = schema.tables.invoiceCaptures;
+  if (!tableId) throw new Error("Invoice Captures table was not found.");
+
+  const supplierName = String(payload.supplierName || "");
+  const invoiceNumber = String(payload.invoiceNumber || "");
+  const invoiceTotal = payload.invoiceTotal === "" ? null : Number(payload.invoiceTotal);
+  const photoUrl = String(payload.photoUrl || "");
+  const extractedText = String(payload.extractedText || "");
+  const notes = String(payload.notes || "");
+
+  if (invoiceTotal !== null && !Number.isFinite(invoiceTotal)) {
+    throw new Error("Invoice total must be a number.");
+  }
+
+  const capturedAt = new Date().toISOString();
+  const record = await airtable(tableId, {
+    method: "POST",
+    body: JSON.stringify({
+      fields: {
+        "Invoice Capture": `${supplierName || "Invoice"} - ${capturedAt.slice(0, 10)}`,
+        "Capture Date/Time": capturedAt,
+        "Supplier Name": supplierName,
+        "Invoice Number": invoiceNumber,
+        ...(invoiceTotal === null ? {} : { "Invoice Total": invoiceTotal }),
+        "Photo URL": photoUrl,
+        "Extracted Text": extractedText,
+        "Entered By": userName,
+        Status: "Captured",
+        Notes: notes
+      }
+    })
+  });
+
+  return { id: record.id, fields: record.fields };
+}
+
+async function markRequestReceived(recordId, userName) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid request record.");
+  }
+
+  const record = await airtable(`${requestsTableId}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        Received: true,
+        "Received Date/Time": new Date().toISOString(),
+        "Received By": userName,
+        Status: "Fulfilled"
+      }
+    })
+  });
+
+  cache.requests.expiresAt = 0;
+  return normalizeRequest(record);
 }
 
 async function serveStatic(req, res) {
@@ -418,6 +669,7 @@ const server = http.createServer(async (req, res) => {
         cache: {
           itemsCached: Boolean(cache.items.value),
           requestsCached: Boolean(cache.requests.value),
+          suppliersCached: Boolean(cache.suppliers.value),
           schemaCached: Boolean(cache.schema.value)
         }
       });
@@ -429,6 +681,39 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const request = await createRequest(await readJson(req));
       send(res, 201, { request });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/items/")) {
+      if (!requireUser(req, res)) return;
+      const recordId = req.url.split("/")[3];
+      const item = await updateItemSettings(recordId, await readJson(req));
+      send(res, 200, { item });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/stock-counts") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const result = await createStockCount(await readJson(req), user.name);
+      send(res, 201, result);
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/invoice-captures") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const invoice = await createInvoiceCapture(await readJson(req), user.name);
+      send(res, 201, { invoice });
+      return;
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/api/requests/") && req.url.endsWith("/receive")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const recordId = req.url.split("/")[3];
+      const request = await markRequestReceived(recordId, user.name);
+      send(res, 200, { request });
       return;
     }
 

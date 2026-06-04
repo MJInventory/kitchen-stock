@@ -51,9 +51,15 @@ function showLogin() {
 
 function groupRequests(requests) {
   return requests.reduce((groups, request) => {
-    const key = [request.inventoryArea || "Unassigned", request.storageLocation || "No location"].join(" - ");
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(request);
+    const key = request.supplierName || "Unassigned Supplier";
+    if (!groups.has(key)) {
+      groups.set(key, {
+        supplierName: key,
+        supplierContact: request.supplierContact || "",
+        requests: []
+      });
+    }
+    groups.get(key).requests.push(request);
     return groups;
   }, new Map());
 }
@@ -69,9 +75,12 @@ function renderSheet(data) {
 
   const groups = groupRequests(data.requests);
   sheetList.innerHTML = [...groups.entries()]
-    .map(([group, requests]) => `
+    .map(([, group]) => `
       <section class="sheet-group">
-        <h2>${group}</h2>
+        <div class="supplier-heading">
+          <h2>${group.supplierName}</h2>
+          ${group.supplierContact ? `<pre>${group.supplierContact}</pre>` : ""}
+        </div>
         <table>
           <thead>
             <tr>
@@ -79,21 +88,25 @@ function renderSheet(data) {
               <th>Item</th>
               <th>Qty</th>
               <th>Unit</th>
+              <th>Area / Location</th>
               <th>Urgency</th>
               <th>Status</th>
+              <th>Received</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody>
-            ${requests
+            ${group.requests
               .map((request) => `
                 <tr>
                   <td class="check-cell"></td>
                   <td>${request.itemName}</td>
                   <td>${request.quantity ?? ""}</td>
                   <td>${request.unit || ""}</td>
+                  <td>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</td>
                   <td>${request.urgency || ""}</td>
                   <td>${request.status || ""}</td>
+                  <td>${request.received ? `Yes - ${request.receivedBy || ""}` : ""}</td>
                   <td>${request.notes || ""}</td>
                 </tr>
               `)

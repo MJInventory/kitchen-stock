@@ -171,6 +171,13 @@ button:hover,
   white-space: nowrap;
 }
 
+.helper-text,
+.item-info {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 #message {
   min-height: 20px;
   margin: 0;
@@ -208,8 +215,57 @@ button:hover,
   font-size: 14px;
 }
 
+.received-text {
+  color: #067647 !important;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.receive-button {
+  width: auto;
+  min-width: 138px;
+  margin-top: 10px;
+  padding: 9px 12px;
+}
+
 .sheet-shell {
   width: min(980px, 100%);
+}
+
+.setup-shell {
+  width: min(1040px, 100%);
+}
+
+.settings-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.settings-item {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px 130px 110px;
+  gap: 12px;
+  align-items: end;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.settings-item strong,
+.settings-item span {
+  display: block;
+}
+
+.settings-item span {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.settings-item button {
+  min-height: 44px;
 }
 
 .sheet-actions {
@@ -265,6 +321,30 @@ button:hover,
   font-size: 18px;
 }
 
+.supplier-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  background: #eef2f6;
+  border: 1px solid #98a2b3;
+  border-bottom: 0;
+  padding: 8px;
+}
+
+.supplier-heading h2 {
+  margin: 0;
+}
+
+.supplier-heading pre {
+  margin: 0;
+  color: #344054;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  white-space: pre-wrap;
+  text-align: right;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -318,6 +398,19 @@ th {
 
   .row {
     grid-template-columns: 1fr;
+  }
+
+  .settings-item {
+    grid-template-columns: 1fr;
+  }
+
+  .supplier-heading {
+    display: block;
+  }
+
+  .supplier-heading pre {
+    margin-top: 6px;
+    text-align: left;
   }
 }
 

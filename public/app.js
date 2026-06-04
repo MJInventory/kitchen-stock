@@ -98,16 +98,28 @@ function renderRequests(requests) {
     .map((request) => {
       const itemName = itemNameById.get(request.itemId) || "Requested item";
       const qty = request.quantity ? `${request.quantity}` : "";
+      const receivedText = request.received
+        ? `Received by ${request.receivedBy || "someone"}${request.receivedAt ? ` on ${new Date(request.receivedAt).toLocaleString()}` : ""}`
+        : "";
       return `
         <article class="request">
           <strong>${itemName}</strong>
           <span>${qty} needed - ${request.urgency || "Medium"} - ${request.status || "Pending"}</span>
           <span>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</span>
           <span>${request.requestedBy || "Kitchen"}</span>
+          ${receivedText ? `<span class="received-text">${receivedText}</span>` : ""}
+          ${request.received ? "" : `<button class="receive-button" type="button" data-request-id="${request.id}">Mark Received</button>`}
         </article>
       `;
     })
     .join("");
+}
+
+async function markReceived(requestId) {
+  const data = await api(`/api/requests/${requestId}/receive`, { method: "POST" });
+  recentRequests = recentRequests.map((request) => (request.id === requestId ? data.request : request));
+  renderRequests(recentRequests);
+  setMessage("Item marked received.");
 }
 
 async function refresh() {
@@ -152,6 +164,17 @@ requestForm.addEventListener("submit", async (event) => {
 
 refreshButton.addEventListener("click", () => {
   refresh().catch((error) => setMessage(error.message, true));
+});
+
+requestList.addEventListener("click", (event) => {
+  const button = event.target.closest(".receive-button");
+  if (!button) return;
+
+  button.disabled = true;
+  markReceived(button.dataset.requestId).catch((error) => {
+    setMessage(error.message, true);
+    button.disabled = false;
+  });
 });
 
 loginForm.addEventListener("submit", async (event) => {

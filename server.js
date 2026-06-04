@@ -598,7 +598,7 @@ async function createRequest(payload) {
     "Urgency Level": urgency,
     "Requested By": requestedBy,
     "Request Date/Time": new Date().toISOString(),
-    Status: "Pending",
+    Status: "Approved",
     Notes: notes
   };
 
@@ -648,7 +648,7 @@ function createRequestFields(payload, schema) {
     "Urgency Level": urgency,
     "Requested By": requestedBy,
     "Request Date/Time": new Date().toISOString(),
-    Status: "Pending",
+    Status: "Approved",
     Notes: notes
   };
 

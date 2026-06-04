@@ -83,13 +83,13 @@ function renderSheet(data) {
           <thead>
             <tr>
               <th>Picked</th>
+              <th>Delivered</th>
               <th>Item</th>
               <th>Qty</th>
               <th>Unit</th>
               <th>Shelf</th>
               <th>Supplier</th>
               <th>Area / Location</th>
-              <th>Status</th>
               <th>Notes</th>
             </tr>
           </thead>
@@ -98,13 +98,13 @@ function renderSheet(data) {
               .map((request) => `
                 <tr>
                   <td class="check-cell"></td>
+                  <td class="check-cell"></td>
                   <td>${request.itemName}</td>
                   <td>${request.quantity ?? ""}</td>
                   <td>${request.unit || ""}</td>
                   <td>${request.shelfCode || ""}</td>
                   <td>${request.supplierName || "Unassigned Supplier"}${request.supplierContact ? `<small>${request.supplierContact}</small>` : ""}</td>
                   <td>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</td>
-                  <td>${request.status || ""}</td>
                   <td>${request.notes || ""}</td>
                 </tr>
               `)

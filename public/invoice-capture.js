@@ -30,7 +30,6 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let items = [];
 let parsedLines = [];
-let ocrLibraryPromise = null;
 
 function message(target, text, isError = false) {
   target.textContent = text;
@@ -63,55 +62,6 @@ async function api(path, options) {
   if (response.status === 401) showLogin();
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[data-ocr-src="${src}"]`);
-    if (existing) {
-      existing.addEventListener("load", resolve, { once: true });
-      existing.addEventListener("error", reject, { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.dataset.ocrSrc = src;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error(`Could not load ${src}`));
-    document.head.appendChild(script);
-  });
-}
-
-async function ensureOcrLibrary() {
-  if (window.Tesseract) return window.Tesseract;
-
-  if (!ocrLibraryPromise) {
-    const sources = [
-      "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js",
-      "https://unpkg.com/tesseract.js@5/dist/tesseract.min.js",
-      "https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"
-    ];
-
-    ocrLibraryPromise = (async () => {
-      const failures = [];
-      for (const source of sources) {
-        try {
-          ocrProgress.textContent = "loading OCR...";
-          await loadScript(source);
-          if (window.Tesseract) return window.Tesseract;
-          failures.push(`${source}: loaded but no OCR object`);
-        } catch (error) {
-          failures.push(error.message);
-        }
-      }
-
-      throw new Error(`OCR could not load from the available sources. Last errors: ${failures.slice(-2).join(" | ")}`);
-    })();
-  }
-
-  return ocrLibraryPromise;
 }
 
 function itemLabel(item) {
@@ -196,6 +146,41 @@ function canvasToDataUrl(canvas, type = "image/jpeg", quality = 0.86) {
   return canvas.toDataURL(type, quality);
 }
 
+function dataUrlByteLength(dataUrl) {
+  const base64 = String(dataUrl || "").split(",")[1] || "";
+  return Math.ceil((base64.length * 3) / 4);
+}
+
+async function canvasToSizedDataUrl(sourceCanvas, maxBytes = 920 * 1024) {
+  let workingCanvas = sourceCanvas;
+  let quality = 0.86;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const dataUrl = workingCanvas.toDataURL("image/jpeg", quality);
+    if (dataUrlByteLength(dataUrl) <= maxBytes) return dataUrl;
+
+    if (quality > 0.58) {
+      quality -= 0.12;
+    } else {
+      const resized = document.createElement("canvas");
+      resized.width = Math.max(480, Math.round(workingCanvas.width * 0.82));
+      resized.height = Math.max(480, Math.round(workingCanvas.height * 0.82));
+      const context = resized.getContext("2d");
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(workingCanvas, 0, 0, resized.width, resized.height);
+      workingCanvas = resized;
+      quality = 0.72;
+    }
+  }
+
+  const finalDataUrl = workingCanvas.toDataURL("image/jpeg", 0.55);
+  if (dataUrlByteLength(finalDataUrl) > maxBytes) {
+    throw new Error("The invoice image is still too large for the free hosted OCR. Retake a closer, cleaner photo.");
+  }
+  return finalDataUrl;
+}
+
 async function fileToEmailDataUrl(file) {
   if (!file.type.startsWith("image/")) {
     return new Promise((resolve, reject) => {
@@ -207,7 +192,7 @@ async function fileToEmailDataUrl(file) {
   }
 
   const image = await fileToImage(file);
-  const maxSide = 2200;
+  const maxSide = 1600;
   const scale = Math.min(maxSide / Math.max(image.width, image.height), 1);
   const width = Math.max(1, Math.round(image.width * scale));
   const height = Math.max(1, Math.round(image.height * scale));
@@ -219,7 +204,7 @@ async function fileToEmailDataUrl(file) {
   context.imageSmoothingQuality = "high";
   context.drawImage(image, 0, 0, width, height);
   const baseName = file.name.replace(/\.[^.]+$/, "") || "invoice";
-  return { dataUrl: canvasToDataUrl(canvas), fileName: `${baseName}.jpg` };
+  return { dataUrl: await canvasToSizedDataUrl(canvas, 1250 * 1024), fileName: `${baseName}.jpg` };
 }
 
 async function prepareImageForOcr(file) {
@@ -291,6 +276,20 @@ async function prepareImageForOcr(file) {
   context.putImageData(imageData, 0, 0);
   canvas.hidden = false;
   return canvas;
+}
+
+async function runCloudOcr(file) {
+  const canvas = await prepareImageForOcr(file);
+  const dataUrl = await canvasToSizedDataUrl(canvas);
+  const data = await api("/api/ocr-invoice", {
+    method: "POST",
+    body: JSON.stringify({
+      dataUrl,
+      engine: ocrTextType.value === "dense" ? "3" : "2"
+    })
+  });
+
+  return data.result.text || "";
 }
 
 function renderInvoiceLines() {
@@ -419,46 +418,13 @@ ocrButton.addEventListener("click", async () => {
 
   ocrButton.disabled = true;
   applyLinesButton.disabled = true;
-  message(invoiceMessage, "Loading OCR...");
+  message(invoiceMessage, "Sending photo to hosted OCR...");
 
   try {
-    const tesseract = await ensureOcrLibrary();
-    const imageForOcr = await prepareImageForOcr(file);
-    message(invoiceMessage, "Reading invoice...");
-    const result = await tesseract.recognize(imageForOcr, "eng", {
-      workerBlobURL: false,
-      langPath: "https://tessdata.projectnaptha.com/4.0.0",
-      logger: (event) => {
-        if (event.status) {
-          const pct = event.progress ? ` ${Math.round(event.progress * 100)}%` : "";
-          ocrProgress.textContent = `${event.status}${pct}`;
-        }
-      },
-      tessedit_pageseg_mode: ocrTextType.value === "dense" ? "6" : "4",
-      preserve_interword_spaces: "1",
-      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:/#- $%&()+"
-    });
+    ocrProgress.textContent = "hosted OCR";
+    const text = await runCloudOcr(file);
 
-    if (!result.data.text.trim() && ocrMode.value !== "original") {
-      message(invoiceMessage, "No clear text found. Trying original image...");
-      ocrMode.value = "original";
-      const fallbackImage = await prepareImageForOcr(file);
-      const fallback = await tesseract.recognize(fallbackImage, "eng", {
-        workerBlobURL: false,
-        langPath: "https://tessdata.projectnaptha.com/4.0.0",
-        logger: (event) => {
-          if (event.status) {
-            const pct = event.progress ? ` ${Math.round(event.progress * 100)}%` : "";
-            ocrProgress.textContent = `${event.status}${pct}`;
-          }
-        },
-        tessedit_pageseg_mode: "6",
-        preserve_interword_spaces: "1"
-      });
-      result.data.text = fallback.data.text;
-    }
-
-    extractedText.value = result.data.text.trim();
+    extractedText.value = text.trim();
     parsedLines = parseInvoiceText(extractedText.value);
     renderInvoiceLines();
     if (textLooksGarbled(extractedText.value)) {

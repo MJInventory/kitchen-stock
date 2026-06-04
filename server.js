@@ -27,6 +27,7 @@ const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === 
 const smtpUser = process.env.SMTP_USER || "";
 const smtpPass = process.env.SMTP_PASS || "";
 const mailFrom = process.env.MAIL_FROM || smtpUser;
+const ocrSpaceApiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
 
 const cache = {
   items: { expiresAt: 0, value: null, pending: null },
@@ -170,6 +171,54 @@ function attachmentFromDataUrl(dataUrl, fileName) {
     filename: String(fileName || "invoice.jpg").replace(/[^\w.\- ]+/g, "_"),
     contentType: match[1],
     content
+  };
+}
+
+async function ocrSpaceParseImage(payload) {
+  const dataUrl = String(payload.dataUrl || "");
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) throw new Error("OCR image data was not valid.");
+
+  const imageBytes = Buffer.from(match[2], "base64");
+  if (!imageBytes.length) throw new Error("OCR image was empty.");
+  if (imageBytes.length > 1024 * 1024) {
+    throw new Error("OCR.space free API accepts images up to 1 MB. Retake or use a smaller image.");
+  }
+
+  const form = new FormData();
+  form.set("base64Image", dataUrl);
+  form.set("language", "eng");
+  form.set("isOverlayRequired", "false");
+  form.set("detectOrientation", "true");
+  form.set("scale", "true");
+  form.set("isTable", "true");
+  form.set("OCREngine", String(payload.engine || "2"));
+
+  const response = await fetch("https://api.ocr.space/parse/image", {
+    method: "POST",
+    headers: {
+      apikey: ocrSpaceApiKey
+    },
+    body: form
+  });
+
+  const data = await response.json();
+  if (!response.ok || data.IsErroredOnProcessing) {
+    const errorText = Array.isArray(data.ErrorMessage)
+      ? data.ErrorMessage.join(" ")
+      : data.ErrorMessage || response.statusText;
+    throw new Error(`Hosted OCR failed: ${errorText}`);
+  }
+
+  const parsedText = (data.ParsedResults || [])
+    .map((result) => result.ParsedText || "")
+    .join("\n")
+    .trim();
+
+  return {
+    text: parsedText,
+    provider: "OCR.space",
+    exitCode: data.OCRExitCode || null
   };
 }
 
@@ -763,6 +812,9 @@ async function emailInvoicePicture(payload, userName) {
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 25000,
     auth: {
       user: smtpUser,
       pass: smtpPass
@@ -938,6 +990,13 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       const result = await emailInvoicePicture(await readJson(req), user.name);
+      send(res, 200, { result });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/ocr-invoice") {
+      if (!requireUser(req, res)) return;
+      const result = await ocrSpaceParseImage(await readJson(req));
       send(res, 200, { result });
       return;
     }

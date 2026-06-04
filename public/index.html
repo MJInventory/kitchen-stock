@@ -13,7 +13,7 @@
     <link rel="apple-touch-icon" href="/icon.svg">
     <link rel="stylesheet" href="/styles.css">
   </head>
-  <body>
+  <body class="order-app">
     <section id="loginScreen" class="login-screen">
       <form id="loginForm" class="login-panel">
         <p class="eyebrow">Inventory</p>
@@ -31,87 +31,69 @@
       </form>
     </section>
 
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Inventory</p>
-          <h1>Kitchen Stock</h1>
+    <main class="order-shell">
+      <header class="order-topbar">
+        <div class="brand-block">
+          <img class="brand-mark" src="/icon.svg" alt="">
+          <div>
+            <h1>Kitchen Order List</h1>
+            <p>MADAME JANETTE</p>
+          </div>
         </div>
         <div class="top-actions">
           <span id="currentUser" class="user-chip"></span>
-          <a class="button secondary" href="/inventory-settings.html">Inventory Setup</a>
-          <a class="button secondary" href="/stock-count.html">Stock Count</a>
-          <a class="button secondary" href="/invoice-capture.html">Invoices</a>
-          <a class="button secondary" href="/driver-sheet.html">Driver Sheet</a>
-          <button id="refreshButton" type="button">Refresh</button>
-          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+          <button id="submitButton" class="save-pill" type="button">0 Saved</button>
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh">Refresh</button>
+          <button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>
         </div>
       </header>
 
-      <section class="panel">
-        <form id="requestForm">
-          <h2>Request Missing Item</h2>
-          <div class="row">
-            <label>
-              Area
-              <select id="areaFilter">
-                <option value="">All</option>
-                <option>Bar</option>
-                <option>Kitchen</option>
-                <option>FOH</option>
-              </select>
-            </label>
-            <label>
-              Location
-              <select id="locationFilter">
-                <option value="">All</option>
-                <option>Dry Storage</option>
-                <option>Cooler</option>
-                <option>Freezer</option>
-                <option>Liquor Storage</option>
-                <option>General Storage</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            Item
-            <select id="itemSelect" required></select>
-          </label>
-
-          <div class="row">
-            <label>
-              Quantity
-              <input id="quantityInput" type="number" min="1" step="1" required>
-            </label>
-            <label>
-              Urgency
-              <select id="urgencySelect">
-                <option>Medium</option>
-                <option>High</option>
-                <option>Critical</option>
-                <option>Low</option>
-              </select>
-            </label>
-          </div>
-
-          <label>
-            Requested by
-            <input id="requestedByInput" type="text" value="Kitchen" autocomplete="name" readonly>
-          </label>
-
-          <label>
-            Notes
-            <textarea id="notesInput" rows="3"></textarea>
-          </label>
-
-          <button id="submitButton" type="submit">Submit Request</button>
-          <p id="message" role="status"></p>
-        </form>
+      <section class="order-search-band">
+        <label class="search-box">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Quick search products..." autocomplete="off">
+        </label>
+        <div class="order-filters">
+          <select id="areaFilter" aria-label="Inventory area">
+            <option value="">All Areas</option>
+            <option>Bar</option>
+            <option>Kitchen</option>
+            <option>FOH</option>
+          </select>
+          <select id="locationFilter" aria-label="Storage location">
+            <option value="">All Locations</option>
+            <option>Dry Storage</option>
+            <option>Cooler</option>
+            <option>Freezer</option>
+            <option>Liquor Storage</option>
+            <option>General Storage</option>
+          </select>
+        </div>
+        <div id="selectedChips" class="selected-chips"></div>
+        <p id="message" class="order-message" role="status"></p>
       </section>
 
-      <section class="list-section">
-        <h2>Recent Requests</h2>
-        <div id="requestList" class="request-list"></div>
+      <section id="categoryView" class="category-view">
+        <div class="order-divider"><span>All Categories</span></div>
+        <div id="categoryGrid" class="category-grid"></div>
+      </section>
+
+      <section id="productView" class="product-view" hidden>
+        <div class="product-heading">
+          <button id="backButton" class="back-button" type="button">Back Home</button>
+          <div>
+            <h2 id="categoryTitle">Products</h2>
+            <p id="categoryMeta"></p>
+          </div>
+        </div>
+        <div id="productList" class="product-list"></div>
+      </section>
+
+      <section class="utility-links">
+        <a href="/inventory-settings.html">Inventory Setup</a>
+        <a href="/stock-count.html">Stock Count</a>
+        <a href="/invoice-capture.html">Invoices</a>
+        <a href="/driver-sheet.html">Driver Sheet</a>
       </section>
     </main>
 

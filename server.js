@@ -24,12 +24,22 @@ const cache = {
   items: { expiresAt: 0, value: null, pending: null },
   requests: { expiresAt: 0, value: null, pending: null },
   suppliers: { expiresAt: 0, value: null, pending: null },
+  lookups: { expiresAt: 0, value: null, pending: null },
   schema: { expiresAt: 0, value: null, pending: null }
 };
 
 const metrics = {
   airtableCalls: 0,
-  cacheHits: { items: 0, requests: 0, suppliers: 0, schema: 0 }
+  cacheHits: { items: 0, requests: 0, suppliers: 0, lookups: 0, schema: 0 }
+};
+
+const lookupConfigs = {
+  categories: { tableName: "Categories", primaryField: "Category" },
+  storageLocations: { tableName: "Storage Locations", primaryField: "Storage Location" },
+  inventorySubgroups: { tableName: "Inventory Subgroups", primaryField: "Inventory Subgroup" },
+  shelfCodes: { tableName: "Shelf Codes", primaryField: "Shelf Code" },
+  inventoryAreas: { tableName: "Inventory Areas", primaryField: "Inventory Area" },
+  unitOfMeasurement: { tableName: "Unit Of Measurement", primaryField: "Unit" }
 };
 
 const mimeTypes = {
@@ -162,28 +172,38 @@ async function airtable(path, options = {}) {
 
 async function listItems() {
   const suppliers = await getSuppliers();
+  const lookups = await getLookups();
   const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
   const data = await airtable(`${inventoryTableId}?pageSize=100`);
   return data.records
-    .map((record) => {
-      const supplierId = record.fields["Supplier/Vendor"]?.[0] || "";
-      const supplier = supplierById.get(supplierId);
-
-      return {
-        id: record.id,
-        name: record.fields["Item Name"] || "",
-        category: record.fields.Category || "",
-        storageLocation: record.fields["Storage Location"] || "",
-        inventoryArea: record.fields["Inventory Area"] || "",
-        supplierId,
-        supplierName: supplier?.name || "Unassigned Supplier",
-        supplierContact: supplier?.contact || "",
-        quantity: record.fields["Current Quantity"] ?? null,
-        unit: record.fields["Unit of Measure"] || "",
-        minimum: record.fields["Minimum Threshold"] ?? null
-      };
-    })
+    .map((record) => normalizeItem(record, supplierById, lookups))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function linkedValue(record, linkFieldName, fallbackFieldName, lookupMap) {
+  const linkedId = record.fields[linkFieldName]?.[0] || "";
+  return lookupMap?.byId?.get(linkedId)?.name || record.fields[fallbackFieldName] || "";
+}
+
+function normalizeItem(record, supplierById, lookups) {
+  const supplierId = record.fields["Supplier/Vendor"]?.[0] || "";
+  const supplier = supplierById.get(supplierId);
+
+  return {
+    id: record.id,
+    name: record.fields["Item Name"] || "",
+    category: linkedValue(record, "Category Link", "Category", lookups.categories),
+    storageLocation: linkedValue(record, "Storage Location Link", "Storage Location", lookups.storageLocations),
+    inventoryArea: linkedValue(record, "Inventory Area Link", "Inventory Area", lookups.inventoryAreas),
+    inventorySubgroup: linkedValue(record, "Inventory Subgroup Link", "Inventory Subgroup", lookups.inventorySubgroups),
+    shelfCode: linkedValue(record, "Shelf Code Link", "Shelf Code", lookups.shelfCodes),
+    supplierId,
+    supplierName: supplier?.name || "Unassigned Supplier",
+    supplierContact: supplier?.contact || "",
+    quantity: record.fields["Current Quantity"] ?? null,
+    unit: linkedValue(record, "Unit Of Measurement Link", "Unit of Measure", lookups.unitOfMeasurement),
+    minimum: record.fields["Minimum Threshold"] ?? null
+  };
 }
 
 async function listSuppliers() {
@@ -207,6 +227,8 @@ async function listRequests() {
     urgency: record.fields["Urgency Level"] || "",
     storageLocation: record.fields["Storage Location"] || "",
     inventoryArea: record.fields["Inventory Area"] || "",
+    inventorySubgroup: record.fields["Inventory Subgroup"] || "",
+    shelfCode: record.fields["Shelf Code"] || "",
     requestedBy: record.fields["Requested By"] || "",
     status: record.fields.Status || "",
     received: Boolean(record.fields.Received),
@@ -258,12 +280,17 @@ async function listSchema() {
   const requests = data.tables.find((table) => table.id === requestsTableId);
   const requestFields = new Set((requests?.fields || []).map((field) => field.name));
   const tableByName = new Map(data.tables.map((table) => [table.name, table.id]));
+  const lookupTables = Object.fromEntries(
+    Object.entries(lookupConfigs).map(([key, config]) => [key, tableByName.get(config.tableName) || ""])
+  );
 
   return {
     tables: {
       driverSheetLines: tableByName.get("Driver Sheet Lines") || "",
       stockCounts: tableByName.get("Stock Counts") || "",
-      invoiceCaptures: tableByName.get("Invoice Captures") || ""
+      invoiceCaptures: tableByName.get("Invoice Captures") || "",
+      invoiceLines: tableByName.get("Invoice Lines") || "",
+      ...lookupTables
     },
     requests: {
       hasStorageLocation: requestFields.has("Storage Location"),
@@ -276,6 +303,58 @@ async function getSchema() {
   return cached("schema", 10 * 60 * 1000, listSchema);
 }
 
+async function listLookupRecords() {
+  const schema = await getSchema();
+  const result = {};
+
+  for (const [key, config] of Object.entries(lookupConfigs)) {
+    const tableId = schema.tables[key];
+    const records = tableId ? (await airtable(`${tableId}?pageSize=100`)).records : [];
+    const values = records
+      .map((record) => ({
+        id: record.id,
+        name: String(record.fields[config.primaryField] || "").trim()
+      }))
+      .filter((record) => record.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    result[key] = {
+      tableId,
+      primaryField: config.primaryField,
+      records: values,
+      byId: new Map(values.map((record) => [record.id, record])),
+      byName: new Map(values.map((record) => [record.name.toLowerCase(), record]))
+    };
+  }
+
+  return result;
+}
+
+async function getLookups() {
+  return cached("lookups", itemCacheMs, listLookupRecords);
+}
+
+async function findOrCreateLookupRecord(lookupKey, value) {
+  const cleaned = String(value || "").trim();
+  if (!cleaned) return "";
+
+  let lookups = await getLookups();
+  const lookup = lookups[lookupKey];
+  if (!lookup?.tableId) return "";
+
+  const existing = lookup.byName.get(cleaned.toLowerCase());
+  if (existing) return existing.id;
+
+  const record = await airtable(lookup.tableId, {
+    method: "POST",
+    body: JSON.stringify({ fields: { [lookup.primaryField]: cleaned } })
+  });
+
+  cache.lookups.expiresAt = 0;
+  cache.schema.expiresAt = 0;
+  return record.id;
+}
+
 function normalizeCreatedRequest(record) {
   return {
     id: record.id,
@@ -285,6 +364,8 @@ function normalizeCreatedRequest(record) {
     urgency: record.fields["Urgency Level"] || "",
     storageLocation: record.fields["Storage Location"] || "",
     inventoryArea: record.fields["Inventory Area"] || "",
+    inventorySubgroup: record.fields["Inventory Subgroup"] || "",
+    shelfCode: record.fields["Shelf Code"] || "",
     requestedBy: record.fields["Requested By"] || "",
     status: record.fields.Status || "",
     received: Boolean(record.fields.Received),
@@ -304,6 +385,8 @@ function normalizeRequest(record) {
     urgency: record.fields["Urgency Level"] || "",
     storageLocation: record.fields["Storage Location"] || "",
     inventoryArea: record.fields["Inventory Area"] || "",
+    inventorySubgroup: record.fields["Inventory Subgroup"] || "",
+    shelfCode: record.fields["Shelf Code"] || "",
     requestedBy: record.fields["Requested By"] || "",
     status: record.fields.Status || "",
     received: Boolean(record.fields.Received),
@@ -342,7 +425,9 @@ async function listDriverSheet(date) {
       supplierName: item?.supplierName || "Unassigned Supplier",
       supplierContact: item?.supplierContact || "",
       storageLocation: request.storageLocation || item?.storageLocation || "",
-      inventoryArea: request.inventoryArea || item?.inventoryArea || ""
+      inventoryArea: request.inventoryArea || item?.inventoryArea || "",
+      inventorySubgroup: request.inventorySubgroup || item?.inventorySubgroup || "",
+      shelfCode: request.shelfCode || item?.shelfCode || ""
     };
   });
 
@@ -381,6 +466,8 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
           Unit: request.unit,
           "Inventory Area": request.inventoryArea || undefined,
           "Storage Location": request.storageLocation || undefined,
+          "Inventory Subgroup": request.inventorySubgroup || "",
+          "Shelf Code": request.shelfCode || "",
           "Request Status": request.status,
           Received: Boolean(request.received),
           Notes: request.notes || ""
@@ -398,6 +485,8 @@ async function createRequest(payload) {
   const notes = String(payload.notes || "");
   const storageLocation = String(payload.storageLocation || "");
   const inventoryArea = String(payload.inventoryArea || "");
+  const inventorySubgroup = String(payload.inventorySubgroup || "");
+  const shelfCode = String(payload.shelfCode || "");
 
   if (!itemId) throw new Error("Choose an item.");
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
@@ -422,6 +511,14 @@ async function createRequest(payload) {
     fields["Inventory Area"] = inventoryArea;
   }
 
+  if (inventorySubgroup) {
+    fields["Inventory Subgroup"] = inventorySubgroup;
+  }
+
+  if (shelfCode) {
+    fields["Shelf Code"] = shelfCode;
+  }
+
   const record = await airtable(requestsTableId, {
     method: "POST",
     body: JSON.stringify({ fields })
@@ -438,6 +535,8 @@ async function updateItemSettings(recordId, payload) {
 
   const minimum = Number(payload.minimumThreshold);
   const unit = String(payload.unit || "").trim().toLowerCase();
+  const inventorySubgroup = String(payload.inventorySubgroup || "").trim();
+  const shelfCode = String(payload.shelfCode || "").trim();
 
   if (!Number.isFinite(minimum) || minimum < 0) {
     throw new Error("Minimum stock must be zero or greater.");
@@ -447,31 +546,31 @@ async function updateItemSettings(recordId, payload) {
     throw new Error("Unit must be box, bag, item, or bottle.");
   }
 
+  const unitRecordId = await findOrCreateLookupRecord("unitOfMeasurement", unit);
+  const subgroupRecordId = await findOrCreateLookupRecord("inventorySubgroups", inventorySubgroup);
+  const shelfRecordId = await findOrCreateLookupRecord("shelfCodes", shelfCode);
+  const fields = {
+    "Minimum Threshold": minimum,
+    "Unit of Measure": unit,
+    "Inventory Subgroup": inventorySubgroup,
+    "Shelf Code": shelfCode
+  };
+
+  if (unitRecordId) fields["Unit Of Measurement Link"] = [unitRecordId];
+  fields["Inventory Subgroup Link"] = subgroupRecordId ? [subgroupRecordId] : [];
+  fields["Shelf Code Link"] = shelfRecordId ? [shelfRecordId] : [];
+
   const record = await airtable(`${inventoryTableId}/${recordId}`, {
     method: "PATCH",
-    body: JSON.stringify({
-      fields: {
-        "Minimum Threshold": minimum,
-        "Unit of Measure": unit
-      }
-    })
+    body: JSON.stringify({ fields })
   });
 
   cache.items.expiresAt = 0;
+  const suppliers = await getSuppliers();
+  const lookups = await getLookups();
+  const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
 
-  return {
-    id: record.id,
-    name: record.fields["Item Name"] || "",
-    category: record.fields.Category || "",
-    storageLocation: record.fields["Storage Location"] || "",
-    inventoryArea: record.fields["Inventory Area"] || "",
-    supplierId: record.fields["Supplier/Vendor"]?.[0] || "",
-    supplierName: "Unassigned Supplier",
-    supplierContact: "",
-    quantity: record.fields["Current Quantity"] ?? null,
-    unit: record.fields["Unit of Measure"] || "",
-    minimum: record.fields["Minimum Threshold"] ?? null
-  };
+  return normalizeItem(record, supplierById, lookups);
 }
 
 async function createStockCount(payload, userName) {
@@ -506,6 +605,8 @@ async function createStockCount(payload, userName) {
         Unit: item.unit || "",
         "Inventory Area": item.inventoryArea || undefined,
         "Storage Location": item.storageLocation || undefined,
+        "Inventory Subgroup": item.inventorySubgroup || "",
+        "Shelf Code": item.shelfCode || "",
         "Counted By": userName,
         Notes: notes
       }
@@ -566,6 +667,46 @@ async function createInvoiceCapture(payload, userName) {
         "Entered By": userName,
         Status: "Captured",
         Notes: notes
+      }
+    })
+  });
+
+  return { id: record.id, fields: record.fields };
+}
+
+async function createInvoiceLine(payload, userName) {
+  const schema = await getSchema();
+  const tableId = schema.tables.invoiceLines;
+  if (!tableId) throw new Error("Invoice Lines table was not found.");
+
+  const itemName = String(payload.itemName || "");
+  const invoiceNumber = String(payload.invoiceNumber || "");
+  const supplierName = String(payload.supplierName || "");
+  const quantity = Number(payload.quantityReceived || 0);
+  const unitPrice = payload.unitPrice === "" || payload.unitPrice === null ? null : Number(payload.unitPrice);
+  const lineTotal = unitPrice === null ? null : quantity * unitPrice;
+  const appliedAt = new Date().toISOString();
+
+  if (!itemName) throw new Error("Invoice line needs an item name.");
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Invoice line quantity must be greater than zero.");
+  if (unitPrice !== null && !Number.isFinite(unitPrice)) throw new Error("Invoice line price must be a number.");
+
+  const record = await airtable(tableId, {
+    method: "POST",
+    body: JSON.stringify({
+      fields: {
+        "Invoice Line": `${invoiceNumber || "Invoice"} - ${itemName} - ${appliedAt.slice(0, 10)}`,
+        "Invoice Capture Record ID": String(payload.invoiceCaptureId || ""),
+        "Invoice Number": invoiceNumber,
+        "Supplier Name": supplierName,
+        "Inventory Item Record ID": String(payload.itemId || ""),
+        "Item Name": itemName,
+        "OCR Line Text": String(payload.ocrLineText || ""),
+        "Quantity Received": quantity,
+        Unit: String(payload.unit || ""),
+        ...(unitPrice === null ? {} : { "Unit Price": unitPrice, "Line Total": lineTotal }),
+        "Applied Date/Time": appliedAt,
+        "Applied By": userName
       }
     })
   });
@@ -670,6 +811,7 @@ const server = http.createServer(async (req, res) => {
           itemsCached: Boolean(cache.items.value),
           requestsCached: Boolean(cache.requests.value),
           suppliersCached: Boolean(cache.suppliers.value),
+          lookupsCached: Boolean(cache.lookups.value),
           schemaCached: Boolean(cache.schema.value)
         }
       });
@@ -705,6 +847,14 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const invoice = await createInvoiceCapture(await readJson(req), user.name);
       send(res, 201, { invoice });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/invoice-lines") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const invoiceLine = await createInvoiceLine(await readJson(req), user.name);
+      send(res, 201, { invoiceLine });
       return;
     }
 

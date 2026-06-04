@@ -67,8 +67,17 @@ function renderItems() {
         <div>
           <strong>${item.name}</strong>
           <span>${[item.inventoryArea, item.storageLocation].filter(Boolean).join(" / ")}</span>
+          <span>${[item.inventorySubgroup, item.shelfCode ? `Shelf ${item.shelfCode}` : ""].filter(Boolean).join(" / ")}</span>
           <span>Current: ${item.quantity ?? ""} ${item.unit || ""}</span>
         </div>
+        <label>
+          Subgroup
+          <input class="subgroup-input" type="text" value="${item.inventorySubgroup || ""}" placeholder="e.g. Produce">
+        </label>
+        <label>
+          Shelf code
+          <input class="shelf-input" type="text" value="${item.shelfCode || ""}" placeholder="e.g. C-02">
+        </label>
         <label>
           Minimum stock
           <input class="minimum-input" type="number" min="0" step="1" value="${item.minimum ?? 0}">
@@ -101,9 +110,11 @@ async function saveItem(article) {
   const id = article.dataset.itemId;
   const minimumThreshold = article.querySelector(".minimum-input").value;
   const unit = article.querySelector(".unit-select").value;
+  const inventorySubgroup = article.querySelector(".subgroup-input").value;
+  const shelfCode = article.querySelector(".shelf-input").value;
   const data = await api(`/api/items/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ minimumThreshold, unit })
+    body: JSON.stringify({ minimumThreshold, unit, inventorySubgroup, shelfCode })
   });
 
   items = items.map((item) => (item.id === id ? data.item : item));

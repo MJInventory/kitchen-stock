@@ -78,7 +78,7 @@ function renderItemInfo() {
     itemInfo.textContent = "";
     return;
   }
-  itemInfo.textContent = `${item.inventoryArea || ""} / ${item.storageLocation || ""} - current ${item.quantity ?? 0} ${item.unit || ""}, minimum ${item.minimum ?? 0}`;
+  itemInfo.textContent = `${item.inventoryArea || ""} / ${item.inventorySubgroup || ""} / ${item.storageLocation || ""} / shelf ${item.shelfCode || "TBD"} - current ${item.quantity ?? 0} ${item.unit || ""}, minimum ${item.minimum ?? 0}`;
 }
 
 async function loadItems() {

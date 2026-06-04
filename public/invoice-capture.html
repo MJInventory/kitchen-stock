@@ -56,11 +56,25 @@
             Invoice photo
             <input id="invoicePhoto" type="file" accept="image/*,.pdf" capture="environment">
           </label>
-          <p class="helper-text">For now, the file picker helps take/select a photo. To save the actual photo in Airtable, paste a public file URL above.</p>
+          <div class="row action-row">
+            <button id="ocrButton" class="secondary" type="button">OCR Photo</button>
+            <button id="applyLinesButton" type="button" disabled>Apply Selected Lines</button>
+          </div>
+          <p class="helper-text">Image files can be OCR'd on this device. PDF OCR needs a saved image/photo version first. To save the actual photo in Airtable, paste a public file URL above.</p>
+          <img id="invoicePreview" class="invoice-preview" alt="" hidden>
           <label>
             Extracted text / line notes
             <textarea id="extractedText" rows="5"></textarea>
           </label>
+          <section class="invoice-lines-section">
+            <div class="section-header">
+              <h2>Invoice Lines</h2>
+              <span id="ocrProgress"></span>
+            </div>
+            <div id="invoiceLines" class="invoice-lines">
+              <p class="empty-sheet">OCR a photo to build invoice lines.</p>
+            </div>
+          </section>
           <label>
             Notes
             <textarea id="invoiceNotes" rows="3"></textarea>
@@ -71,6 +85,7 @@
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="/invoice-capture.js" type="module"></script>
   </body>
 </html>

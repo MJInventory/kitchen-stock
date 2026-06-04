@@ -83,7 +83,7 @@ function renderItems(items) {
   itemSelect.innerHTML = filtered
     .map((item) => {
       const quantity = [item.quantity, item.unit].filter(Boolean).join(" ");
-      const detail = [quantity, item.storageLocation, item.inventoryArea].filter(Boolean).join(" / ");
+      const detail = [quantity, item.inventorySubgroup, item.storageLocation, item.shelfCode, item.inventoryArea].filter(Boolean).join(" / ");
       return `<option value="${item.id}">${item.name}${detail ? ` (${detail})` : ""}</option>`;
     })
     .join("");
@@ -145,6 +145,8 @@ requestForm.addEventListener("submit", async (event) => {
         urgencyLevel: urgencySelect.value,
         storageLocation: allItems.find((item) => item.id === itemSelect.value)?.storageLocation || "",
         inventoryArea: allItems.find((item) => item.id === itemSelect.value)?.inventoryArea || areaFilter.value || "",
+        inventorySubgroup: allItems.find((item) => item.id === itemSelect.value)?.inventorySubgroup || "",
+        shelfCode: allItems.find((item) => item.id === itemSelect.value)?.shelfCode || "",
         requestedBy: requestedByInput.value,
         notes: notesInput.value
       })

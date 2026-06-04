@@ -51,11 +51,10 @@ function showLogin() {
 
 function groupRequests(requests) {
   return requests.reduce((groups, request) => {
-    const key = request.supplierName || "Unassigned Supplier";
+    const key = request.inventorySubgroup || "Unassigned Subgroup";
     if (!groups.has(key)) {
       groups.set(key, {
-        supplierName: key,
-        supplierContact: request.supplierContact || "",
+        subgroup: key,
         requests: []
       });
     }
@@ -78,8 +77,7 @@ function renderSheet(data) {
     .map(([, group]) => `
       <section class="sheet-group">
         <div class="supplier-heading">
-          <h2>${group.supplierName}</h2>
-          ${group.supplierContact ? `<pre>${group.supplierContact}</pre>` : ""}
+          <h2>${group.subgroup}</h2>
         </div>
         <table>
           <thead>
@@ -88,10 +86,10 @@ function renderSheet(data) {
               <th>Item</th>
               <th>Qty</th>
               <th>Unit</th>
+              <th>Shelf</th>
+              <th>Supplier</th>
               <th>Area / Location</th>
-              <th>Urgency</th>
               <th>Status</th>
-              <th>Received</th>
               <th>Notes</th>
             </tr>
           </thead>
@@ -103,10 +101,10 @@ function renderSheet(data) {
                   <td>${request.itemName}</td>
                   <td>${request.quantity ?? ""}</td>
                   <td>${request.unit || ""}</td>
+                  <td>${request.shelfCode || ""}</td>
+                  <td>${request.supplierName || "Unassigned Supplier"}${request.supplierContact ? `<small>${request.supplierContact}</small>` : ""}</td>
                   <td>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</td>
-                  <td>${request.urgency || ""}</td>
                   <td>${request.status || ""}</td>
-                  <td>${request.received ? `Yes - ${request.receivedBy || ""}` : ""}</td>
                   <td>${request.notes || ""}</td>
                 </tr>
               `)

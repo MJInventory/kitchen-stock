@@ -50,17 +50,32 @@ function showLogin() {
 }
 
 function groupRequests(requests) {
-  return requests.reduce((groups, request) => {
-    const key = request.inventorySubgroup || "Unassigned Subgroup";
-    if (!groups.has(key)) {
-      groups.set(key, {
-        subgroup: key,
+  const groups = new Map();
+
+  for (const request of requests) {
+    const subgroup = request.inventorySubgroup || "Unassigned Subgroup";
+    const supplier = request.supplierName || "Unassigned Supplier";
+
+    if (!groups.has(subgroup)) {
+      groups.set(subgroup, {
+        subgroup,
+        suppliers: new Map()
+      });
+    }
+
+    const subgroupEntry = groups.get(subgroup);
+    if (!subgroupEntry.suppliers.has(supplier)) {
+      subgroupEntry.suppliers.set(supplier, {
+        supplier,
+        contact: request.supplierContact || "",
         requests: []
       });
     }
-    groups.get(key).requests.push(request);
-    return groups;
-  }, new Map());
+
+    subgroupEntry.suppliers.get(supplier).requests.push(request);
+  }
+
+  return groups;
 }
 
 function renderSheet(data) {
@@ -74,43 +89,54 @@ function renderSheet(data) {
 
   const groups = groupRequests(data.requests);
   sheetList.innerHTML = [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([, group]) => `
       <section class="sheet-group">
         <div class="supplier-heading">
           <h2>${group.subgroup}</h2>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Picked</th>
-              <th>Delivered</th>
-              <th>Item</th>
-              <th>Qty</th>
-              <th>Unit</th>
-              <th>Shelf</th>
-              <th>Supplier</th>
-              <th>Area / Location</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${group.requests
-              .map((request) => `
-                <tr>
-                  <td class="check-cell"></td>
-                  <td class="check-cell"></td>
-                  <td>${request.itemName}</td>
-                  <td>${request.quantity ?? ""}</td>
-                  <td>${request.unit || ""}</td>
-                  <td>${request.shelfCode || ""}</td>
-                  <td>${request.supplierName || "Unassigned Supplier"}${request.supplierContact ? `<small>${request.supplierContact}</small>` : ""}</td>
-                  <td>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</td>
-                  <td>${request.notes || ""}</td>
-                </tr>
-              `)
-              .join("")}
-          </tbody>
-        </table>
+        ${[...group.suppliers.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([, supplier]) => `
+            <div class="driver-supplier">
+              <div class="driver-supplier-title">
+                <h3>${supplier.supplier}</h3>
+                ${supplier.contact ? `<pre>${supplier.contact}</pre>` : ""}
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Picked</th>
+                    <th>Delivered</th>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Shelf</th>
+                    <th>Area / Location</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${supplier.requests
+                    .sort((a, b) => `${a.shelfCode || ""} ${a.itemName || ""}`.localeCompare(`${b.shelfCode || ""} ${b.itemName || ""}`))
+                    .map((request) => `
+                      <tr>
+                        <td class="check-cell"></td>
+                        <td class="check-cell"></td>
+                        <td>${request.itemName}</td>
+                        <td>${request.quantity ?? ""}</td>
+                        <td>${request.unit || ""}</td>
+                        <td>${request.shelfCode || ""}</td>
+                        <td>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</td>
+                        <td>${request.notes || ""}</td>
+                      </tr>
+                    `)
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `)
+          .join("")}
       </section>
     `)
     .join("");

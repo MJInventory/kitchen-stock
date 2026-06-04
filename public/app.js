@@ -18,6 +18,8 @@ const productList = document.querySelector("#productList");
 const categoryTitle = document.querySelector("#categoryTitle");
 const categoryMeta = document.querySelector("#categoryMeta");
 const backButton = document.querySelector("#backButton");
+const dailyOrderCount = document.querySelector("#dailyOrderCount");
+const dailyOrderList = document.querySelector("#dailyOrderList");
 const message = document.querySelector("#message");
 
 let allItems = [];
@@ -146,6 +148,34 @@ function renderSelectedChips() {
     .join("");
 }
 
+function itemNameFromRequest(request) {
+  return allItems.find((item) => item.id === request.itemId)?.name || "Requested item";
+}
+
+function renderDailyOrder() {
+  const activeRequests = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
+  dailyOrderCount.textContent = `${activeRequests.length} active`;
+  dailyOrderList.innerHTML = activeRequests
+    .slice(0, 100)
+    .map((request) => `
+      <article class="daily-order-row">
+        <div>
+          <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
+          <span>${escapeHtml([request.quantity, request.inventorySubgroup, request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</span>
+        </div>
+        <div class="daily-order-actions">
+          <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
+          <button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>
+        </div>
+      </article>
+    `)
+    .join("");
+
+  if (!dailyOrderList.innerHTML) {
+    dailyOrderList.innerHTML = '<p class="empty-sheet">No active orders yet.</p>';
+  }
+}
+
 function renderCategories() {
   const items = filterItems();
   const groups = new Map();
@@ -226,6 +256,7 @@ function render() {
   if (productView.hidden) renderCategories();
   else renderProductList();
   renderSelectedChips();
+  renderDailyOrder();
   updateSaveButton();
 }
 
@@ -294,7 +325,7 @@ async function submitSelected() {
       method: "POST",
       body: JSON.stringify({ requests })
     });
-    recentRequests = [...data.requests, ...recentRequests].slice(0, 20);
+    recentRequests = [...data.requests, ...recentRequests].slice(0, 100);
     const saved = selected.size;
     selected.clear();
     render();
@@ -304,6 +335,19 @@ async function submitSelected() {
   } finally {
     updateSaveButton();
   }
+}
+
+async function deleteDailyOrder(requestId) {
+  await api(`/api/requests/${requestId}`, { method: "DELETE" });
+  recentRequests = recentRequests.filter((request) => request.id !== requestId);
+  render();
+  setMessage("Item removed from today's order.");
+}
+
+async function deliverDailyOrder(requestId) {
+  await api(`/api/requests/${requestId}/deliver`, { method: "POST" });
+  await refresh();
+  setMessage("Item delivered, added to inventory, and closed.");
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -395,6 +439,27 @@ selectedChips.addEventListener("click", (event) => {
   if (!chip) return;
   selected.delete(chip.dataset.removeId);
   render();
+});
+
+dailyOrderList.addEventListener("click", (event) => {
+  const deliverButton = event.target.closest(".deliver-order-button");
+  if (deliverButton) {
+    deliverButton.disabled = true;
+    deliverDailyOrder(deliverButton.dataset.deliverId).catch((error) => {
+      setMessage(error.message, true);
+      deliverButton.disabled = false;
+    });
+    return;
+  }
+
+  const button = event.target.closest(".delete-order-button");
+  if (!button) return;
+
+  button.disabled = true;
+  deleteDailyOrder(button.dataset.requestId).catch((error) => {
+    setMessage(error.message, true);
+    button.disabled = false;
+  });
 });
 
 [areaFilter, locationFilter, searchInput].forEach((control) => {

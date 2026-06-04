@@ -338,6 +338,21 @@ async function listRequests() {
   }));
 }
 
+async function listOpenRequests() {
+  const query = new URLSearchParams({
+    pageSize: "100",
+    filterByFormula: "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))",
+    "sort[0][field]": "Inventory Subgroup",
+    "sort[0][direction]": "asc",
+    "sort[1][field]": "Requested By",
+    "sort[1][direction]": "asc",
+    "sort[2][field]": "Request ID",
+    "sort[2][direction]": "desc"
+  });
+  const data = await airtable(`${requestsTableId}?${query}`);
+  return data.records.map(normalizeRequest);
+}
+
 async function cached(key, ttlMs, loader) {
   const entry = cache[key];
   const now = Date.now();
@@ -1044,6 +1059,52 @@ async function markRequestReceived(recordId, userName) {
   return normalizeRequest(record);
 }
 
+async function deliverRequest(recordId, userName) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid request record.");
+  }
+
+  const requestRecord = await airtable(`${requestsTableId}/${recordId}`);
+  const request = normalizeRequest(requestRecord);
+  if (request.received || request.status === "Fulfilled") {
+    return request;
+  }
+
+  const quantity = Number(request.quantity || 0);
+  if (!request.itemId) throw new Error("Request has no linked inventory item.");
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Request quantity is not valid.");
+
+  const items = await getItems();
+  const item = items.find((candidate) => candidate.id === request.itemId);
+  if (!item) throw new Error("Linked inventory item was not found.");
+
+  const currentQuantity = Number(item.quantity || 0);
+  const newQuantity = currentQuantity + quantity;
+  await createStockCount({
+    itemId: item.id,
+    countedQuantity: newQuantity,
+    notes: `Delivered from order request ${request.requestId || request.id}: added ${quantity} ${item.unit || ""}.`
+  }, userName);
+
+  return markRequestReceived(recordId, userName);
+}
+
+async function deleteRequest(recordId) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid request record.");
+  }
+
+  const result = await airtable(`${requestsTableId}/${recordId}`, {
+    method: "DELETE"
+  });
+
+  cache.requests.expiresAt = 0;
+  return {
+    id: result.id || recordId,
+    deleted: Boolean(result.deleted)
+  };
+}
+
 async function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   const rawPath = url.pathname === "/" ? "/index.html" : url.pathname;
@@ -1100,7 +1161,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && req.url.startsWith("/api/bootstrap")) {
       if (!requireUser(req, res)) return;
-      const [items, requests] = await Promise.all([getItems(), getRequests()]);
+      const [items, requests] = await Promise.all([getItems(), listOpenRequests()]);
       send(res, 200, { items, requests });
       return;
     }
@@ -1221,6 +1282,24 @@ const server = http.createServer(async (req, res) => {
       const recordId = req.url.split("/")[3];
       const request = await markRequestReceived(recordId, user.name);
       send(res, 200, { request });
+      return;
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/api/requests/") && req.url.endsWith("/deliver")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const recordId = req.url.split("/")[3];
+      const request = await deliverRequest(recordId, user.name);
+      send(res, 200, { request });
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url.startsWith("/api/requests/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const recordId = req.url.split("/")[3];
+      const result = await deleteRequest(recordId);
+      send(res, 200, { result });
       return;
     }
 

@@ -67,6 +67,15 @@
               </select>
             </label>
             <label>
+              Rotate
+              <select id="ocrRotation">
+                <option value="0">No rotation</option>
+                <option value="90">Rotate right</option>
+                <option value="270">Rotate left</option>
+                <option value="180">Upside down</option>
+              </select>
+            </label>
+            <label>
               Text type
               <select id="ocrTextType">
                 <option value="invoice">Invoice lines</option>
@@ -86,6 +95,9 @@
             Extracted text / line notes
             <textarea id="extractedText" rows="5"></textarea>
           </label>
+          <div class="row action-row">
+            <button id="buildLinesButton" class="secondary" type="button">Build Lines From Text</button>
+          </div>
           <section class="invoice-lines-section">
             <div class="section-header">
               <h2>Invoice Lines</h2>

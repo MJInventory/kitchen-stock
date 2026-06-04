@@ -20,7 +20,9 @@ const applyLinesButton = document.querySelector("#applyLinesButton");
 const invoicePreview = document.querySelector("#invoicePreview");
 const ocrCanvas = document.querySelector("#ocrCanvas");
 const ocrMode = document.querySelector("#ocrMode");
+const ocrRotation = document.querySelector("#ocrRotation");
 const ocrTextType = document.querySelector("#ocrTextType");
+const buildLinesButton = document.querySelector("#buildLinesButton");
 const invoiceLines = document.querySelector("#invoiceLines");
 const ocrProgress = document.querySelector("#ocrProgress");
 
@@ -170,6 +172,18 @@ function parseInvoiceText(text) {
     });
 }
 
+function textLooksGarbled(text) {
+  const cleaned = String(text || "").replace(/\s+/g, "");
+  if (cleaned.length < 30) return false;
+
+  const letters = (cleaned.match(/[A-Za-z]/g) || []).length;
+  const digits = (cleaned.match(/[0-9]/g) || []).length;
+  const useful = letters + digits;
+  const symbolRatio = 1 - (useful / cleaned.length);
+  const shortWordBursts = (String(text || "").match(/\b[A-Za-z]\b/g) || []).length;
+  return symbolRatio > 0.42 || shortWordBursts > 35;
+}
+
 async function fileToImage(file) {
   const image = new Image();
   image.decoding = "async";
@@ -212,8 +226,12 @@ async function prepareImageForOcr(file) {
   const image = await fileToImage(file);
   const maxWidth = ocrTextType.value === "dense" ? 2200 : 1800;
   const scale = Math.min(maxWidth / image.width, 1.8);
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
+  const sourceWidth = Math.max(1, Math.round(image.width * scale));
+  const sourceHeight = Math.max(1, Math.round(image.height * scale));
+  const rotation = Number(ocrRotation.value || 0);
+  const isQuarterTurn = rotation === 90 || rotation === 270;
+  const width = isQuarterTurn ? sourceHeight : sourceWidth;
+  const height = isQuarterTurn ? sourceWidth : sourceHeight;
   const canvas = ocrCanvas;
   const context = canvas.getContext("2d", { willReadFrequently: true });
 
@@ -221,7 +239,19 @@ async function prepareImageForOcr(file) {
   canvas.height = height;
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
-  context.drawImage(image, 0, 0, width, height);
+  context.save();
+  if (rotation === 90) {
+    context.translate(width, 0);
+    context.rotate(Math.PI / 2);
+  } else if (rotation === 180) {
+    context.translate(width, height);
+    context.rotate(Math.PI);
+  } else if (rotation === 270) {
+    context.translate(0, height);
+    context.rotate((3 * Math.PI) / 2);
+  }
+  context.drawImage(image, 0, 0, sourceWidth, sourceHeight);
+  context.restore();
 
   if (ocrMode.value === "original") {
     canvas.hidden = false;
@@ -431,13 +461,23 @@ ocrButton.addEventListener("click", async () => {
     extractedText.value = result.data.text.trim();
     parsedLines = parseInvoiceText(extractedText.value);
     renderInvoiceLines();
-    message(invoiceMessage, `OCR finished. Review ${parsedLines.length} detected lines before applying stock.`);
+    if (textLooksGarbled(extractedText.value)) {
+      message(invoiceMessage, "OCR result looks garbled. Try another rotation or paste/correct the text, then tap Build Lines From Text.", true);
+    } else {
+      message(invoiceMessage, `OCR finished. Review ${parsedLines.length} detected lines before applying stock.`);
+    }
   } catch (error) {
     message(invoiceMessage, error.message, true);
   } finally {
     ocrProgress.textContent = "";
     ocrButton.disabled = false;
   }
+});
+
+buildLinesButton.addEventListener("click", () => {
+  parsedLines = parseInvoiceText(extractedText.value);
+  renderInvoiceLines();
+  message(invoiceMessage, `Built ${parsedLines.length} line(s) from the text box.`);
 });
 
 emailInvoiceButton.addEventListener("click", async () => {

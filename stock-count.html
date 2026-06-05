@@ -70,12 +70,12 @@ async function api(path, options = {}) {
   return data;
 }
 
-function groupByStorage(requests) {
+function groupBySupplier(requests) {
   const groups = new Map();
   for (const request of requests) {
-    const location = request.storageLocation || "Unassigned Storage";
-    if (!groups.has(location)) groups.set(location, []);
-    groups.get(location).push(request);
+    const supplier = request.supplierName || "Unassigned Supplier";
+    if (!groups.has(supplier)) groups.set(supplier, []);
+    groups.get(supplier).push(request);
   }
   return groups;
 }
@@ -90,13 +90,13 @@ function renderSheet(data) {
     return;
   }
 
-  const groups = groupByStorage(data.requests);
+  const groups = groupBySupplier(data.requests);
   receivingList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([location, requests]) => `
+    .map(([supplier, requests]) => `
       <section class="sheet-group">
         <div class="supplier-heading">
-          <h2>${escapeHtml(location)}</h2>
+          <h2>${escapeHtml(supplier)}</h2>
         </div>
         <table>
           <thead>
@@ -107,12 +107,17 @@ function renderSheet(data) {
               <th>Unit</th>
               <th>Shelf</th>
               <th>Area / Location</th>
-              <th>Supplier</th>
             </tr>
           </thead>
           <tbody>
             ${requests
-              .sort((a, b) => `${a.shelfCode || ""} ${a.itemName || ""}`.localeCompare(`${b.shelfCode || ""} ${b.itemName || ""}`, undefined, { numeric: true }))
+              .sort((a, b) => {
+                const storage = (a.storageLocation || "").localeCompare(b.storageLocation || "");
+                if (storage) return storage;
+                const shelf = (a.shelfCode || "").localeCompare(b.shelfCode || "", undefined, { numeric: true });
+                if (shelf) return shelf;
+                return (a.itemName || "").localeCompare(b.itemName || "");
+              })
               .map((request) => `
                 <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                   <td>
@@ -125,7 +130,6 @@ function renderSheet(data) {
                   <td>${escapeHtml(request.unit || "")}</td>
                   <td>${escapeHtml(request.shelfCode || "")}</td>
                   <td>${escapeHtml([request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</td>
-                  <td>${escapeHtml(request.supplierName || "")}</td>
                 </tr>
               `)
               .join("")}

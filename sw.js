@@ -487,6 +487,50 @@ td small {
   white-space: pre-wrap;
 }
 
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.report-summary article {
+  border: 1px solid #98a2b3;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.report-summary strong {
+  display: block;
+  color: #101828;
+  font-size: 20px;
+}
+
+.report-summary span {
+  color: #475467;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.order-report-table th,
+.order-report-table td {
+  font-size: 12px;
+}
+
+.order-report-table td:nth-child(2),
+.order-report-table td:nth-child(5),
+.order-report-table td:nth-child(7) {
+  white-space: nowrap;
+}
+
+.report-waiting td {
+  background: #fff8e1;
+}
+
+.report-delivered td {
+  background: #f7fff7;
+}
+
 .empty-sheet {
   color: var(--muted);
 }

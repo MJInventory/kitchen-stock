@@ -541,6 +541,12 @@ function normalizeDriverLine(record) {
     itemName: record.fields["Item Name"] || "",
     supplierName: record.fields["Supplier Name"] || "",
     supplierContact: record.fields["Supplier Contact"] || "",
+    quantity: record.fields.Quantity ?? null,
+    unit: record.fields.Unit || "",
+    inventoryArea: record.fields["Inventory Area"] || "",
+    storageLocation: record.fields["Storage Location"] || "",
+    inventorySubgroup: record.fields["Inventory Subgroup"] || "",
+    shelfCode: record.fields["Shelf Code"] || "",
     ordered: Boolean(record.fields.Ordered),
     toDeliver: Boolean(record.fields["2Deliver"]),
     orderedAt: record.fields["Ordered Date/Time"] || "",
@@ -550,6 +556,71 @@ function normalizeDriverLine(record) {
     receivedBy: record.fields["Received By"] || "",
     requestStatus: record.fields["Request Status"] || "",
     notes: record.fields.Notes || ""
+  };
+}
+
+async function listRequestsByRecordIds(recordIds) {
+  const uniqueIds = [...new Set(recordIds.filter((id) => /^rec[a-zA-Z0-9]+$/.test(id || "")))];
+  const records = [];
+
+  for (let index = 0; index < uniqueIds.length; index += 20) {
+    const chunk = uniqueIds.slice(index, index + 20);
+    const formula = `OR(${chunk.map((id) => `RECORD_ID()='${id}'`).join(",")})`;
+    records.push(...(await listAirtableRecords(requestsTableId, { filterByFormula: formula })));
+  }
+
+  return new Map(records.map((record) => [record.id, normalizeRequest(record)]));
+}
+
+async function listOrderReport(date) {
+  const schema = await getSchema();
+  const driverLinesTableId = schema.tables.driverSheetLines;
+  if (!driverLinesTableId) throw new Error("Driver Sheet Lines table is not configured.");
+
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
+
+  await listDriverSheet(selectedDate);
+  const lines = await listDriverSheetLines(driverLinesTableId, selectedDate);
+  const requestById = await listRequestsByRecordIds(lines.map((line) => line.requestRecordId));
+
+  const rows = lines
+    .map((line) => {
+      const request = requestById.get(line.requestRecordId);
+      const delivered = Boolean(line.received || request?.received);
+      const ordered = Boolean(line.ordered);
+      return {
+        ...line,
+        quantity: line.quantity ?? request?.quantity ?? null,
+        unit: line.unit || "",
+        requestedBy: request?.requestedBy || "",
+        requestedAt: request?.requestedAt || "",
+        urgency: request?.urgency || "",
+        notes: line.notes || request?.notes || "",
+        status: delivered ? "Delivered" : ordered ? "Picked / Ordered" : "Waiting",
+        delivered,
+        receivedAt: line.receivedAt || request?.receivedAt || "",
+        receivedBy: line.receivedBy || request?.receivedBy || "",
+        waiting: !delivered
+      };
+    })
+    .sort((a, b) => {
+      const supplier = (a.supplierName || "").localeCompare(b.supplierName || "");
+      if (supplier) return supplier;
+      const status = a.status.localeCompare(b.status);
+      if (status) return status;
+      return (a.itemName || "").localeCompare(b.itemName || "");
+    });
+
+  return {
+    date: selectedDate,
+    summary: {
+      totalLines: rows.length,
+      orderedLines: rows.filter((row) => row.ordered).length,
+      deliveredLines: rows.filter((row) => row.delivered).length,
+      waitingLines: rows.filter((row) => row.waiting).length,
+      toDeliverLines: rows.filter((row) => row.toDeliver).length
+    },
+    rows
   };
 }
 
@@ -1333,6 +1404,13 @@ const server = http.createServer(async (req, res) => {
         ...sheet,
         requests: sheet.requests.filter((request) => !request.delivered)
       });
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/order-report")) {
+      if (!requireUser(req, res)) return;
+      const url = new URL(req.url, "http://localhost");
+      send(res, 200, await listOrderReport(url.searchParams.get("date")));
       return;
     }
 

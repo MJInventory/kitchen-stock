@@ -991,6 +991,7 @@ body.order-app {
 }
 
 .product-main span,
+.product-main small,
 .product-main em {
   color: var(--order-muted);
   font-family: Arial, Helvetica, sans-serif;
@@ -1043,6 +1044,25 @@ body.order-app {
   font-size: 11px;
 }
 
+.stock-adjust {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--order-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.stock-adjust input {
+  width: 58px;
+}
+
+.stock-adjust button {
+  width: auto;
+  min-width: 38px;
+  padding: 0 8px;
+}
+
 .product-controls select {
   width: 96px;
   border-color: var(--order-line);
@@ -1062,10 +1082,17 @@ body.order-app {
 .stock-location-picker select {
   width: 100%;
   border: 0;
-  background: transparent;
+  background: #050505;
   color: var(--order-ink);
   font: inherit;
   outline: none;
+  color-scheme: dark;
+}
+
+.order-app select option,
+.stock-location-picker select option {
+  background: #080808;
+  color: var(--order-ink);
 }
 
 .stock-count-heading {

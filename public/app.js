@@ -1,4 +1,4 @@
-const loginScreen = document.querySelector("#loginScreen");
+﻿const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");
@@ -90,6 +90,10 @@ function itemCategory(item) {
 
 function itemMeta(item) {
   return [item.inventoryArea, item.storageLocation, item.shelfCode].filter(Boolean).join(" / ");
+}
+
+function stockMeta(item) {
+  return `Current ${item.quantity ?? 0} ${itemUnit(item)} / min ${item.minimum ?? 0}`;
 }
 
 function itemUnit(item) {
@@ -227,13 +231,19 @@ function renderProductList() {
       const lowStock = item.minimum !== null && Number(item.quantity || 0) < Number(item.minimum || 0);
       return `
         <article class="product-row${checked ? " selected" : ""}" data-item-id="${item.id}">
-          <button class="product-check" type="button" aria-label="Select ${escapeHtml(item.name)}">${checked ? "✓" : ""}</button>
+          <button class="product-check" type="button" aria-label="Select ${escapeHtml(item.name)}">${checked ? "&#10003;" : ""}</button>
           <div class="product-main">
             <strong>${escapeHtml(item.name)}</strong>
             <span>${escapeHtml(itemMeta(item) || itemCategory(item))}</span>
+            <small>${escapeHtml(stockMeta(item))}</small>
             ${lowStock ? `<em>Below minimum: ${item.quantity ?? 0} / ${item.minimum} ${escapeHtml(itemUnit(item))}</em>` : ""}
           </div>
           <div class="product-controls">
+            <label class="stock-adjust">
+              Stock
+              <input class="stock-input" type="number" min="0" step="0.01" value="${item.quantity ?? 0}">
+              <button class="stock-save" type="button">Set</button>
+            </label>
             <button class="qty-minus" type="button" aria-label="Decrease">-</button>
             <input class="qty-input" type="number" min="0" step="1" value="${quantity}">
             <button class="qty-plus" type="button" aria-label="Increase">+</button>
@@ -350,6 +360,24 @@ async function deliverDailyOrder(requestId) {
   setMessage("Item delivered, added to inventory, and closed.");
 }
 
+async function updateCurrentStock(itemId, countedQuantity) {
+  const data = await api("/api/stock-counts", {
+    method: "POST",
+    body: JSON.stringify({
+      itemId,
+      countedQuantity,
+      notes: "Adjusted from request screen."
+    })
+  });
+  allItems = allItems.map((item) => (item.id === data.item.id ? { ...item, quantity: data.item.quantity } : item));
+  selected = new Map(
+    [...selected.entries()].map(([id, entry]) => [
+      id,
+      id === data.item.id ? { ...entry, item: { ...entry.item, quantity: data.item.quantity } } : entry
+    ])
+  );
+}
+
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setLoginMessage("Logging in...");
@@ -405,6 +433,23 @@ productList.addEventListener("click", (event) => {
 
   if (event.target.closest(".product-check")) {
     toggleProduct(row);
+    return;
+  }
+
+  if (event.target.closest(".stock-save")) {
+    const itemId = row.dataset.itemId;
+    const input = row.querySelector(".stock-input");
+    const button = event.target.closest(".stock-save");
+    button.disabled = true;
+    updateCurrentStock(itemId, input.value)
+      .then(() => {
+        render();
+        setMessage("Current stock updated.");
+      })
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => {
+        button.disabled = false;
+      });
     return;
   }
 
@@ -480,3 +525,4 @@ if (sessionToken && sessionUser) {
   showLogin();
   updateSaveButton();
 }
+

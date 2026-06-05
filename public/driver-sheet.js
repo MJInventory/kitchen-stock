@@ -1,4 +1,4 @@
-const sheetDate = document.querySelector("#sheetDate");
+﻿const sheetDate = document.querySelector("#sheetDate");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -148,15 +148,14 @@ function renderSheet(data) {
               <table>
                 <thead>
                   <tr>
-                    <th>Picked</th>
+                    <th>Ordered</th>
                     <th>Delivered</th>
                     <th>Item</th>
                     <th>Supplier</th>
                     <th>Qty</th>
                     <th>Unit</th>
-                    <th>Shelf</th>
-                    <th>Area / Location</th>
-                    <th>Notes</th>
+                    <th>Priority</th>
+                    <th>2Deliver</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,12 +165,12 @@ function renderSheet(data) {
                       <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                         <td>
                           <button class="driver-check-button${request.ordered ? " checked" : ""}" type="button" data-action="ordered" ${request.driverLineId ? "" : "disabled"} aria-label="Mark ordered">
-                            ${request.ordered ? "✓" : ""}
+                            ${request.ordered ? "&#10003;" : ""}
                           </button>
                         </td>
                         <td>
                           <button class="driver-check-button${request.delivered ? " checked" : ""}" type="button" data-action="delivered" ${request.driverLineId || request.delivered ? "" : "disabled"} aria-label="Mark delivered">
-                            ${request.delivered ? "✓" : ""}
+                            ${request.delivered ? "&#10003;" : ""}
                           </button>
                         </td>
                         <td>${escapeHtml(request.itemName)}</td>
@@ -182,9 +181,12 @@ function renderSheet(data) {
                         </td>
                         <td>${escapeHtml(request.quantity ?? "")}</td>
                         <td>${escapeHtml(request.unit || "")}</td>
-                        <td>${escapeHtml(request.shelfCode || "")}</td>
-                        <td>${escapeHtml([request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</td>
-                        <td>${escapeHtml(request.notes || "")}</td>
+                        <td>${escapeHtml(request.urgency || "")}</td>
+                        <td>
+                          <button class="driver-check-button${request.toDeliver ? " checked" : ""}" type="button" data-action="toDeliver" ${request.driverLineId ? "" : "disabled"} aria-label="Mark 2Deliver">
+                            ${request.toDeliver ? "&#10003;" : ""}
+                          </button>
+                        </td>
                       </tr>
                     `)
                     .join("")}
@@ -211,6 +213,7 @@ function updateRequestFromLine(line) {
     return {
       ...request,
       ordered: line.ordered,
+      toDeliver: line.toDeliver,
       delivered: line.received || request.delivered,
       supplierName: line.supplierName || request.supplierName,
       supplierContact: line.supplierContact || request.supplierContact
@@ -258,6 +261,26 @@ async function markDelivered(row, button) {
   }
 }
 
+async function toggleToDeliver(row, button) {
+  const lineId = row.dataset.lineId;
+  const toDeliver = !button.classList.contains("checked");
+  button.disabled = true;
+  setMessage("Saving 2Deliver status...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ toDeliver })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage("");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function changeSupplier(row, select) {
   const lineId = row.dataset.lineId;
   select.disabled = true;
@@ -294,6 +317,9 @@ sheetList.addEventListener("click", (event) => {
   }
   if (button.dataset.action === "delivered") {
     markDelivered(row, button);
+  }
+  if (button.dataset.action === "toDeliver") {
+    toggleToDeliver(row, button);
   }
 });
 
@@ -344,3 +370,4 @@ if (sessionToken && sessionUser) {
 } else {
   showLogin();
 }
+

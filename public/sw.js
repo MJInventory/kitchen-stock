@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v32";
+const CACHE_NAME = "kitchen-stock-v33";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -14,6 +14,9 @@ const APP_SHELL = [
   "/invoice-capture.js",
   "/manifest.webmanifest",
   "/madame-janette-logo.png",
+  "/mjordering-icon-192.png",
+  "/mjordering-icon-512.png",
+  "/mjordering-apple-touch-icon.png",
   "/icon.svg"
 ];
 

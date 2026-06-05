@@ -1,6 +1,6 @@
 {
-  "name": "Inventory & Ordering System",
-  "short_name": "Inventory",
+  "name": "MJOrdering",
+  "short_name": "MJOrdering",
   "description": "Inventory counting, ordering, receiving, and driver sheets.",
   "start_url": "/",
   "scope": "/",
@@ -9,9 +9,15 @@
   "theme_color": "#0f766e",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/mjordering-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/mjordering-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

@@ -269,12 +269,34 @@ async function airtable(path, options = {}) {
   return data;
 }
 
+async function listAirtableRecords(tableId, params = {}) {
+  const records = [];
+  let offset = "";
+
+  do {
+    const query = new URLSearchParams({
+      pageSize: "100",
+      ...params
+    });
+
+    if (offset) {
+      query.set("offset", offset);
+    }
+
+    const data = await airtable(`${tableId}?${query}`);
+    records.push(...(data.records || []));
+    offset = data.offset || "";
+  } while (offset);
+
+  return records;
+}
+
 async function listItems() {
   const suppliers = await getSuppliers();
   const lookups = await getLookups();
   const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
-  const data = await airtable(`${inventoryTableId}?pageSize=100`);
-  return data.records
+  const records = await listAirtableRecords(inventoryTableId);
+  return records
     .map((record) => normalizeItem(record, supplierById, lookups))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -306,8 +328,8 @@ function normalizeItem(record, supplierById, lookups) {
 }
 
 async function listSuppliers() {
-  const data = await airtable(`${suppliersTableId}?pageSize=100`);
-  return data.records
+  const records = await listAirtableRecords(suppliersTableId);
+  return records
     .map((record) => ({
       id: record.id,
       name: record.fields["Supplier Name"] || "",
@@ -339,8 +361,7 @@ async function listRequests() {
 }
 
 async function listOpenRequests() {
-  const query = new URLSearchParams({
-    pageSize: "100",
+  const records = await listAirtableRecords(requestsTableId, {
     filterByFormula: "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))",
     "sort[0][field]": "Inventory Subgroup",
     "sort[0][direction]": "asc",
@@ -349,8 +370,7 @@ async function listOpenRequests() {
     "sort[2][field]": "Request ID",
     "sort[2][direction]": "desc"
   });
-  const data = await airtable(`${requestsTableId}?${query}`);
-  return data.records.map(normalizeRequest);
+  return records.map(normalizeRequest);
 }
 
 async function cached(key, ttlMs, loader) {
@@ -423,7 +443,7 @@ async function listLookupRecords() {
 
   for (const [key, config] of Object.entries(lookupConfigs)) {
     const tableId = schema.tables[key];
-    const records = tableId ? (await airtable(`${tableId}?pageSize=100`)).records : [];
+    const records = tableId ? await listAirtableRecords(tableId) : [];
     const values = records
       .map((record) => ({
         id: record.id,

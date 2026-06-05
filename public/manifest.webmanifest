@@ -1,7 +1,7 @@
 {
-  "name": "Kitchen Stock Requests",
-  "short_name": "Kitchen Stock",
-  "description": "Request missing inventory items from a phone.",
+  "name": "Inventory & Ordering System",
+  "short_name": "Inventory",
+  "description": "Inventory counting, ordering, receiving, and driver sheets.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

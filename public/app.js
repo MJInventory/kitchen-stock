@@ -85,7 +85,7 @@ function normalize(value) {
 }
 
 function itemCategory(item) {
-  return item.inventorySubgroup || item.category || item.storageLocation || "Unsorted";
+  return item.category || item.inventorySubgroup || item.storageLocation || "Unsorted";
 }
 
 function itemMeta(item) {

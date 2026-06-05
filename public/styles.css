@@ -442,6 +442,42 @@ th {
   margin: 0 auto;
 }
 
+.driver-check-button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border: 2px solid #101828;
+  border-radius: 2px;
+  background: #fff;
+  color: #101828;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.driver-check-button.checked {
+  background: #d4ad43;
+  border-color: #101828;
+}
+
+.driver-check-button:disabled {
+  opacity: 0.55;
+}
+
+.driver-supplier-select {
+  width: 150px;
+  min-width: 130px;
+  border: 1px solid #98a2b3;
+  border-radius: 4px;
+  background: #fff;
+  color: #101828;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
 td small {
   display: block;
   margin-top: 3px;

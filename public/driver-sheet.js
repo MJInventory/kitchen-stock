@@ -15,6 +15,7 @@ const printDriver = document.querySelector("#printDriver");
 const sheetList = document.querySelector("#sheetList");
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+let currentSheet = { date: "", requests: [], suppliers: [] };
 
 function todayLocal() {
   const now = new Date();
@@ -49,6 +50,29 @@ function showLogin() {
   localStorage.removeItem("kitchenStockUser");
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+    },
+    ...options
+  });
+  const data = await response.json();
+  if (response.status === 401) showLogin();
+  if (!response.ok) throw new Error(data.error || "Something went wrong.");
+  return data;
+}
+
 function groupRequests(requests) {
   const groups = new Map();
 
@@ -78,7 +102,25 @@ function groupRequests(requests) {
   return groups;
 }
 
+function supplierOptions(selectedSupplier) {
+  const selected = selectedSupplier || "";
+  const known = currentSheet.suppliers || [];
+  const hasSelected = known.some((supplier) => supplier.name === selected);
+  const options = [
+    ...(selected && !hasSelected ? [{ name: selected }] : []),
+    ...known
+  ];
+
+  return options
+    .map((supplier) => {
+      const name = supplier.name || "";
+      return `<option value="${escapeHtml(name)}"${name === selected ? " selected" : ""}>${escapeHtml(name)}</option>`;
+    })
+    .join("");
+}
+
 function renderSheet(data) {
+  currentSheet = data;
   printDate.textContent = `Date: ${data.date}`;
   printDriver.textContent = `Driver: ${driverName.value || "________________"}`;
 
@@ -93,15 +135,15 @@ function renderSheet(data) {
     .map(([, group]) => `
       <section class="sheet-group">
         <div class="supplier-heading">
-          <h2>${group.subgroup}</h2>
+          <h2>${escapeHtml(group.subgroup)}</h2>
         </div>
         ${[...group.suppliers.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, supplier]) => `
             <div class="driver-supplier">
               <div class="driver-supplier-title">
-                <h3>${supplier.supplier}</h3>
-                ${supplier.contact ? `<pre>${supplier.contact}</pre>` : ""}
+                <h3>${escapeHtml(supplier.supplier)}</h3>
+                ${supplier.contact ? `<pre>${escapeHtml(supplier.contact)}</pre>` : ""}
               </div>
               <table>
                 <thead>
@@ -109,6 +151,7 @@ function renderSheet(data) {
                     <th>Picked</th>
                     <th>Delivered</th>
                     <th>Item</th>
+                    <th>Supplier</th>
                     <th>Qty</th>
                     <th>Unit</th>
                     <th>Shelf</th>
@@ -120,15 +163,28 @@ function renderSheet(data) {
                   ${supplier.requests
                     .sort((a, b) => `${a.shelfCode || ""} ${a.itemName || ""}`.localeCompare(`${b.shelfCode || ""} ${b.itemName || ""}`))
                     .map((request) => `
-                      <tr>
-                        <td class="check-cell"></td>
-                        <td class="check-cell"></td>
-                        <td>${request.itemName}</td>
-                        <td>${request.quantity ?? ""}</td>
-                        <td>${request.unit || ""}</td>
-                        <td>${request.shelfCode || ""}</td>
-                        <td>${[request.inventoryArea, request.storageLocation].filter(Boolean).join(" / ")}</td>
-                        <td>${request.notes || ""}</td>
+                      <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
+                        <td>
+                          <button class="driver-check-button${request.ordered ? " checked" : ""}" type="button" data-action="ordered" ${request.driverLineId ? "" : "disabled"} aria-label="Mark ordered">
+                            ${request.ordered ? "✓" : ""}
+                          </button>
+                        </td>
+                        <td>
+                          <button class="driver-check-button${request.delivered ? " checked" : ""}" type="button" data-action="delivered" ${request.driverLineId || request.delivered ? "" : "disabled"} aria-label="Mark delivered">
+                            ${request.delivered ? "✓" : ""}
+                          </button>
+                        </td>
+                        <td>${escapeHtml(request.itemName)}</td>
+                        <td>
+                          <select class="driver-supplier-select" ${request.driverLineId ? "" : "disabled"} aria-label="Supplier for ${escapeHtml(request.itemName)}">
+                            ${supplierOptions(request.supplierName)}
+                          </select>
+                        </td>
+                        <td>${escapeHtml(request.quantity ?? "")}</td>
+                        <td>${escapeHtml(request.unit || "")}</td>
+                        <td>${escapeHtml(request.shelfCode || "")}</td>
+                        <td>${escapeHtml([request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</td>
+                        <td>${escapeHtml(request.notes || "")}</td>
                       </tr>
                     `)
                     .join("")}
@@ -144,16 +200,81 @@ function renderSheet(data) {
 
 async function loadSheet() {
   setMessage("Loading...");
-  const response = await fetch(`/api/driver-sheet?date=${encodeURIComponent(sheetDate.value)}`, {
-    headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}
-  });
-  const data = await response.json();
-  if (response.status === 401) {
-    showLogin();
-  }
-  if (!response.ok) throw new Error(data.error || "Could not load driver sheet.");
+  const data = await api(`/api/driver-sheet?date=${encodeURIComponent(sheetDate.value)}`);
   renderSheet(data);
   setMessage("");
+}
+
+function updateRequestFromLine(line) {
+  currentSheet.requests = currentSheet.requests.map((request) => {
+    if (request.driverLineId !== line.id) return request;
+    return {
+      ...request,
+      ordered: line.ordered,
+      delivered: line.received || request.delivered,
+      supplierName: line.supplierName || request.supplierName,
+      supplierContact: line.supplierContact || request.supplierContact
+    };
+  });
+}
+
+async function toggleOrdered(row, button) {
+  const lineId = row.dataset.lineId;
+  const ordered = !button.classList.contains("checked");
+  button.disabled = true;
+  setMessage("Saving ordered status...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ordered })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage("");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function markDelivered(row, button) {
+  const lineId = row.dataset.lineId;
+  const requestId = row.dataset.requestId;
+  if (button.classList.contains("checked")) return;
+  button.disabled = true;
+  setMessage("Marking delivered and updating stock...");
+  try {
+    await api(`/api/driver-lines/${lineId}/deliver`, {
+      method: "POST",
+      body: JSON.stringify({ requestId })
+    });
+    await loadSheet();
+    setMessage("Delivered. Stock updated.");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function changeSupplier(row, select) {
+  const lineId = row.dataset.lineId;
+  select.disabled = true;
+  setMessage("Saving supplier...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ supplierName: select.value })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage("");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    select.disabled = false;
+  }
 }
 
 sheetDate.value = todayLocal();
@@ -162,6 +283,27 @@ driverName.addEventListener("input", () => {
   printDriver.textContent = `Driver: ${driverName.value || "________________"}`;
 });
 printSheetButton.addEventListener("click", () => window.print());
+
+sheetList.addEventListener("click", (event) => {
+  const button = event.target.closest(".driver-check-button");
+  if (!button) return;
+  const row = button.closest("tr");
+  if (!row?.dataset.lineId) return;
+  if (button.dataset.action === "ordered") {
+    toggleOrdered(row, button);
+  }
+  if (button.dataset.action === "delivered") {
+    markDelivered(row, button);
+  }
+});
+
+sheetList.addEventListener("change", (event) => {
+  const select = event.target.closest(".driver-supplier-select");
+  if (!select) return;
+  const row = select.closest("tr");
+  if (!row?.dataset.lineId) return;
+  changeSupplier(row, select);
+});
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -531,10 +531,30 @@ function normalizeRequest(record) {
   };
 }
 
+function normalizeDriverLine(record) {
+  return {
+    id: record.id,
+    sheetDate: record.fields["Sheet Date"] || "",
+    requestRecordId: record.fields["Item Request Record ID"] || "",
+    requestId: record.fields["Request ID"] || "",
+    itemRecordId: record.fields["Inventory Item Record ID"] || "",
+    itemName: record.fields["Item Name"] || "",
+    supplierName: record.fields["Supplier Name"] || "",
+    supplierContact: record.fields["Supplier Contact"] || "",
+    ordered: Boolean(record.fields.Ordered),
+    orderedAt: record.fields["Ordered Date/Time"] || "",
+    orderedBy: record.fields["Ordered By"] || "",
+    received: Boolean(record.fields.Received),
+    requestStatus: record.fields["Request Status"] || "",
+    notes: record.fields.Notes || ""
+  };
+}
+
 async function listDriverSheet(date) {
   const schema = await getSchema();
   const driverLinesTableId = schema.tables.driverSheetLines;
   const items = await getItems();
+  const suppliers = await getSuppliers();
   const itemById = new Map(items.map((item) => [item.id, item]));
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
   const formula = "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))";
@@ -548,8 +568,8 @@ async function listDriverSheet(date) {
     "sort[2][field]": "Request ID",
     "sort[2][direction]": "asc"
   });
-  const data = await airtable(`${requestsTableId}?${query}`);
-  const requests = data.records.map((record) => {
+  const records = await listAirtableRecords(requestsTableId, Object.fromEntries(query.entries()));
+  const requests = records.map((record) => {
     const request = normalizeRequest(record);
     const item = itemById.get(request.itemId);
     return {
@@ -565,17 +585,41 @@ async function listDriverSheet(date) {
     };
   });
 
+  let lineByRequestId = new Map();
   if (driverLinesTableId) {
     await persistDriverSheetLines(driverLinesTableId, selectedDate, requests);
+    const lines = await listDriverSheetLines(driverLinesTableId, selectedDate);
+    lineByRequestId = new Map(lines.map((line) => [line.requestRecordId, line]));
   }
 
-  return { date: selectedDate, requests };
+  const mergedRequests = requests.map((request) => {
+    const line = lineByRequestId.get(request.id);
+    return {
+      ...request,
+      driverLineId: line?.id || "",
+      ordered: Boolean(line?.ordered),
+      orderedAt: line?.orderedAt || "",
+      orderedBy: line?.orderedBy || "",
+      delivered: Boolean(line?.received || request.received),
+      supplierName: line?.supplierName || request.supplierName,
+      supplierContact: line?.supplierContact || request.supplierContact
+    };
+  });
+
+  return {
+    date: selectedDate,
+    requests: mergedRequests,
+    suppliers: suppliers.map((supplier) => ({
+      id: supplier.id,
+      name: supplier.name,
+      contact: supplier.contact
+    }))
+  };
 }
 
 async function persistDriverSheetLines(tableId, sheetDate, requests) {
   const formula = `IS_SAME({Sheet Date}, '${sheetDate}', 'day')`;
-  const existingQuery = new URLSearchParams({ pageSize: "100", filterByFormula: formula });
-  const existing = await airtable(`${tableId}?${existingQuery}`);
+  const existing = { records: await listAirtableRecords(tableId, { filterByFormula: formula }) };
   const existingKeys = new Set(
     existing.records.map((record) => `${record.fields["Item Request Record ID"] || ""}|${record.fields["Sheet Date"] || ""}`)
   );
@@ -609,6 +653,12 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
       })
     });
   }
+}
+
+async function listDriverSheetLines(tableId, sheetDate) {
+  const formula = `IS_SAME({Sheet Date}, '${sheetDate}', 'day')`;
+  const records = await listAirtableRecords(tableId, { filterByFormula: formula });
+  return records.map(normalizeDriverLine);
 }
 
 async function createRequest(payload) {
@@ -1109,6 +1159,74 @@ async function deliverRequest(recordId, userName) {
   return markRequestReceived(recordId, userName);
 }
 
+async function updateDriverLine(recordId, payload, userName) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid driver line record.");
+  }
+
+  const schema = await getSchema();
+  const tableId = schema.tables.driverSheetLines;
+  if (!tableId) throw new Error("Driver Sheet Lines table is not configured.");
+
+  const fields = {};
+
+  if (Object.prototype.hasOwnProperty.call(payload, "ordered")) {
+    const ordered = Boolean(payload.ordered);
+    fields.Ordered = ordered;
+    fields["Ordered Date/Time"] = ordered ? new Date().toISOString() : null;
+    fields["Ordered By"] = ordered ? userName : "";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "supplierName")) {
+    const supplierName = String(payload.supplierName || "").trim();
+    const suppliers = await getSuppliers();
+    const supplier = suppliers.find((entry) => entry.name.toLowerCase() === supplierName.toLowerCase());
+    fields["Supplier Name"] = supplierName || "Unassigned Supplier";
+    fields["Supplier Contact"] = supplier?.contact || "";
+  }
+
+  if (!Object.keys(fields).length) {
+    throw new Error("Nothing to update.");
+  }
+
+  const record = await airtable(`${tableId}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields })
+  });
+
+  return normalizeDriverLine(record);
+}
+
+async function deliverDriverLine(recordId, requestRecordId, userName) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid driver line record.");
+  }
+  if (!/^rec[a-zA-Z0-9]+$/.test(requestRecordId || "")) {
+    throw new Error("Invalid request record.");
+  }
+
+  const schema = await getSchema();
+  const tableId = schema.tables.driverSheetLines;
+  if (!tableId) throw new Error("Driver Sheet Lines table is not configured.");
+
+  const request = await deliverRequest(requestRecordId, userName);
+  const record = await airtable(`${tableId}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        Received: true,
+        "Request Status": "Fulfilled"
+      }
+    })
+  });
+
+  cache.requests.expiresAt = 0;
+  return {
+    request,
+    line: normalizeDriverLine(record)
+  };
+}
+
 async function deleteRequest(recordId) {
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid request record.");
@@ -1311,6 +1429,25 @@ const server = http.createServer(async (req, res) => {
       const recordId = req.url.split("/")[3];
       const request = await deliverRequest(recordId, user.name);
       send(res, 200, { request });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/driver-lines/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const recordId = req.url.split("/")[3];
+      const line = await updateDriverLine(recordId, await readJson(req), user.name);
+      send(res, 200, { line });
+      return;
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/api/driver-lines/") && req.url.endsWith("/deliver")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const recordId = req.url.split("/")[3];
+      const payload = await readJson(req);
+      const result = await deliverDriverLine(recordId, String(payload.requestId || ""), user.name);
+      send(res, 200, result);
       return;
     }
 

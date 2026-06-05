@@ -14,7 +14,7 @@ const receivingList = document.querySelector("#receivingList");
 
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-let currentSheet = { date: "", requests: [] };
+let currentSheet = { date: "", requests: [], suppliers: [] };
 
 function todayLocal() {
   const now = new Date();
@@ -70,14 +70,31 @@ async function api(path, options = {}) {
   return data;
 }
 
-function groupByStorage(requests) {
+function groupBySupplier(requests) {
   const groups = new Map();
   for (const request of requests) {
-    const location = request.storageLocation || "Unassigned Storage";
-    if (!groups.has(location)) groups.set(location, []);
-    groups.get(location).push(request);
+    const supplier = request.supplierName || "Unassigned Supplier";
+    if (!groups.has(supplier)) groups.set(supplier, []);
+    groups.get(supplier).push(request);
   }
   return groups;
+}
+
+function supplierOptions(selectedSupplier) {
+  const selected = selectedSupplier || "";
+  const known = currentSheet.suppliers || [];
+  const hasSelected = known.some((supplier) => supplier.name === selected);
+  const options = [
+    ...(selected && !hasSelected ? [{ name: selected }] : []),
+    ...known
+  ];
+
+  return options
+    .map((supplier) => {
+      const name = supplier.name || "";
+      return `<option value="${escapeHtml(name)}"${name === selected ? " selected" : ""}>${escapeHtml(name)}</option>`;
+    })
+    .join("");
 }
 
 function renderSheet(data) {
@@ -90,29 +107,35 @@ function renderSheet(data) {
     return;
   }
 
-  const groups = groupByStorage(data.requests);
+  const groups = groupBySupplier(data.requests);
   receivingList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([location, requests]) => `
+    .map(([supplier, requests]) => `
       <section class="sheet-group">
         <div class="supplier-heading">
-          <h2>${escapeHtml(location)}</h2>
+          <h2>${escapeHtml(supplier)}</h2>
         </div>
         <table>
           <thead>
             <tr>
               <th>Received</th>
               <th>Item</th>
+              <th>Supplier</th>
               <th>Qty</th>
               <th>Unit</th>
               <th>Shelf</th>
               <th>Area / Location</th>
-              <th>Supplier</th>
             </tr>
           </thead>
           <tbody>
             ${requests
-              .sort((a, b) => `${a.shelfCode || ""} ${a.itemName || ""}`.localeCompare(`${b.shelfCode || ""} ${b.itemName || ""}`, undefined, { numeric: true }))
+              .sort((a, b) => {
+                const storage = (a.storageLocation || "").localeCompare(b.storageLocation || "");
+                if (storage) return storage;
+                const shelf = (a.shelfCode || "").localeCompare(b.shelfCode || "", undefined, { numeric: true });
+                if (shelf) return shelf;
+                return (a.itemName || "").localeCompare(b.itemName || "");
+              })
               .map((request) => `
                 <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                   <td>
@@ -121,11 +144,15 @@ function renderSheet(data) {
                     </button>
                   </td>
                   <td>${escapeHtml(request.itemName)}</td>
+                  <td>
+                    <select class="driver-supplier-select receiving-supplier-select" ${request.driverLineId ? "" : "disabled"} aria-label="Supplier for ${escapeHtml(request.itemName)}">
+                      ${supplierOptions(request.supplierName)}
+                    </select>
+                  </td>
                   <td>${escapeHtml(request.quantity ?? "")}</td>
                   <td>${escapeHtml(request.unit || "")}</td>
                   <td>${escapeHtml(request.shelfCode || "")}</td>
                   <td>${escapeHtml([request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</td>
-                  <td>${escapeHtml(request.supplierName || "")}</td>
                 </tr>
               `)
               .join("")}
@@ -163,6 +190,36 @@ async function markReceived(row, button) {
   }
 }
 
+function updateRequestFromLine(line) {
+  currentSheet.requests = currentSheet.requests.map((request) => {
+    if (request.driverLineId !== line.id) return request;
+    return {
+      ...request,
+      supplierName: line.supplierName || request.supplierName,
+      supplierContact: line.supplierContact || request.supplierContact
+    };
+  });
+}
+
+async function changeSupplier(row, select) {
+  const lineId = row.dataset.lineId;
+  select.disabled = true;
+  setMessage("Saving supplier...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ supplierName: select.value })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage("");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    select.disabled = false;
+  }
+}
+
 sheetDate.value = todayLocal();
 loadSheetButton.addEventListener("click", () => loadSheet().catch((error) => setMessage(error.message, true)));
 logoutButton.addEventListener("click", showLogin);
@@ -173,6 +230,14 @@ receivingList.addEventListener("click", (event) => {
   const row = button.closest("tr");
   if (!row?.dataset.lineId) return;
   markReceived(row, button);
+});
+
+receivingList.addEventListener("change", (event) => {
+  const select = event.target.closest(".receiving-supplier-select");
+  if (!select) return;
+  const row = select.closest("tr");
+  if (!row?.dataset.lineId) return;
+  changeSupplier(row, select);
 });
 
 loginForm.addEventListener("submit", async (event) => {

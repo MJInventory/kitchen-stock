@@ -9,6 +9,8 @@ const refreshButton = document.querySelector("#refreshButton");
 const saveAllButton = document.querySelector("#saveAllButton");
 const areaFilter = document.querySelector("#areaFilter");
 const locationFilter = document.querySelector("#locationFilter");
+const locationPickerButton = document.querySelector("#locationPickerButton");
+const locationPickerList = document.querySelector("#locationPickerList");
 const categoryFilter = document.querySelector("#categoryFilter");
 const countMessage = document.querySelector("#countMessage");
 const stockCountList = document.querySelector("#stockCountList");
@@ -88,6 +90,38 @@ function populateSelect(select, values, firstLabel) {
   if (values.includes(current)) select.value = current;
 }
 
+function syncLocationPicker(values, firstLabel) {
+  const current = locationFilter.value;
+  const options = [{ value: "", label: firstLabel }, ...values.map((value) => ({ value, label: value }))];
+
+  locationPickerButton.textContent = current || firstLabel;
+  locationPickerList.innerHTML = options
+    .map(
+      (option) => `
+        <button
+          class="location-picker-option${option.value === current ? " selected" : ""}"
+          type="button"
+          role="option"
+          aria-selected="${option.value === current ? "true" : "false"}"
+          data-value="${escapeHtml(option.value)}"
+        >
+          ${escapeHtml(option.label)}
+        </button>
+      `
+    )
+    .join("");
+}
+
+function closeLocationPicker() {
+  locationPickerList.hidden = true;
+  locationPickerButton.setAttribute("aria-expanded", "false");
+}
+
+function openLocationPicker() {
+  locationPickerList.hidden = false;
+  locationPickerButton.setAttribute("aria-expanded", "true");
+}
+
 function selectedLocation() {
   return locationFilter.value;
 }
@@ -118,6 +152,8 @@ function renderFilters() {
   if (!locationFilter.value && locations.length) {
     locationFilter.value = locations[0];
   }
+
+  syncLocationPicker(locations, "Choose Storage Location");
 }
 
 function renderList() {
@@ -244,8 +280,31 @@ refreshButton.addEventListener("click", () => loadItems().catch((error) => messa
 saveAllButton.addEventListener("click", saveAllCounts);
 backToTopButton.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
-[areaFilter, locationFilter, categoryFilter].forEach((control) => {
+[areaFilter, categoryFilter].forEach((control) => {
   control.addEventListener("change", renderList);
+});
+
+locationPickerButton.addEventListener("click", () => {
+  if (locationPickerList.hidden) openLocationPicker();
+  else closeLocationPicker();
+});
+
+locationPickerList.addEventListener("click", (event) => {
+  const option = event.target.closest(".location-picker-option");
+  if (!option) return;
+  locationFilter.value = option.dataset.value || "";
+  closeLocationPicker();
+  renderList();
+  syncLocationPicker([...new Set(items.map((item) => item.storageLocation).filter(Boolean))].sort(), "Choose Storage Location");
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".stock-location-picker")) return;
+  closeLocationPicker();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeLocationPicker();
 });
 
 stockCountList.addEventListener("input", (event) => {

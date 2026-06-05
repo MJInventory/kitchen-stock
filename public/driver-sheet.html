@@ -37,6 +37,7 @@
           <span id="currentUser" class="user-chip"></span>
           <a class="button secondary" href="/">Main Menu</a>
           <a class="button secondary" href="/receiving-sheet.html">Receiving</a>
+          <a class="button secondary" href="/order-report.html">Reports</a>
           <button id="logoutButton" class="secondary" type="button">Log Out</button>
         </div>
       </header>

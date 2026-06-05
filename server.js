@@ -542,9 +542,12 @@ function normalizeDriverLine(record) {
     supplierName: record.fields["Supplier Name"] || "",
     supplierContact: record.fields["Supplier Contact"] || "",
     ordered: Boolean(record.fields.Ordered),
+    toDeliver: Boolean(record.fields["2Deliver"]),
     orderedAt: record.fields["Ordered Date/Time"] || "",
     orderedBy: record.fields["Ordered By"] || "",
     received: Boolean(record.fields.Received),
+    receivedAt: record.fields["Received Date/Time"] || "",
+    receivedBy: record.fields["Received By"] || "",
     requestStatus: record.fields["Request Status"] || "",
     notes: record.fields.Notes || ""
   };
@@ -598,9 +601,12 @@ async function listDriverSheet(date) {
       ...request,
       driverLineId: line?.id || "",
       ordered: Boolean(line?.ordered),
+      toDeliver: Boolean(line?.toDeliver),
       orderedAt: line?.orderedAt || "",
       orderedBy: line?.orderedBy || "",
       delivered: Boolean(line?.received || request.received),
+      receivedAt: line?.receivedAt || request.receivedAt || "",
+      receivedBy: line?.receivedBy || request.receivedBy || "",
       supplierName: line?.supplierName || request.supplierName,
       supplierContact: line?.supplierContact || request.supplierContact
     };
@@ -648,6 +654,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
           "Shelf Code": request.shelfCode || "",
           "Request Status": request.status,
           Received: Boolean(request.received),
+          "2Deliver": false,
           Notes: request.notes || ""
         }
       })
@@ -1177,6 +1184,10 @@ async function updateDriverLine(recordId, payload, userName) {
     fields["Ordered By"] = ordered ? userName : "";
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, "toDeliver")) {
+    fields["2Deliver"] = Boolean(payload.toDeliver);
+  }
+
   if (Object.prototype.hasOwnProperty.call(payload, "supplierName")) {
     const supplierName = String(payload.supplierName || "").trim();
     const suppliers = await getSuppliers();
@@ -1210,11 +1221,14 @@ async function deliverDriverLine(recordId, requestRecordId, userName) {
   if (!tableId) throw new Error("Driver Sheet Lines table is not configured.");
 
   const request = await deliverRequest(requestRecordId, userName);
+  const receivedAt = new Date().toISOString();
   const record = await airtable(`${tableId}/${recordId}`, {
     method: "PATCH",
     body: JSON.stringify({
       fields: {
         Received: true,
+        "Received Date/Time": receivedAt,
+        "Received By": userName,
         "Request Status": "Fulfilled"
       }
     })
@@ -1308,6 +1322,17 @@ const server = http.createServer(async (req, res) => {
       if (!requireUser(req, res)) return;
       const url = new URL(req.url, "http://localhost");
       send(res, 200, await listDriverSheet(url.searchParams.get("date")));
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/receiving-sheet")) {
+      if (!requireUser(req, res)) return;
+      const url = new URL(req.url, "http://localhost");
+      const sheet = await listDriverSheet(url.searchParams.get("date"));
+      send(res, 200, {
+        ...sheet,
+        requests: sheet.requests.filter((request) => !request.delivered)
+      });
       return;
     }
 

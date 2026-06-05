@@ -1,0 +1,85 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJOrdering">
+    <title>Stock Count</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="order-app stock-count-app">
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Stock Count</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="order-shell">
+      <header class="order-topbar">
+        <div class="brand-block">
+          <img class="brand-mark brand-logo" src="/madame-janette-logo.png" alt="Madame Janette">
+          <div>
+            <h1>Inventory &amp; Ordering system</h1>
+            <p>STOCK COUNT</p>
+          </div>
+        </div>
+        <nav class="order-nav" aria-label="Inventory tools">
+          <a href="/">Main Menu</a>
+          <a href="/inventory-settings.html">Setup</a>
+          <a href="/invoice-capture.html">Invoices</a>
+          <a href="/driver-sheet.html">Driver Sheet</a>
+          <a href="/receiving-sheet.html">Receiving</a>
+        </nav>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <button id="saveAllButton" class="save-pill" type="button">Save Counts</button>
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh">Refresh</button>
+          <button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>
+        </div>
+      </header>
+
+      <section class="stock-count-toolbar">
+        <div class="stock-location-picker">
+          <span>Storage location</span>
+          <button id="locationPickerButton" class="location-picker-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+            Choose Storage Location
+          </button>
+          <div id="locationPickerList" class="location-picker-list" role="listbox" hidden></div>
+          <select id="locationFilter" aria-label="Storage location"></select>
+        </div>
+        <div class="order-filters">
+          <select id="areaFilter" aria-label="Inventory area">
+            <option value="">All Areas</option>
+          </select>
+          <select id="categoryFilter" aria-label="Category">
+            <option value="">All Categories</option>
+          </select>
+        </div>
+        <p id="countMessage" class="order-message" role="status"></p>
+      </section>
+
+      <section class="stock-count-heading">
+        <button id="backToTopButton" class="back-button" type="button">Back Top</button>
+        <div>
+          <h2 id="locationTitle">Stock Count</h2>
+          <p id="locationMeta">Select a storage location</p>
+        </div>
+      </section>
+
+      <section id="stockCountList" class="stock-count-list"></section>
+    </main>
+
+    <script src="/stock-count.js" type="module"></script>
+  </body>
+</html>
+
+

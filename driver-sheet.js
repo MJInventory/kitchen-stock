@@ -1,0 +1,86 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJOrdering">
+    <title>Driver Sheet</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Driver Sheet</h1>
+        <label>
+          Username
+          <input id="usernameInput" type="text" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell sheet-shell">
+      <header class="topbar no-print">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Driver Sheet</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <a class="button secondary" href="/receiving-sheet.html">Receiving</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel no-print">
+        <div class="row">
+          <label>
+            Pickup date
+            <input id="sheetDate" type="date">
+          </label>
+          <label>
+            Driver
+            <input id="driverName" type="text" placeholder="Driver name">
+          </label>
+        </div>
+        <div class="sheet-actions">
+          <button id="loadSheetButton" type="button">Load Sheet</button>
+          <button id="printSheetButton" type="button">Print / Save PDF</button>
+        </div>
+        <p id="sheetMessage" role="status"></p>
+      </section>
+
+      <section id="printSheet" class="print-sheet">
+        <div class="sheet-header">
+          <div>
+            <p class="eyebrow">Daily Pickup Order</p>
+            <h1 id="printTitle">Driver Sheet</h1>
+          </div>
+          <div class="sheet-meta">
+            <span id="printDate"></span>
+            <span id="printDriver"></span>
+          </div>
+        </div>
+
+        <div class="signature-row">
+          <span>Driver signature:</span>
+          <span>Received by:</span>
+        </div>
+
+        <div id="sheetList" class="sheet-list"></div>
+      </section>
+    </main>
+
+    <script src="/driver-sheet.js" type="module"></script>
+  </body>
+</html>
+

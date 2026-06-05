@@ -1,0 +1,111 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="MJOrdering">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Inventory & Ordering System</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="order-app">
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Kitchen Stock</h1>
+        <label>
+          Username
+          <input id="usernameInput" type="text" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="order-shell">
+      <header class="order-topbar">
+        <div class="brand-block">
+          <img class="brand-mark brand-logo" src="/madame-janette-logo.png" alt="Madame Janette">
+          <div>
+            <h1>Inventory &amp; Ordering system</h1>
+            <p>MADAME JANETTE</p>
+          </div>
+        </div>
+        <nav class="order-nav" aria-label="Inventory tools">
+          <a href="/inventory-settings.html">Setup</a>
+          <a href="/stock-count.html">Stock Count</a>
+          <a href="/invoice-capture.html">Invoices</a>
+          <a href="/driver-sheet.html">Driver Sheet</a>
+          <a href="/receiving-sheet.html">Receiving</a>
+        </nav>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <button id="submitButton" class="save-pill" type="button">0 Saved</button>
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh">Refresh</button>
+          <button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>
+        </div>
+      </header>
+
+      <section class="order-search-band">
+        <label class="search-box">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Quick search products..." autocomplete="off">
+        </label>
+        <div class="order-filters">
+          <select id="areaFilter" aria-label="Inventory area">
+            <option value="">All Areas</option>
+            <option>Bar</option>
+            <option>Kitchen</option>
+            <option>FOH</option>
+          </select>
+          <select id="locationFilter" aria-label="Storage location">
+            <option value="">All Locations</option>
+            <option>Dry Storage</option>
+            <option>Cooler</option>
+            <option>Freezer</option>
+            <option>Liquor Storage</option>
+            <option>General Storage</option>
+          </select>
+        </div>
+        <div id="selectedChips" class="selected-chips"></div>
+        <p id="message" class="order-message" role="status"></p>
+      </section>
+
+      <section id="categoryView" class="category-view">
+        <div class="order-divider"><span>All Categories</span></div>
+        <div id="categoryGrid" class="category-grid"></div>
+      </section>
+
+      <section id="productView" class="product-view" hidden>
+        <div class="product-heading">
+          <button id="backButton" class="back-button" type="button">Back Home</button>
+          <div>
+            <h2 id="categoryTitle">Products</h2>
+            <p id="categoryMeta"></p>
+          </div>
+        </div>
+        <div id="productList" class="product-list"></div>
+      </section>
+
+      <section class="daily-order-panel">
+        <div class="daily-order-heading">
+          <h2>Today's Order</h2>
+          <span id="dailyOrderCount"></span>
+        </div>
+        <div id="dailyOrderList" class="daily-order-list"></div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
+

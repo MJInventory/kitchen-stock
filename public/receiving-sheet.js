@@ -54,6 +54,8 @@ function showLogin() {
   sessionUser = "";
   localStorage.removeItem("kitchenStockToken");
   localStorage.removeItem("kitchenStockUser");
+  localStorage.removeItem("kitchenStockRole");
+  localStorage.removeItem("kitchenStockPermissions");
 }
 
 async function api(path, options = {}) {
@@ -66,6 +68,9 @@ async function api(path, options = {}) {
   });
   const data = await response.json();
   if (response.status === 401) showLogin();
+  if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") {
+    window.location.href = "/change-password.html";
+  }
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
 }
@@ -78,6 +83,14 @@ function groupBySupplier(requests) {
     groups.get(supplier).push(request);
   }
   return groups;
+}
+
+function logicalRequestCompare(a, b) {
+  const storage = String(a.storageLocation || "").localeCompare(String(b.storageLocation || ""));
+  if (storage) return storage;
+  const shelf = String(a.shelfCode || "").localeCompare(String(b.shelfCode || ""), undefined, { numeric: true });
+  if (shelf) return shelf;
+  return String(a.itemName || "").localeCompare(String(b.itemName || ""));
 }
 
 function supplierOptions(selectedSupplier) {
@@ -129,13 +142,7 @@ function renderSheet(data) {
           </thead>
           <tbody>
             ${requests
-              .sort((a, b) => {
-                const storage = (a.storageLocation || "").localeCompare(b.storageLocation || "");
-                if (storage) return storage;
-                const shelf = (a.shelfCode || "").localeCompare(b.shelfCode || "", undefined, { numeric: true });
-                if (shelf) return shelf;
-                return (a.itemName || "").localeCompare(b.itemName || "");
-              })
+              .sort(logicalRequestCompare)
               .map((request) => `
                 <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                   <td>
@@ -260,6 +267,12 @@ loginForm.addEventListener("submit", async (event) => {
     sessionUser = data.user.name;
     localStorage.setItem("kitchenStockToken", sessionToken);
     localStorage.setItem("kitchenStockUser", sessionUser);
+    localStorage.setItem("kitchenStockRole", data.user.role || "user");
+    localStorage.setItem("kitchenStockPermissions", JSON.stringify(data.user.permissions || {}));
+    if (data.user.mustChangePassword) {
+      window.location.href = "/change-password.html";
+      return;
+    }
     passwordInput.value = "";
     setLoginMessage("");
     showApp();

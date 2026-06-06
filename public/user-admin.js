@@ -35,6 +35,8 @@ function saveSession(data) {
   localStorage.setItem("kitchenStockUser", sessionUser);
   localStorage.setItem("kitchenStockRole", data.user.role || "user");
   localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
+  localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
+  window.applyKitchenTheme?.(data.user.theme || "dark");
 }
 
 function showApp() {
@@ -84,6 +86,12 @@ function renderUsers(users) {
           <option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>
         </select>
       </label>
+      <label>Theme
+        <select class="user-theme" ${user.editable ? "" : "disabled"}>
+          <option value="dark"${user.theme !== "light" ? " selected" : ""}>Dark</option>
+          <option value="light"${user.theme === "light" ? " selected" : ""}>Light</option>
+        </select>
+      </label>
       <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
       <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
       <button class="save-user" type="button" ${user.editable ? "" : "disabled"}>Save</button>
@@ -109,6 +117,7 @@ async function saveUser(row) {
       name: row.querySelector("strong").textContent,
       password: row.querySelector(".user-password").value,
       role: row.querySelector(".user-role").value,
+      theme: row.querySelector(".user-theme").value,
       active: row.querySelector(".user-active").checked,
       mustChangePassword: row.querySelector(".user-must-change").checked
     })
@@ -150,6 +159,7 @@ newUserForm.addEventListener("submit", async (event) => {
         name: document.querySelector("#newName").value,
         password: document.querySelector("#newPassword").value,
         role: document.querySelector("#newRole").value,
+        theme: document.querySelector("#newTheme").value,
         active: true,
         mustChangePassword: document.querySelector("#newMustChange").checked
       })

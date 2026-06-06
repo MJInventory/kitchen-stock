@@ -8,6 +8,7 @@ const currentUser = document.querySelector("#currentUser");
 const logoutButton = document.querySelector("#logoutButton");
 const driverName = document.querySelector("#driverName");
 const loadSheetButton = document.querySelector("#loadSheetButton");
+const saveDriverButton = document.querySelector("#saveDriverButton");
 const printSheetButton = document.querySelector("#printSheetButton");
 const sheetMessage = document.querySelector("#sheetMessage");
 const printDate = document.querySelector("#printDate");
@@ -15,6 +16,7 @@ const printDriver = document.querySelector("#printDriver");
 const sheetList = document.querySelector("#sheetList");
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 let currentSheet = { date: "", requests: [], suppliers: [] };
 
 function todayLocal() {
@@ -69,6 +71,9 @@ async function api(path, options = {}) {
   });
   const data = await response.json();
   if (response.status === 401) showLogin();
+  if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") {
+    window.location.href = "/change-password.html";
+  }
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
 }
@@ -77,29 +82,37 @@ function groupRequests(requests) {
   const groups = new Map();
 
   for (const request of requests) {
-    const subgroup = request.inventorySubgroup || "Unassigned Subgroup";
     const supplier = request.supplierName || "Unassigned Supplier";
+    const category = request.inventorySubgroup || request.category || "Unassigned Category";
 
-    if (!groups.has(subgroup)) {
-      groups.set(subgroup, {
-        subgroup,
-        suppliers: new Map()
+    if (!groups.has(supplier)) {
+      groups.set(supplier, {
+        supplier,
+        contact: request.supplierContact || "",
+        categories: new Map()
       });
     }
 
-    const subgroupEntry = groups.get(subgroup);
-    if (!subgroupEntry.suppliers.has(supplier)) {
-      subgroupEntry.suppliers.set(supplier, {
-        supplier,
-        contact: request.supplierContact || "",
+    const supplierEntry = groups.get(supplier);
+    if (!supplierEntry.categories.has(category)) {
+      supplierEntry.categories.set(category, {
+        category,
         requests: []
       });
     }
 
-    subgroupEntry.suppliers.get(supplier).requests.push(request);
+    supplierEntry.categories.get(category).requests.push(request);
   }
 
   return groups;
+}
+
+function logicalRequestCompare(a, b) {
+  const category = String(a.inventorySubgroup || a.category || "").localeCompare(String(b.inventorySubgroup || b.category || ""));
+  if (category) return category;
+  const shelf = String(a.shelfCode || "").localeCompare(String(b.shelfCode || ""), undefined, { numeric: true });
+  if (shelf) return shelf;
+  return String(a.itemName || "").localeCompare(String(b.itemName || ""));
 }
 
 function supplierOptions(selectedSupplier) {
@@ -121,6 +134,7 @@ function supplierOptions(selectedSupplier) {
 
 function renderSheet(data) {
   currentSheet = data;
+  if (data.driverName && !driverName.value) driverName.value = data.driverName;
   printDate.textContent = `Date: ${data.date}`;
   printDriver.textContent = `Driver: ${driverName.value || "________________"}`;
 
@@ -132,18 +146,18 @@ function renderSheet(data) {
   const groups = groupRequests(data.requests);
   sheetList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, group]) => `
+    .map(([, supplier]) => `
       <section class="sheet-group">
         <div class="supplier-heading">
-          <h2>${escapeHtml(group.subgroup)}</h2>
+          <h2>${escapeHtml(supplier.supplier)}</h2>
+          ${supplier.contact ? `<pre>${escapeHtml(supplier.contact)}</pre>` : ""}
         </div>
-        ${[...group.suppliers.entries()]
+        ${[...supplier.categories.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([, supplier]) => `
+          .map(([, category]) => `
             <div class="driver-supplier">
               <div class="driver-supplier-title">
-                <h3>${escapeHtml(supplier.supplier)}</h3>
-                ${supplier.contact ? `<pre>${escapeHtml(supplier.contact)}</pre>` : ""}
+                <h3>${escapeHtml(category.category)}</h3>
               </div>
               <table>
                 <thead>
@@ -156,11 +170,12 @@ function renderSheet(data) {
                     <th>Unit</th>
                     <th>Priority</th>
                     <th>2Deliver</th>
+                    <th>Delivery Day</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${supplier.requests
-                    .sort((a, b) => `${a.shelfCode || ""} ${a.itemName || ""}`.localeCompare(`${b.shelfCode || ""} ${b.itemName || ""}`))
+                  ${category.requests
+                    .sort(logicalRequestCompare)
                     .map((request) => `
                       <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                         <td>
@@ -186,6 +201,9 @@ function renderSheet(data) {
                           <button class="driver-check-button${request.toDeliver ? " checked" : ""}" type="button" data-action="toDeliver" ${request.driverLineId ? "" : "disabled"} aria-label="Mark 2Deliver">
                             ${request.toDeliver ? "&#10003;" : ""}
                           </button>
+                        </td>
+                        <td>
+                          <input class="delivery-day-input" type="date" value="${escapeHtml(request.deliveryDay || "")}" ${request.driverLineId ? "" : "disabled"} aria-label="Delivery day for ${escapeHtml(request.itemName)}">
                         </td>
                       </tr>
                     `)
@@ -214,6 +232,8 @@ function updateRequestFromLine(line) {
       ...request,
       ordered: line.ordered,
       toDeliver: line.toDeliver,
+      deliveryDay: line.deliveryDay || "",
+      driverName: line.driverName || request.driverName,
       delivered: line.received || request.delivered,
       supplierName: line.supplierName || request.supplierName,
       supplierContact: line.supplierContact || request.supplierContact
@@ -264,12 +284,13 @@ async function markDelivered(row, button) {
 async function toggleToDeliver(row, button) {
   const lineId = row.dataset.lineId;
   const toDeliver = !button.classList.contains("checked");
+  const deliveryDay = row.querySelector(".delivery-day-input")?.value || "";
   button.disabled = true;
   setMessage("Saving 2Deliver status...");
   try {
     const { line } = await api(`/api/driver-lines/${lineId}`, {
       method: "PATCH",
-      body: JSON.stringify({ toDeliver })
+      body: JSON.stringify({ toDeliver, deliveryDay })
     });
     updateRequestFromLine(line);
     renderSheet(currentSheet);
@@ -279,6 +300,24 @@ async function toggleToDeliver(row, button) {
   } finally {
     button.disabled = false;
   }
+}
+
+async function saveDriverAssignment() {
+  if (!sessionPermissions.canAddInventoryItems) {
+    setMessage("Only admins and power users can assign a driver.", true);
+    return;
+  }
+  setMessage("Assigning driver...");
+  const result = await api("/api/driver-sheet/driver", {
+    method: "PATCH",
+    body: JSON.stringify({
+      date: sheetDate.value,
+      driverName: driverName.value
+    })
+  });
+  currentSheet.driverName = result.driverName;
+  printDriver.textContent = `Driver: ${result.driverName}`;
+  setMessage(`Driver assigned to ${result.updated} line(s).`);
 }
 
 async function changeSupplier(row, select) {
@@ -302,6 +341,7 @@ async function changeSupplier(row, select) {
 
 sheetDate.value = todayLocal();
 loadSheetButton.addEventListener("click", () => loadSheet().catch((error) => setMessage(error.message, true)));
+saveDriverButton.addEventListener("click", () => saveDriverAssignment().catch((error) => setMessage(error.message, true)));
 driverName.addEventListener("input", () => {
   printDriver.textContent = `Driver: ${driverName.value || "________________"}`;
 });
@@ -349,8 +389,15 @@ loginForm.addEventListener("submit", async (event) => {
 
     sessionToken = data.token;
     sessionUser = data.user.name;
+    sessionPermissions = data.user.permissions || {};
     localStorage.setItem("kitchenStockToken", sessionToken);
     localStorage.setItem("kitchenStockUser", sessionUser);
+    localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
+    localStorage.setItem("kitchenStockRole", data.user.role || "user");
+    if (data.user.mustChangePassword) {
+      window.location.href = "/change-password.html";
+      return;
+    }
     passwordInput.value = "";
     setLoginMessage("");
     showApp();

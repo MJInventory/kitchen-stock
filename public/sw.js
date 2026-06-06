@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v47";
+const CACHE_NAME = "kitchen-stock-v48";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -8,6 +8,8 @@ const APP_SHELL = [
   "/change-password.html",
   "/user-admin.html",
   "/inventory-add.html",
+  "/storage-locations.html",
+  "/shelf-codes.html",
   "/standing-orders.html",
   "/inventory-settings.html",
   "/stock-count.html",
@@ -21,6 +23,8 @@ const APP_SHELL = [
   "/change-password.js",
   "/user-admin.js",
   "/inventory-add.js",
+  "/storage-locations.js",
+  "/shelf-codes.js",
   "/standing-orders.js",
   "/page-auth.js",
   "/inventory-settings.js",

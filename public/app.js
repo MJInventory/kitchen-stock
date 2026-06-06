@@ -28,6 +28,7 @@ let activeCategory = "";
 let selected = new Map();
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 
 if ("serviceWorker" in navigator) {
@@ -46,7 +47,8 @@ function setLoginMessage(text, isError = false) {
 
 function showApp() {
   loginScreen.hidden = true;
-  currentUser.textContent = sessionUser;
+  const roleLabel = sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
+  currentUser.textContent = sessionUser ? `${sessionUser} / ${roleLabel}` : "";
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];
   });
@@ -55,10 +57,11 @@ function showApp() {
 function saveSession(data) {
   sessionToken = data.token || sessionToken;
   sessionUser = data.user.name;
+  sessionRole = data.user.role || "user";
   sessionPermissions = data.user.permissions || {};
   localStorage.setItem("kitchenStockToken", sessionToken);
   localStorage.setItem("kitchenStockUser", sessionUser);
-  localStorage.setItem("kitchenStockRole", data.user.role || "user");
+  localStorage.setItem("kitchenStockRole", sessionRole);
   localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
 }
 

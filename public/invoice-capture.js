@@ -509,6 +509,8 @@ loginForm.addEventListener("submit", async (event) => {
     sessionUser = data.user.name;
     localStorage.setItem("kitchenStockToken", sessionToken);
     localStorage.setItem("kitchenStockUser", sessionUser);
+    localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
+    window.applyKitchenTheme?.(data.user.theme || "dark");
     passwordInput.value = "";
     showApp();
     await loadItems();

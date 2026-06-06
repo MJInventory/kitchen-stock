@@ -52,6 +52,10 @@ function showApp() {
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];
   });
+  document.querySelectorAll("#featureMenu option[data-permission]").forEach((option) => {
+    option.hidden = !sessionPermissions[option.dataset.permission];
+    option.disabled = !sessionPermissions[option.dataset.permission];
+  });
 }
 
 function saveSession(data) {
@@ -63,6 +67,8 @@ function saveSession(data) {
   localStorage.setItem("kitchenStockUser", sessionUser);
   localStorage.setItem("kitchenStockRole", sessionRole);
   localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
+  localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
+  window.applyKitchenTheme?.(data.user.theme || "dark");
 }
 
 function showLogin() {
@@ -479,6 +485,9 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
+document.querySelector("#featureMenu")?.addEventListener("change", (event) => {
+  if (event.target.value) window.location.href = event.target.value;
+});
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
 submitButton.addEventListener("click", () => submitSelected());
 

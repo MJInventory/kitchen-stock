@@ -52,6 +52,16 @@ function showApp() {
   });
 }
 
+function saveSession(data) {
+  sessionToken = data.token || sessionToken;
+  sessionUser = data.user.name;
+  sessionPermissions = data.user.permissions || {};
+  localStorage.setItem("kitchenStockToken", sessionToken);
+  localStorage.setItem("kitchenStockUser", sessionUser);
+  localStorage.setItem("kitchenStockRole", data.user.role || "user");
+  localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
+}
+
 function showLogin() {
   loginScreen.hidden = false;
   currentUser.textContent = "";
@@ -78,6 +88,17 @@ async function api(path, options) {
   }
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
+}
+
+async function refreshSession() {
+  const data = await api("/api/me");
+  saveSession({ token: sessionToken, user: data.user });
+  if (data.user.mustChangePassword) {
+    window.location.href = "/change-password.html";
+    return false;
+  }
+  showApp();
+  return true;
 }
 
 function escapeHtml(value) {
@@ -440,13 +461,7 @@ loginForm.addEventListener("submit", async (event) => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not log in.");
 
-    sessionToken = data.token;
-    sessionUser = data.user.name;
-    sessionPermissions = data.user.permissions || {};
-    localStorage.setItem("kitchenStockToken", sessionToken);
-    localStorage.setItem("kitchenStockUser", sessionUser);
-    localStorage.setItem("kitchenStockRole", data.user.role || "user");
-    localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
+    saveSession(data);
     if (data.user.mustChangePassword) {
       window.location.href = "/change-password.html";
       return;
@@ -572,8 +587,12 @@ dailyOrderList.addEventListener("click", (event) => {
 });
 
 if (sessionToken && sessionUser) {
-  showApp();
-  refresh().catch((error) => setMessage(error.message, true));
+  refreshSession()
+    .then((ok) => {
+      if (ok) return refresh();
+      return null;
+    })
+    .catch((error) => setMessage(error.message, true));
 } else {
   showLogin();
   updateSaveButton();

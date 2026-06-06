@@ -169,6 +169,14 @@ button:hover,
   background: #344054;
 }
 
+.danger-button {
+  background: var(--danger);
+}
+
+.danger-button:hover {
+  background: #8f1f17;
+}
+
 .top-actions,
 .sheet-actions {
   display: flex;
@@ -267,6 +275,69 @@ button:hover,
 .setup-menu-links .button {
   width: auto;
   min-width: 150px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.inline-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+}
+
+.inline-fieldset legend {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+.standing-item-adder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.standing-items {
+  display: grid;
+  gap: 8px;
+}
+
+.standing-item-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 96px auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--ink) 12%);
+  padding: 10px;
+}
+
+.standing-item-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.standing-item-line span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .settings-item {
@@ -1678,6 +1749,16 @@ body.order-app {
 
   .row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-form-grid,
+  .standing-item-adder,
+  .standing-item-line {
+    grid-template-columns: 1fr;
+  }
+
+  .standing-item-line strong {
+    white-space: normal;
   }
 
   .settings-item {

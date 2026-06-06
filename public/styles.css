@@ -675,6 +675,15 @@ body.order-app {
   outline: none;
 }
 
+.app-version {
+  padding: 18px 16px 22px;
+  color: rgba(242, 236, 219, 0.45);
+  font: 11px Arial, Helvetica, sans-serif;
+  letter-spacing: 1px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .order-app .user-chip {
   color: var(--order-muted);
   font-family: Arial, Helvetica, sans-serif;

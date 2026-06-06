@@ -254,6 +254,21 @@ button:hover,
   margin-top: 16px;
 }
 
+.setup-menu-panel {
+  margin-bottom: 14px;
+}
+
+.setup-menu-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.setup-menu-links .button {
+  width: auto;
+  min-width: 150px;
+}
+
 .settings-item {
   display: grid;
   grid-template-columns: minmax(220px, 1.2fr) 150px 130px 130px 110px 100px;

@@ -40,17 +40,21 @@
             <p>MADAME JANETTE</p>
           </div>
         </div>
-        <nav class="order-nav" aria-label="Inventory tools">
-          <a href="/inventory-settings.html">Setup</a>
-          <a href="/inventory-add.html" data-permission="canAddInventoryItems">Add Item</a>
-          <a href="/standing-orders.html" data-permission="canAddInventoryItems">Standing Orders</a>
-          <a href="/stock-count.html">Stock Count</a>
-          <a href="/invoice-capture.html" data-permission="canUseInvoices">Invoices</a>
-          <a href="/driver-sheet.html">Driver Sheet</a>
-          <a href="/receiving-sheet.html">Receiving</a>
-          <a href="/order-report.html">Reports</a>
-          <a href="/user-admin.html" data-permission="canAdminUsers">Users</a>
-        </nav>
+        <details class="feature-menu">
+          <summary>Menu</summary>
+          <nav class="feature-menu-list" aria-label="Inventory tools">
+            <a href="/">Ordering</a>
+            <a href="/stock-count.html">Stock Count</a>
+            <a href="/driver-sheet.html">Driver Sheet</a>
+            <a href="/receiving-sheet.html">Receiving</a>
+            <a href="/order-report.html">Reports</a>
+            <a href="/inventory-settings.html" data-permission="canAddInventoryItems">Inventory Setup</a>
+            <a href="/inventory-add.html" data-permission="canAddInventoryItems">Add Item</a>
+            <a href="/standing-orders.html" data-permission="canAddInventoryItems">Standing Orders</a>
+            <a href="/invoice-capture.html" data-permission="canUseInvoices">Invoices</a>
+            <a href="/user-admin.html" data-permission="canAdminUsers">User Admin</a>
+          </nav>
+        </details>
         <div class="top-actions">
           <span id="currentUser" class="user-chip"></span>
           <button id="submitButton" class="save-pill" type="button">0 Saved</button>
@@ -109,7 +113,7 @@
       </section>
     </main>
 
-    <footer class="app-version">MJOrdering v44</footer>
+    <footer class="app-version">MJOrdering v45</footer>
     <script src="/app.js" type="module"></script>
   </body>
 </html>

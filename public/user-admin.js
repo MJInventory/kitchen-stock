@@ -42,8 +42,12 @@ function saveSession(data) {
 function showApp() {
   loginScreen.hidden = true;
   const role = localStorage.getItem("kitchenStockRole") || "user";
-  const roleLabel = role === "admin" ? "Admin" : role === "power-user" ? "Power User" : "User";
+  const roleLabel = role === "god" ? "God" : role === "admin" ? "Admin" : role === "power-user" ? "Power User" : "User";
   currentUser.textContent = sessionUser ? `${sessionUser} / ${roleLabel}` : "";
+  document.querySelectorAll("[data-god-only]").forEach((option) => {
+    option.hidden = !permissions.canManageAdminRoles;
+    option.disabled = !permissions.canManageAdminRoles;
+  });
 }
 
 function showLogin() {
@@ -80,10 +84,11 @@ function renderUsers(users) {
       </div>
       <label>Password <input class="user-password" type="text" value="${escapeHtml(user.password)}" ${user.editable ? "" : "disabled"}></label>
       <label>Role
-        <select class="user-role" ${user.editable ? "" : "disabled"}>
+        <select class="user-role" ${user.editable && user.canEditRole ? "" : "disabled"}>
           <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
           <option value="power-user"${user.role === "power-user" ? " selected" : ""}>Power User</option>
           <option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>
+          <option value="god"${user.role === "god" ? " selected" : ""}>God</option>
         </select>
       </label>
       <label>Theme
@@ -94,7 +99,8 @@ function renderUsers(users) {
       </label>
       <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
       <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
-      <button class="save-user" type="button" ${user.editable ? "" : "disabled"}>Save</button>
+      <button class="save-user" type="button" ${user.editable && user.canEditRole ? "" : "disabled"}>Save</button>
+      <button class="delete-user danger-button" type="button" ${user.editable && user.canDelete ? "" : "disabled"}>Delete</button>
     </article>
   `).join("");
 }
@@ -173,6 +179,20 @@ newUserForm.addEventListener("submit", async (event) => {
 });
 
 userList.addEventListener("click", (event) => {
+  const deleteButton = event.target.closest(".delete-user");
+  if (deleteButton) {
+    const row = deleteButton.closest(".user-admin-row");
+    const name = row.querySelector("strong").textContent;
+    if (!confirm(`Delete user ${name}?`)) return;
+    deleteButton.disabled = true;
+    api(`/api/app-users/${row.dataset.userId}`, { method: "DELETE" })
+      .then(loadUsers)
+      .then(() => setMessage("User deleted."))
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => { deleteButton.disabled = false; });
+    return;
+  }
+
   const button = event.target.closest(".save-user");
   if (!button) return;
   const row = button.closest(".user-admin-row");

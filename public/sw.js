@@ -1,10 +1,14 @@
-const CACHE_NAME = "kitchen-stock-v39";
+const CACHE_NAME = "kitchen-stock-v43";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/driver-sheet.html",
   "/receiving-sheet.html",
   "/order-report.html",
+  "/change-password.html",
+  "/user-admin.html",
+  "/inventory-add.html",
+  "/standing-orders.html",
   "/inventory-settings.html",
   "/stock-count.html",
   "/invoice-capture.html",
@@ -13,6 +17,11 @@ const APP_SHELL = [
   "/driver-sheet.js",
   "/receiving-sheet.js",
   "/order-report.js",
+  "/change-password.js",
+  "/user-admin.js",
+  "/inventory-add.js",
+  "/standing-orders.js",
+  "/page-auth.js",
   "/inventory-settings.js",
   "/stock-count.js",
   "/invoice-capture.js",

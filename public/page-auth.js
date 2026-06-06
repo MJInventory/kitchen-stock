@@ -66,6 +66,7 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
 
   async function verifyPermission() {
     const data = await api("/api/me");
+    if (data.token) saveSession(data);
     permissions = data.user.permissions || permissions;
     if (permission && !permissions[permission]) throw new Error("You do not have permission to use this screen.");
   }

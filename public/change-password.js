@@ -16,6 +16,8 @@ function saveSession(data) {
   localStorage.setItem("kitchenStockUser", data.user.name);
   localStorage.setItem("kitchenStockRole", data.user.role || "user");
   localStorage.setItem("kitchenStockPermissions", JSON.stringify(data.user.permissions || {}));
+  localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
+  window.applyKitchenTheme?.(data.user.theme || "dark");
   sessionToken = data.token;
 }
 

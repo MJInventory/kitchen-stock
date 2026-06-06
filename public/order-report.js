@@ -256,6 +256,8 @@ loginForm.addEventListener("submit", async (event) => {
     localStorage.setItem("kitchenStockUser", sessionUser);
     localStorage.setItem("kitchenStockRole", data.user.role || "user");
     localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
+    localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
+    window.applyKitchenTheme?.(data.user.theme || "dark");
     if (data.user.mustChangePassword) {
       window.location.href = "/change-password.html";
       return;

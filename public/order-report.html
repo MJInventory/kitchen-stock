@@ -42,9 +42,18 @@
             Report date
             <input id="reportDate" type="date">
           </label>
+          <label id="guestCountField" hidden>
+            Guests
+            <input id="guestCountInput" type="number" min="0" step="1" placeholder="Daily guests">
+          </label>
+          <label id="guestNotesField" hidden>
+            Guest notes
+            <input id="guestNotesInput" type="text" placeholder="Optional note">
+          </label>
         </div>
         <div class="sheet-actions">
           <button id="loadReportButton" type="button">Load Report</button>
+          <button id="saveGuestsButton" type="button" hidden>Save Guests</button>
           <button id="printReportButton" type="button">Print / Save PDF</button>
         </div>
         <p id="reportMessage" role="status"></p>

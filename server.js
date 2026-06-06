@@ -475,11 +475,12 @@ async function getRequests() {
 
 function normalizeAppUser(record) {
   const fields = record.fields || {};
+  const name = String(fields.Name || fields.Username || "").trim();
   return {
     id: record.id,
-    name: String(fields.Name || fields.Username || "").trim(),
+    name,
     password: String(fields.Password || "").trim(),
-    role: normalizeRole(fields.Role || "user"),
+    role: name.toLowerCase() === "enno" ? "admin" : normalizeRole(fields.Role || "user"),
     active: fields.Active !== false,
     mustChangePassword: Boolean(fields["Force Password Change"]),
     source: "airtable"
@@ -530,6 +531,12 @@ async function findAppUserByName(name) {
   const normalized = String(name || "").trim().toLowerCase();
   const appUsers = await getAppUsers();
   return appUsers.find((user) => user.name.toLowerCase() === normalized && user.active !== false);
+}
+
+async function refreshUserFromDirectory(user) {
+  const freshUser = await findAppUserByName(user?.name);
+  if (!freshUser) return user;
+  return freshUser;
 }
 
 function appUserFields(payload) {
@@ -1955,7 +1962,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url.startsWith("/api/me")) {
       const user = requireUser(req, res, { allowPasswordChange: true });
       if (!user) return;
-      send(res, 200, { user });
+      const freshUser = await refreshUserFromDirectory(user);
+      if (freshUser.active === false) {
+        send(res, 403, { error: "This user is no longer active." });
+        return;
+      }
+      send(res, 200, storeSession(freshUser));
       return;
     }
 

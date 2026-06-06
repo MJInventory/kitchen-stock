@@ -28,6 +28,7 @@ let activeCategory = "";
 let selected = new Map();
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -46,6 +47,9 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   currentUser.textContent = sessionUser;
+  document.querySelectorAll("[data-permission]").forEach((element) => {
+    element.hidden = !sessionPermissions[element.dataset.permission];
+  });
 }
 
 function showLogin() {
@@ -55,6 +59,8 @@ function showLogin() {
   sessionUser = "";
   localStorage.removeItem("kitchenStockToken");
   localStorage.removeItem("kitchenStockUser");
+  localStorage.removeItem("kitchenStockRole");
+  localStorage.removeItem("kitchenStockPermissions");
 }
 
 async function api(path, options) {
@@ -67,6 +73,9 @@ async function api(path, options) {
   });
   const data = await response.json();
   if (response.status === 401) showLogin();
+  if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") {
+    window.location.href = "/change-password.html";
+  }
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
 }
@@ -94,6 +103,16 @@ function itemMeta(item) {
 
 function stockMeta(item) {
   return `Current ${item.quantity ?? 0} ${itemUnit(item)} / min ${item.minimum ?? 0}`;
+}
+
+function isStandingOrder(request) {
+  return String(request.requestedBy || "").toLowerCase().includes("standing order")
+    || String(request.notes || "").toLowerCase().includes("standing order");
+}
+
+function expectedDateFromRequest(request) {
+  const match = String(request.notes || "").match(/Expected arrival:\s*(\d{4}-\d{2}-\d{2})/i);
+  return match ? match[1] : "";
 }
 
 function itemUnit(item) {
@@ -156,8 +175,29 @@ function itemNameFromRequest(request) {
   return allItems.find((item) => item.id === request.itemId)?.name || "Requested item";
 }
 
+function requestSortValue(request) {
+  const item = allItems.find((candidate) => candidate.id === request.itemId);
+  return {
+    supplier: item?.supplierName || request.supplierName || "",
+    category: request.inventorySubgroup || item?.inventorySubgroup || item?.category || "",
+    name: item?.name || "Requested item"
+  };
+}
+
+function logicalRequestCompare(a, b) {
+  const left = requestSortValue(a);
+  const right = requestSortValue(b);
+  const supplier = left.supplier.localeCompare(right.supplier);
+  if (supplier) return supplier;
+  const category = left.category.localeCompare(right.category);
+  if (category) return category;
+  return left.name.localeCompare(right.name);
+}
+
 function renderDailyOrder() {
-  const activeRequests = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
+  const activeRequests = recentRequests
+    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   dailyOrderList.innerHTML = activeRequests
     .slice(0, 100)
@@ -165,11 +205,17 @@ function renderDailyOrder() {
       <article class="daily-order-row">
         <div>
           <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
-          <span>${escapeHtml([request.quantity, request.inventorySubgroup, request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</span>
+          <span>${escapeHtml([
+            request.quantity,
+            request.inventorySubgroup,
+            request.inventoryArea,
+            request.storageLocation,
+            isStandingOrder(request) ? `Standing order${expectedDateFromRequest(request) ? ` expected ${expectedDateFromRequest(request)}` : ""}` : ""
+          ].filter(Boolean).join(" / "))}</span>
         </div>
         <div class="daily-order-actions">
           <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
-          <button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>
+          ${sessionPermissions.canDeleteAnyOrder || request.requestedBy === sessionUser ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
         </div>
       </article>
     `)
@@ -396,8 +442,15 @@ loginForm.addEventListener("submit", async (event) => {
 
     sessionToken = data.token;
     sessionUser = data.user.name;
+    sessionPermissions = data.user.permissions || {};
     localStorage.setItem("kitchenStockToken", sessionToken);
     localStorage.setItem("kitchenStockUser", sessionUser);
+    localStorage.setItem("kitchenStockRole", data.user.role || "user");
+    localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
+    if (data.user.mustChangePassword) {
+      window.location.href = "/change-password.html";
+      return;
+    }
     passwordInput.value = "";
     setLoginMessage("");
     showApp();

@@ -112,6 +112,7 @@ function publicUser(user) {
   return {
     name: user?.name || "",
     role,
+    theme: user?.theme === "light" ? "light" : "dark",
     active: user?.active !== false,
     mustChangePassword: Boolean(user?.mustChangePassword),
     source: user?.source || "airtable",
@@ -481,6 +482,7 @@ function normalizeAppUser(record) {
     name,
     password: String(fields.Password || "").trim(),
     role: name.toLowerCase() === "enno" ? "admin" : normalizeRole(fields.Role || "user"),
+    theme: String(fields.Theme || "dark").trim().toLowerCase() === "light" ? "light" : "dark",
     active: fields.Active !== false,
     mustChangePassword: Boolean(fields["Force Password Change"]),
     source: "airtable"
@@ -493,6 +495,7 @@ function envUsersList() {
     name: user.name,
     password: user.password,
     role: normalizeRole(user.role),
+    theme: user.theme === "light" ? "light" : "dark",
     active: user.active !== false,
     mustChangePassword: Boolean(user.mustChangePassword),
     source: "env"
@@ -543,6 +546,7 @@ function appUserFields(payload) {
   const name = String(payload.name || "").trim();
   const password = String(payload.password || "").trim();
   const role = normalizeRole(payload.role);
+  const theme = String(payload.theme || "dark").trim().toLowerCase() === "light" ? "Light" : "Dark";
   const active = payload.active !== false;
   const mustChangePassword = Boolean(payload.mustChangePassword);
 
@@ -552,6 +556,7 @@ function appUserFields(payload) {
     Name: name,
     Password: password,
     Role: role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User",
+    Theme: theme,
     Active: active,
     "Force Password Change": mustChangePassword
   };

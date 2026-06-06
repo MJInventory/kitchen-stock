@@ -32,6 +32,8 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
     localStorage.setItem("kitchenStockUser", sessionUser);
     localStorage.setItem("kitchenStockRole", data.user.role || "user");
     localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
+    localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
+    window.applyKitchenTheme?.(data.user.theme || "dark");
   }
 
   function showApp() {

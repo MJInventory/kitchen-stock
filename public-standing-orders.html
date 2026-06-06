@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJOrdering">
+    <title>Standing Orders</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Standing Orders</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell setup-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Standing Orders</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <form id="standingOrderForm" class="admin-form-grid">
+          <label>Item <select id="standingItem" required></select></label>
+          <label>Supplier <select id="standingSupplier"></select></label>
+          <label>Quantity <input id="standingQuantity" type="number" min="1" step="1" value="1" required></label>
+          <label>Expected arrival <input id="expectedDate" type="date" required></label>
+          <label>Schedule
+            <select id="schedule">
+              <option>Weekly</option>
+              <option>Daily</option>
+              <option>One Time</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>Other schedule <input id="otherSchedule" type="text" placeholder="Every 2 weeks, monthly, manual"></label>
+          <label class="wide-field">Notes <textarea id="standingNotes" rows="3"></textarea></label>
+          <button type="submit">Create Standing Order</button>
+          <p id="standingMessage" role="status"></p>
+        </form>
+      </section>
+
+      <section id="standingList" class="settings-list"></section>
+    </main>
+
+    <script src="/standing-orders.js" type="module"></script>
+  </body>
+</html>

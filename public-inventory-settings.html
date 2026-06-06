@@ -1,0 +1,75 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJOrdering">
+    <title>Inventory Setup</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Inventory Setup</h1>
+        <label>
+          Username
+          <input id="usernameInput" type="text" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell setup-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Inventory Setup</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="row">
+          <label>
+            Area
+            <select id="areaFilter">
+              <option value="">All</option>
+              <option>Bar</option>
+              <option>Kitchen</option>
+              <option>FOH</option>
+            </select>
+          </label>
+          <label>
+            Location
+            <select id="locationFilter">
+              <option value="">All</option>
+              <option>Dry Storage</option>
+              <option>Cooler</option>
+              <option>Freezer</option>
+              <option>Liquor Storage</option>
+              <option>General Storage</option>
+            </select>
+          </label>
+        </div>
+        <p id="setupMessage" role="status"></p>
+      </section>
+
+      <section id="itemSettingsList" class="settings-list"></section>
+    </main>
+
+    <script src="/inventory-settings.js" type="module"></script>
+  </body>
+</html>
+

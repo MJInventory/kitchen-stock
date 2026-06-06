@@ -13,6 +13,7 @@ const inventoryTableId = "tblEuIXG6gxEiD5oU";
 const requestsTableId = "tblUHh1jWhqMFEfjd";
 const suppliersTableId = "tbl2YP7EpUpk3Ug6f";
 const invoiceOcrRulesTableId = process.env.INVOICE_OCR_RULES_TABLE_ID || "tblW611UMHnm9LUeb";
+const appUsersTableIdFromEnv = process.env.APP_USERS_TABLE_ID || "";
 const token = process.env.AIRTABLE_TOKEN;
 const port = Number(process.env.PORT || 3000);
 const itemCacheMs = Number(process.env.ITEM_CACHE_MS || 10 * 60 * 1000);
@@ -21,6 +22,7 @@ const authSecret = process.env.AUTH_SECRET || "change-this-secret-in-render";
 const sessionMaxAgeMs = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
 const userConfig = process.env.APP_USERS || "";
 const allowedUnits = new Set(["box", "bag", "item", "bottle"]);
+const editableUserSources = new Set(["airtable"]);
 const accountingInbox = process.env.ACCOUNTING_INBOX || "bills.madameja.23d9599b@billfiles.com";
 const smtpHost = process.env.SMTP_HOST || "";
 const smtpPort = Number(process.env.SMTP_PORT || 587);
@@ -36,6 +38,7 @@ const cache = {
   items: { expiresAt: 0, value: null, pending: null },
   requests: { expiresAt: 0, value: null, pending: null },
   suppliers: { expiresAt: 0, value: null, pending: null },
+  appUsers: { expiresAt: 0, value: null, pending: null },
   lookups: { expiresAt: 0, value: null, pending: null },
   schema: { expiresAt: 0, value: null, pending: null }
 };
@@ -69,10 +72,15 @@ function parseUsers() {
       .map((entry) => entry.trim())
       .filter(Boolean)
       .map((entry) => {
-        const [name, password] = entry.split(":");
+        const [name, password, roleValue] = entry.split(":");
+        const role = normalizeRole(roleValue || (String(name || "").trim().toLowerCase() === "enno" ? "admin" : "user"));
         return [String(name || "").trim().toLowerCase(), {
           name: String(name || "").trim(),
-          password: String(password || "").trim()
+          password: String(password || "").trim(),
+          role,
+          active: true,
+          mustChangePassword: false,
+          source: "env"
         }];
       })
       .filter(([name, user]) => name && user.password)
@@ -80,6 +88,49 @@ function parseUsers() {
 }
 
 const users = parseUsers();
+
+function normalizeRole(role) {
+  const cleaned = String(role || "").trim().toLowerCase().replace(/[\s_-]+/g, "-");
+  if (cleaned === "admin") return "admin";
+  if (cleaned === "power-user" || cleaned === "poweruser" || cleaned === "power") return "power-user";
+  return "user";
+}
+
+function userPermissions(role) {
+  const normalized = normalizeRole(role);
+  return {
+    canAdminUsers: normalized === "admin",
+    canAddInventoryItems: normalized === "admin" || normalized === "power-user",
+    canDeleteAnyOrder: normalized === "admin" || normalized === "power-user",
+    canUseInvoices: normalized === "admin" || normalized === "power-user",
+    canSendInvoiceToAccounting: normalized === "admin"
+  };
+}
+
+function publicUser(user) {
+  const role = normalizeRole(user?.role);
+  return {
+    name: user?.name || "",
+    role,
+    active: user?.active !== false,
+    mustChangePassword: Boolean(user?.mustChangePassword),
+    source: user?.source || "airtable",
+    permissions: userPermissions(role)
+  };
+}
+
+function publicUserForAdmin(user) {
+  return {
+    ...publicUser(user),
+    id: user.id || "",
+    password: user.password || "",
+    editable: editableUserSources.has(user.source)
+  };
+}
+
+function storeSession(user) {
+  return { token: createSession(user), user: publicUser(user) };
+}
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -89,9 +140,12 @@ function sign(value) {
   return crypto.createHmac("sha256", authSecret).update(value).digest("base64url");
 }
 
-function createSession(userName) {
+function createSession(user) {
+  const safeUser = publicUser(user);
   const payload = JSON.stringify({
-    user: userName,
+    user: safeUser.name,
+    role: safeUser.role,
+    mustChangePassword: Boolean(safeUser.mustChangePassword),
     exp: Date.now() + sessionMaxAgeMs
   });
   const encoded = base64url(payload);
@@ -115,7 +169,7 @@ function verifySession(tokenValue) {
   try {
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
     if (!payload.user || !payload.exp || Date.now() > payload.exp) return null;
-    return { name: payload.user };
+    return publicUser({ name: payload.user, role: payload.role || "user", active: true, mustChangePassword: Boolean(payload.mustChangePassword) });
   } catch {
     return null;
   }
@@ -127,13 +181,23 @@ function bearerUser(req) {
   return verifySession(tokenValue);
 }
 
-function requireUser(req, res) {
+function requireUser(req, res, options = {}) {
   const user = bearerUser(req);
   if (!user) {
     send(res, 401, { error: "Login required." });
     return null;
   }
+  if (user.mustChangePassword && !options.allowPasswordChange) {
+    send(res, 403, { error: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
+    return null;
+  }
   return user;
+}
+
+function requireRole(user, res, predicate, message) {
+  if (predicate(user)) return true;
+  send(res, 403, { error: message || "You do not have permission for this action." });
+  return false;
 }
 
 function send(res, status, body, contentType = "application/json; charset=utf-8") {
@@ -409,10 +473,371 @@ async function getRequests() {
   return cached("requests", requestCacheMs, listRequests);
 }
 
+function normalizeAppUser(record) {
+  const fields = record.fields || {};
+  return {
+    id: record.id,
+    name: String(fields.Name || fields.Username || "").trim(),
+    password: String(fields.Password || "").trim(),
+    role: normalizeRole(fields.Role || "user"),
+    active: fields.Active !== false,
+    mustChangePassword: Boolean(fields["Force Password Change"]),
+    source: "airtable"
+  };
+}
+
+function envUsersList() {
+  return [...users.values()].map((user) => ({
+    id: `env-${user.name.toLowerCase()}`,
+    name: user.name,
+    password: user.password,
+    role: normalizeRole(user.role),
+    active: user.active !== false,
+    mustChangePassword: Boolean(user.mustChangePassword),
+    source: "env"
+  }));
+}
+
+async function getAppUsersTableId() {
+  if (appUsersTableIdFromEnv) return appUsersTableIdFromEnv;
+  const schema = await getSchema();
+  return schema.tables.appUsers || "";
+}
+
+async function listAppUsers() {
+  const tableId = await getAppUsersTableId();
+  if (!tableId) return envUsersList();
+
+  const records = await listAirtableRecords(tableId, {
+    pageSize: "100",
+    "sort[0][field]": "Name",
+    "sort[0][direction]": "asc"
+  });
+
+  const tableUsers = records.map(normalizeAppUser).filter((user) => user.name && user.password);
+  if (!tableUsers.some((user) => user.name.toLowerCase() === "enno")) {
+    const enno = users.get("enno");
+    if (enno) tableUsers.unshift({ ...enno, id: "env-enno", source: "env" });
+  }
+  return tableUsers;
+}
+
+async function getAppUsers() {
+  return cached("appUsers", 30 * 1000, listAppUsers);
+}
+
+async function findAppUserByName(name) {
+  const normalized = String(name || "").trim().toLowerCase();
+  const appUsers = await getAppUsers();
+  return appUsers.find((user) => user.name.toLowerCase() === normalized && user.active !== false);
+}
+
+function appUserFields(payload) {
+  const name = String(payload.name || "").trim();
+  const password = String(payload.password || "").trim();
+  const role = normalizeRole(payload.role);
+  const active = payload.active !== false;
+  const mustChangePassword = Boolean(payload.mustChangePassword);
+
+  if (!name) throw new Error("User name is required.");
+  if (!password) throw new Error("Password is required.");
+  return {
+    Name: name,
+    Password: password,
+    Role: role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User",
+    Active: active,
+    "Force Password Change": mustChangePassword
+  };
+}
+
+async function createAppUser(payload) {
+  const tableId = await getAppUsersTableId();
+  if (!tableId) throw new Error("App Users table is not configured yet. Create an Airtable table named App Users with fields Name, Password, Role, Active.");
+
+  const fields = appUserFields(payload);
+  const existing = await findAppUserByName(fields.Name);
+  if (existing && !String(existing.id).startsWith("env-")) throw new Error("That user already exists.");
+
+  const record = await airtable(tableId, {
+    method: "POST",
+    body: JSON.stringify({ fields })
+  });
+  cache.appUsers.expiresAt = 0;
+  return normalizeAppUser(record);
+}
+
+async function changeOwnPassword(userName, currentPassword, newPassword, options = {}) {
+  const appUser = await findAppUserByName(userName);
+  if (!appUser) throw new Error("User was not found.");
+  if (!editableUserSources.has(appUser.source)) {
+    throw new Error("This user is configured in Render. Move users to the App Users Airtable table before changing passwords online.");
+  }
+  if (!options.forceChange && appUser.password !== String(currentPassword || "")) throw new Error("Current password is not correct.");
+  if (String(newPassword || "").trim().length < 2) throw new Error("New password is too short.");
+
+  const tableId = await getAppUsersTableId();
+  const record = await airtable(`${tableId}/${appUser.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        Password: String(newPassword).trim(),
+        "Force Password Change": false
+      }
+    })
+  });
+  cache.appUsers.expiresAt = 0;
+  return normalizeAppUser(record);
+}
+
+async function itemFormOptions() {
+  const [suppliers, lookups] = await Promise.all([getSuppliers(), getLookups()]);
+  return {
+    suppliers,
+    categories: lookups.categories.records,
+    storageLocations: lookups.storageLocations.records,
+    inventoryAreas: lookups.inventoryAreas.records,
+    inventorySubgroups: lookups.inventorySubgroups.records,
+    shelfCodes: lookups.shelfCodes.records,
+    units: lookups.unitOfMeasurement.records.length
+      ? lookups.unitOfMeasurement.records
+      : [...allowedUnits].map((name) => ({ id: name, name }))
+  };
+}
+
+function addDays(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeStandingOrder(record) {
+  const fields = record.fields || {};
+  return {
+    id: record.id,
+    name: fields["Standing Order"] || fields.Name || "",
+    itemId: fields["Inventory Item"]?.[0] || fields["Inventory Item Record ID"] || "",
+    itemName: fields["Item Name"] || "",
+    supplierName: fields["Supplier Name"] || "",
+    quantity: fields.Quantity ?? 1,
+    expectedDate: fields["Expected Arrival Date"] || "",
+    schedule: fields.Schedule || "Weekly",
+    otherSchedule: fields["Other Schedule"] || "",
+    active: fields.Active !== false,
+    lastGeneratedDate: fields["Last Generated Date"] || "",
+    notes: fields.Notes || ""
+  };
+}
+
+async function getStandingOrdersTableId() {
+  const schema = await getSchema();
+  return schema.tables.standingOrders || "";
+}
+
+async function listStandingOrders() {
+  const tableId = await getStandingOrdersTableId();
+  if (!tableId) return [];
+  const records = await listAirtableRecords(tableId, {
+    "sort[0][field]": "Expected Arrival Date",
+    "sort[0][direction]": "asc"
+  });
+  return records.map(normalizeStandingOrder);
+}
+
+function nextStandingOrderDate(order, generatedDate) {
+  if (order.schedule === "Daily") return addDays(generatedDate, 1);
+  if (order.schedule === "Weekly") return addDays(generatedDate, 7);
+  return "";
+}
+
+function normalizeDailyGuestCount(record) {
+  const fields = record.fields || {};
+  return {
+    id: record.id,
+    date: fields.Date || fields["Guest Date"] || "",
+    guests: fields["Guest Count"] ?? fields.Guests ?? null,
+    notes: fields.Notes || "",
+    enteredBy: fields["Entered By"] || "",
+    enteredAt: fields["Entered At"] || ""
+  };
+}
+
+async function getDailyGuestCountsTableId() {
+  const schema = await getSchema();
+  return schema.tables.dailyGuestCounts || "";
+}
+
+async function getDailyGuestCount(date) {
+  const tableId = await getDailyGuestCountsTableId();
+  if (!tableId) return null;
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
+  const records = await listAirtableRecords(tableId, {
+    filterByFormula: `IS_SAME({Date}, '${selectedDate}', 'day')`,
+    pageSize: "1"
+  });
+  return records[0] ? normalizeDailyGuestCount(records[0]) : null;
+}
+
+async function saveDailyGuestCount(payload, user) {
+  if (!user.permissions?.canAdminUsers) throw new Error("Only admins can enter daily guest counts.");
+  const tableId = await getDailyGuestCountsTableId();
+  if (!tableId) throw new Error("Daily Guest Counts table is not configured. Add an Airtable table named Daily Guest Counts.");
+
+  const selectedDate = String(payload.date || "").trim();
+  const guests = Number(payload.guests);
+  const notes = String(payload.notes || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) throw new Error("Choose a valid date.");
+  if (!Number.isFinite(guests) || guests < 0) throw new Error("Guest count must be zero or greater.");
+
+  const existing = await getDailyGuestCount(selectedDate);
+  const fields = {
+    Date: selectedDate,
+    "Guest Count": guests,
+    Notes: notes,
+    "Entered By": user.name,
+    "Entered At": new Date().toISOString()
+  };
+
+  const record = existing
+    ? await airtable(`${tableId}/${existing.id}`, { method: "PATCH", body: JSON.stringify({ fields }) })
+    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
+
+  return normalizeDailyGuestCount(record);
+}
+
+function isStandingOrderDue(order, selectedDate) {
+  if (!order.active || !order.expectedDate) return false;
+  if (order.lastGeneratedDate === selectedDate) return false;
+  return order.expectedDate <= selectedDate;
+}
+
+async function updateStandingOrderRecord(recordId, payload) {
+  const tableId = await getStandingOrdersTableId();
+  if (!tableId) throw new Error("Standing Orders table is not configured.");
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid standing order record.");
+
+  const fields = standingOrderFields(payload);
+  const record = await airtable(`${tableId}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields })
+  });
+  return normalizeStandingOrder(record);
+}
+
+function standingOrderFields(payload) {
+  const itemId = String(payload.itemId || "").trim();
+  const itemName = String(payload.itemName || "").trim();
+  const supplierName = String(payload.supplierName || "").trim();
+  const quantity = Number(payload.quantityNeeded || payload.quantity || 0);
+  const expectedDate = String(payload.expectedDate || "").trim();
+  const schedule = ["Daily", "Weekly", "Other", "One Time"].includes(payload.schedule) ? payload.schedule : "Weekly";
+  const otherSchedule = String(payload.otherSchedule || payload.recurrence || "").trim();
+  const active = payload.active !== false;
+
+  if (!/^rec[a-zA-Z0-9]+$/.test(itemId)) throw new Error("Choose an inventory item.");
+  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedDate)) throw new Error("Choose the expected arrival date.");
+
+  return {
+    "Standing Order": `${itemName || itemId} - ${schedule}`,
+    "Inventory Item": [itemId],
+    "Inventory Item Record ID": itemId,
+    "Item Name": itemName,
+    "Supplier Name": supplierName,
+    Quantity: quantity,
+    "Expected Arrival Date": expectedDate,
+    Schedule: schedule,
+    "Other Schedule": otherSchedule,
+    Active: active,
+    Notes: String(payload.notes || "")
+  };
+}
+
+async function saveStandingOrderDefinition(payload, user) {
+  if (!user.permissions?.canAddInventoryItems) throw new Error("Only admins and power users can save standing orders.");
+  const tableId = await getStandingOrdersTableId();
+  if (!tableId) throw new Error("Standing Orders table is not configured. Add an Airtable table named Standing Orders.");
+
+  const items = await getItems();
+  const item = items.find((candidate) => candidate.id === String(payload.itemId || ""));
+  if (!item) throw new Error("Inventory item was not found.");
+
+  const fields = standingOrderFields({
+    ...payload,
+    itemName: item.name,
+    supplierName: payload.supplierName || item.supplierName || ""
+  });
+
+  const record = await airtable(tableId, {
+    method: "POST",
+    body: JSON.stringify({ fields })
+  });
+  return normalizeStandingOrder(record);
+}
+
+async function generateStandingOrdersForDate(selectedDate, userName = "System") {
+  const tableId = await getStandingOrdersTableId();
+  if (!tableId) return [];
+
+  const orders = (await listStandingOrders()).filter((order) => isStandingOrderDue(order, selectedDate));
+  const generated = [];
+  const items = await getItems();
+  const itemById = new Map(items.map((item) => [item.id, item]));
+
+  for (const order of orders) {
+    const item = itemById.get(order.itemId);
+    if (!item) continue;
+    const request = await createRequest({
+      itemId: item.id,
+      quantityNeeded: order.quantity,
+      urgencyLevel: "Low",
+      storageLocation: item.storageLocation || "",
+      inventoryArea: item.inventoryArea || "",
+      inventorySubgroup: item.inventorySubgroup || "",
+      shelfCode: item.shelfCode || "",
+      notes: [
+        `Standing order: ${order.schedule}.`,
+        order.otherSchedule ? `Schedule detail: ${order.otherSchedule}.` : "",
+        `Expected arrival: ${selectedDate}.`,
+        order.notes
+      ].filter(Boolean).join("\n")
+    }, `Standing Order - ${userName}`);
+
+    generated.push(request);
+    const nextDate = nextStandingOrderDate(order, selectedDate);
+    await airtable(`${tableId}/${order.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        fields: {
+          "Last Generated Date": selectedDate,
+          "Expected Arrival Date": nextDate || selectedDate,
+          Active: order.schedule === "One Time" ? false : order.active
+        }
+      })
+    });
+  }
+
+  return generated;
+}
+
+async function updateAppUser(recordId, payload) {
+  const tableId = await getAppUsersTableId();
+  if (!tableId || !/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid app user record.");
+
+  const fields = appUserFields(payload);
+  const record = await airtable(`${tableId}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields })
+  });
+  cache.appUsers.expiresAt = 0;
+  return normalizeAppUser(record);
+}
+
 async function listSchema() {
   const data = await airtable("tables", { meta: true });
   const requests = data.tables.find((table) => table.id === requestsTableId);
+  const driverSheetLines = data.tables.find((table) => table.name === "Driver Sheet Lines");
   const requestFields = new Set((requests?.fields || []).map((field) => field.name));
+  const driverLineFields = new Set((driverSheetLines?.fields || []).map((field) => field.name));
   const tableByName = new Map(data.tables.map((table) => [table.name, table.id]));
   const lookupTables = Object.fromEntries(
     Object.entries(lookupConfigs).map(([key, config]) => [key, tableByName.get(config.tableName) || ""])
@@ -420,15 +845,23 @@ async function listSchema() {
 
   return {
     tables: {
-      driverSheetLines: tableByName.get("Driver Sheet Lines") || "",
+      driverSheetLines: driverSheetLines?.id || "",
       stockCounts: tableByName.get("Stock Counts") || "",
       invoiceCaptures: tableByName.get("Invoice Captures") || "",
       invoiceLines: tableByName.get("Invoice Lines") || "",
+      appUsers: tableByName.get("App Users") || "",
+      standingOrders: tableByName.get("Standing Orders") || "",
+      dailyGuestCounts: tableByName.get("Daily Guest Counts") || "",
       ...lookupTables
     },
     requests: {
       hasStorageLocation: requestFields.has("Storage Location"),
       hasInventoryArea: requestFields.has("Inventory Area")
+    },
+    driverLines: {
+      hasDriver: driverLineFields.has("Driver"),
+      hasDeliveryDay: driverLineFields.has("Delivery Day"),
+      hasDeliveryDate: driverLineFields.has("Delivery Date")
     }
   };
 }
@@ -549,6 +982,8 @@ function normalizeDriverLine(record) {
     shelfCode: record.fields["Shelf Code"] || "",
     ordered: Boolean(record.fields.Ordered),
     toDeliver: Boolean(record.fields["2Deliver"]),
+    deliveryDay: record.fields["Delivery Day"] || record.fields["Delivery Date"] || "",
+    driverName: record.fields.Driver || "",
     orderedAt: record.fields["Ordered Date/Time"] || "",
     orderedBy: record.fields["Ordered By"] || "",
     received: Boolean(record.fields.Received),
@@ -557,6 +992,20 @@ function normalizeDriverLine(record) {
     requestStatus: record.fields["Request Status"] || "",
     notes: record.fields.Notes || ""
   };
+}
+
+function orderCategory(value) {
+  return String(value?.inventorySubgroup || value?.category || value?.inventoryArea || "").trim();
+}
+
+function logicalOrderCompare(a, b) {
+  const supplier = String(a.supplierName || "").localeCompare(String(b.supplierName || ""));
+  if (supplier) return supplier;
+  const category = orderCategory(a).localeCompare(orderCategory(b));
+  if (category) return category;
+  const shelf = String(a.shelfCode || "").localeCompare(String(b.shelfCode || ""), undefined, { numeric: true });
+  if (shelf) return shelf;
+  return String(a.itemName || a.name || "").localeCompare(String(b.itemName || b.name || ""));
 }
 
 async function listRequestsByRecordIds(recordIds) {
@@ -580,6 +1029,7 @@ async function listOrderReport(date) {
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
 
   await listDriverSheet(selectedDate);
+  const guestCount = await getDailyGuestCount(selectedDate);
   const lines = await listDriverSheetLines(driverLinesTableId, selectedDate);
   const requestById = await listRequestsByRecordIds(lines.map((line) => line.requestRecordId));
 
@@ -604,22 +1054,24 @@ async function listOrderReport(date) {
       };
     })
     .sort((a, b) => {
-      const supplier = (a.supplierName || "").localeCompare(b.supplierName || "");
-      if (supplier) return supplier;
-      const status = a.status.localeCompare(b.status);
+      const logical = logicalOrderCompare(a, b);
+      if (logical) return logical;
+      const status = String(a.status || "").localeCompare(String(b.status || ""));
       if (status) return status;
-      return (a.itemName || "").localeCompare(b.itemName || "");
+      return String(a.requestId || "").localeCompare(String(b.requestId || ""));
     });
 
   return {
     date: selectedDate,
     summary: {
+      guests: guestCount?.guests ?? null,
       totalLines: rows.length,
       orderedLines: rows.filter((row) => row.ordered).length,
       deliveredLines: rows.filter((row) => row.delivered).length,
       waitingLines: rows.filter((row) => row.waiting).length,
       toDeliverLines: rows.filter((row) => row.toDeliver).length
     },
+    guestCount,
     rows
   };
 }
@@ -631,6 +1083,7 @@ async function listDriverSheet(date) {
   const suppliers = await getSuppliers();
   const itemById = new Map(items.map((item) => [item.id, item]));
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
+  await generateStandingOrdersForDate(selectedDate);
   const formula = "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))";
   const query = new URLSearchParams({
     pageSize: "100",
@@ -673,6 +1126,8 @@ async function listDriverSheet(date) {
       driverLineId: line?.id || "",
       ordered: Boolean(line?.ordered),
       toDeliver: Boolean(line?.toDeliver),
+      deliveryDay: line?.deliveryDay || "",
+      driverName: line?.driverName || "",
       orderedAt: line?.orderedAt || "",
       orderedBy: line?.orderedBy || "",
       delivered: Boolean(line?.received || request.received),
@@ -681,10 +1136,11 @@ async function listDriverSheet(date) {
       supplierName: line?.supplierName || request.supplierName,
       supplierContact: line?.supplierContact || request.supplierContact
     };
-  });
+  }).sort(logicalOrderCompare);
 
   return {
     date: selectedDate,
+    driverName: [...lineByRequestId.values()].find((line) => line.driverName)?.driverName || "",
     requests: mergedRequests,
     suppliers: suppliers.map((supplier) => ({
       id: supplier.id,
@@ -694,7 +1150,38 @@ async function listDriverSheet(date) {
   };
 }
 
+async function assignDriverToSheet(date, driverName, user) {
+  if (!user.permissions?.canAddInventoryItems) {
+    throw new Error("Only admins and power users can assign a driver.");
+  }
+
+  const schema = await getSchema();
+  const tableId = schema.tables.driverSheetLines;
+  if (!tableId) throw new Error("Driver Sheet Lines table is not configured.");
+  if (!schema.driverLines.hasDriver) throw new Error("Add a Driver field to the Driver Sheet Lines table first.");
+
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
+  await listDriverSheet(selectedDate);
+  const lines = await listDriverSheetLines(tableId, selectedDate);
+  const cleanedDriver = String(driverName || "").trim();
+  if (!cleanedDriver) throw new Error("Driver name is required.");
+
+  for (const line of lines) {
+    await airtable(`${tableId}/${line.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ fields: { Driver: cleanedDriver } })
+    });
+  }
+
+  return {
+    date: selectedDate,
+    driverName: cleanedDriver,
+    updated: lines.length
+  };
+}
+
 async function persistDriverSheetLines(tableId, sheetDate, requests) {
+  const schema = await getSchema();
   const formula = `IS_SAME({Sheet Date}, '${sheetDate}', 'day')`;
   const existing = { records: await listAirtableRecords(tableId, { filterByFormula: formula }) };
   const existingKeys = new Set(
@@ -705,30 +1192,33 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
     const key = `${request.id}|${sheetDate}`;
     if (existingKeys.has(key)) continue;
 
+    const isStanding = String(request.requestedBy || "").includes("Standing Order") || String(request.notes || "").includes("Standing order:");
+    const fields = {
+      "Sheet Line": `${sheetDate} - ${request.requestId || request.id}`,
+      "Sheet Date": sheetDate,
+      "Item Request Record ID": request.id,
+      "Request ID": request.requestId || 0,
+      "Inventory Item Record ID": request.itemId,
+      "Item Name": request.itemName,
+      "Supplier Name": request.supplierName,
+      "Supplier Contact": request.supplierContact,
+      Quantity: request.quantity || 0,
+      Unit: request.unit,
+      "Inventory Area": request.inventoryArea || undefined,
+      "Storage Location": request.storageLocation || undefined,
+      "Inventory Subgroup": request.inventorySubgroup || "",
+      "Shelf Code": request.shelfCode || "",
+      "Request Status": request.status,
+      Received: Boolean(request.received),
+      "2Deliver": isStanding,
+      Notes: request.notes || ""
+    };
+    if (isStanding && schema.driverLines.hasDeliveryDay) fields["Delivery Day"] = sheetDate;
+    if (isStanding && schema.driverLines.hasDeliveryDate) fields["Delivery Date"] = sheetDate;
+
     await airtable(tableId, {
       method: "POST",
-      body: JSON.stringify({
-        fields: {
-          "Sheet Line": `${sheetDate} - ${request.requestId || request.id}`,
-          "Sheet Date": sheetDate,
-          "Item Request Record ID": request.id,
-          "Request ID": request.requestId || 0,
-          "Inventory Item Record ID": request.itemId,
-          "Item Name": request.itemName,
-          "Supplier Name": request.supplierName,
-          "Supplier Contact": request.supplierContact,
-          Quantity: request.quantity || 0,
-          Unit: request.unit,
-          "Inventory Area": request.inventoryArea || undefined,
-          "Storage Location": request.storageLocation || undefined,
-          "Inventory Subgroup": request.inventorySubgroup || "",
-          "Shelf Code": request.shelfCode || "",
-          "Request Status": request.status,
-          Received: Boolean(request.received),
-          "2Deliver": false,
-          Notes: request.notes || ""
-        }
-      })
+      body: JSON.stringify({ fields })
     });
   }
 }
@@ -739,11 +1229,11 @@ async function listDriverSheetLines(tableId, sheetDate) {
   return records.map(normalizeDriverLine);
 }
 
-async function createRequest(payload) {
+async function createRequest(payload, requestedByOverride = "") {
   const itemId = String(payload.itemId || "");
   const quantity = Number(payload.quantityNeeded || 0);
   const urgency = String(payload.urgencyLevel || "Medium");
-  const requestedBy = String(payload.requestedBy || "Kitchen");
+  const requestedBy = String(requestedByOverride || payload.requestedBy || "Kitchen");
   const notes = String(payload.notes || "");
   const storageLocation = String(payload.storageLocation || "");
   const inventoryArea = String(payload.inventoryArea || "");
@@ -790,11 +1280,11 @@ async function createRequest(payload) {
   return normalizeCreatedRequest(record);
 }
 
-function createRequestFields(payload, schema) {
+function createRequestFields(payload, schema, requestedByOverride = "") {
   const itemId = String(payload.itemId || "");
   const quantity = Number(payload.quantityNeeded || 0);
   const urgency = String(payload.urgencyLevel || "Medium");
-  const requestedBy = String(payload.requestedBy || "Kitchen");
+  const requestedBy = String(requestedByOverride || payload.requestedBy || "Kitchen");
   const notes = String(payload.notes || "");
   const storageLocation = String(payload.storageLocation || "");
   const inventoryArea = String(payload.inventoryArea || "");
@@ -823,18 +1313,27 @@ function createRequestFields(payload, schema) {
   return fields;
 }
 
-async function createRequestsBatch(payload) {
+async function createRequestsBatch(payload, requestedByOverride = "") {
   const requestedItems = Array.isArray(payload.requests) ? payload.requests : [];
   if (!requestedItems.length) throw new Error("Select at least one item.");
   if (requestedItems.length > 50) throw new Error("Submit 50 items or fewer at a time.");
 
   const created = [];
   for (const request of requestedItems) {
-    created.push(await createRequest(request));
+    created.push(await createRequest(request, requestedByOverride));
   }
 
   cache.requests.expiresAt = 0;
   return created;
+}
+
+async function createStandingOrder(payload, user) {
+  const standingOrder = await saveStandingOrderDefinition(payload, user);
+  const today = new Date().toISOString().slice(0, 10);
+  const generated = standingOrder.expectedDate <= today
+    ? await generateStandingOrdersForDate(today, user.name)
+    : [];
+  return { standingOrder, generated };
 }
 
 async function updateItemSettings(recordId, payload) {
@@ -879,6 +1378,64 @@ async function updateItemSettings(recordId, payload) {
   const lookups = await getLookups();
   const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
 
+  return normalizeItem(record, supplierById, lookups);
+}
+
+async function createInventoryItem(payload) {
+  const itemName = String(payload.itemName || "").trim();
+  const category = String(payload.category || "").trim();
+  const storageLocation = String(payload.storageLocation || "").trim();
+  const inventoryArea = String(payload.inventoryArea || "").trim();
+  const inventorySubgroup = String(payload.inventorySubgroup || "").trim();
+  const shelfCode = String(payload.shelfCode || "TBD").trim();
+  const supplierId = String(payload.supplierId || "").trim();
+  const unit = String(payload.unit || "item").trim().toLowerCase();
+  const currentQuantity = Number(payload.currentQuantity || 0);
+  const minimum = Number(payload.minimumThreshold || 0);
+
+  if (!itemName) throw new Error("Item name is required.");
+  if (!allowedUnits.has(unit)) throw new Error("Unit must be box, bag, item, or bottle.");
+  if (!Number.isFinite(currentQuantity) || currentQuantity < 0) throw new Error("Current stock must be zero or greater.");
+  if (!Number.isFinite(minimum) || minimum < 0) throw new Error("Minimum stock must be zero or greater.");
+
+  const categoryId = await findOrCreateLookupRecord("categories", category);
+  const storageLocationId = await findOrCreateLookupRecord("storageLocations", storageLocation);
+  const inventoryAreaId = await findOrCreateLookupRecord("inventoryAreas", inventoryArea);
+  const subgroupId = await findOrCreateLookupRecord("inventorySubgroups", inventorySubgroup);
+  const shelfId = await findOrCreateLookupRecord("shelfCodes", shelfCode);
+  const unitId = await findOrCreateLookupRecord("unitOfMeasurement", unit);
+
+  const fields = {
+    "Item Name": itemName,
+    Category: category,
+    "Storage Location": storageLocation,
+    "Inventory Area": inventoryArea,
+    "Inventory Subgroup": inventorySubgroup,
+    "Shelf Code": shelfCode,
+    "Current Quantity": currentQuantity,
+    "Minimum Threshold": minimum,
+    "Unit of Measure": unit,
+    "Last Updated Date": new Date().toISOString()
+  };
+
+  if (categoryId) fields["Category Link"] = [categoryId];
+  if (storageLocationId) fields["Storage Location Link"] = [storageLocationId];
+  if (inventoryAreaId) fields["Inventory Area Link"] = [inventoryAreaId];
+  if (subgroupId) fields["Inventory Subgroup Link"] = [subgroupId];
+  if (shelfId) fields["Shelf Code Link"] = [shelfId];
+  if (unitId) fields["Unit Of Measurement Link"] = [unitId];
+  if (/^rec[a-zA-Z0-9]+$/.test(supplierId)) fields["Supplier/Vendor"] = [supplierId];
+
+  const record = await airtable(inventoryTableId, {
+    method: "POST",
+    body: JSON.stringify({ fields })
+  });
+
+  cache.items.expiresAt = 0;
+  cache.lookups.expiresAt = 0;
+  const suppliers = await getSuppliers();
+  const lookups = await getLookups();
+  const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
   return normalizeItem(record, supplierById, lookups);
 }
 
@@ -1256,7 +1813,20 @@ async function updateDriverLine(recordId, payload, userName) {
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "toDeliver")) {
-    fields["2Deliver"] = Boolean(payload.toDeliver);
+    const toDeliver = Boolean(payload.toDeliver);
+    fields["2Deliver"] = toDeliver;
+    if (toDeliver) {
+      const deliveryDay = String(payload.deliveryDay || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDay)) {
+        throw new Error("Choose the delivery day for 2Deliver items.");
+      }
+      if (schema.driverLines.hasDeliveryDay) fields["Delivery Day"] = deliveryDay;
+      else if (schema.driverLines.hasDeliveryDate) fields["Delivery Date"] = deliveryDay;
+      else throw new Error("Add a Delivery Day field to the Driver Sheet Lines table first.");
+    } else {
+      if (schema.driverLines.hasDeliveryDay) fields["Delivery Day"] = null;
+      if (schema.driverLines.hasDeliveryDate) fields["Delivery Date"] = null;
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "supplierName")) {
@@ -1328,6 +1898,14 @@ async function deleteRequest(recordId) {
   };
 }
 
+async function canDeleteRequest(recordId, user) {
+  if (user.permissions?.canDeleteAnyOrder) return true;
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) return false;
+  const record = await airtable(`${requestsTableId}/${recordId}`);
+  const requestedBy = String(record.fields?.["Requested By"] || "").trim().toLowerCase();
+  return requestedBy && requestedBy === String(user.name || "").trim().toLowerCase();
+}
+
 async function serveStatic(req, res) {
   const url = new URL(req.url, "http://localhost");
   const rawPath = url.pathname === "/" ? "/index.html" : url.pathname;
@@ -1352,27 +1930,73 @@ const server = http.createServer(async (req, res) => {
       const payload = await readJson(req);
       const name = String(payload.username || "").trim();
       const password = String(payload.password || "").trim();
-      const user = users.get(name.toLowerCase());
+      const user = await findAppUserByName(name);
 
       if (!user || user.password !== password) {
         send(res, 401, { error: "Invalid username or password." });
         return;
       }
 
-      send(res, 200, { token: createSession(user.name), user: { name: user.name } });
+      send(res, 200, storeSession(user));
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/change-password") {
+      const user = requireUser(req, res, { allowPasswordChange: true });
+      if (!user) return;
+      const payload = await readJson(req);
+      const updatedUser = await changeOwnPassword(user.name, payload.currentPassword, payload.newPassword, {
+        forceChange: Boolean(user.mustChangePassword)
+      });
+      send(res, 200, storeSession(updatedUser));
       return;
     }
 
     if (req.method === "GET" && req.url.startsWith("/api/me")) {
-      const user = requireUser(req, res);
+      const user = requireUser(req, res, { allowPasswordChange: true });
       if (!user) return;
       send(res, 200, { user });
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/app-users")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
+      send(res, 200, { users: (await getAppUsers()).map(publicUserForAdmin) });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/app-users") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
+      const created = await createAppUser(await readJson(req));
+      send(res, 201, { user: publicUserForAdmin(created) });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/app-users/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
+      const recordId = req.url.split("/")[3];
+      const updated = await updateAppUser(recordId, await readJson(req));
+      send(res, 200, { user: publicUserForAdmin(updated) });
       return;
     }
 
     if (req.method === "GET" && req.url.startsWith("/api/items")) {
       if (!requireUser(req, res)) return;
       send(res, 200, { items: await getItems() });
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/item-form-options")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can add inventory items.")) return;
+      send(res, 200, await itemFormOptions());
       return;
     }
 
@@ -1396,6 +2020,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "PATCH" && req.url === "/api/driver-sheet/driver") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can assign a driver.")) return;
+      const payload = await readJson(req);
+      send(res, 200, await assignDriverToSheet(payload.date, payload.driverName, user));
+      return;
+    }
+
     if (req.method === "GET" && req.url.startsWith("/api/receiving-sheet")) {
       if (!requireUser(req, res)) return;
       const url = new URL(req.url, "http://localhost");
@@ -1411,6 +2044,22 @@ const server = http.createServer(async (req, res) => {
       if (!requireUser(req, res)) return;
       const url = new URL(req.url, "http://localhost");
       send(res, 200, await listOrderReport(url.searchParams.get("date")));
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/daily-guests")) {
+      if (!requireUser(req, res)) return;
+      const url = new URL(req.url, "http://localhost");
+      send(res, 200, { guestCount: await getDailyGuestCount(url.searchParams.get("date")) });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/daily-guests") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can enter daily guest counts.")) return;
+      const guestCount = await saveDailyGuestCount(await readJson(req), user);
+      send(res, 200, { guestCount });
       return;
     }
 
@@ -1440,7 +2089,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/requests") {
       const user = requireUser(req, res);
       if (!user) return;
-      const request = await createRequest(await readJson(req));
+      const request = await createRequest(await readJson(req), user.name);
       send(res, 201, { request });
       return;
     }
@@ -1448,16 +2097,54 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/requests/batch") {
       const user = requireUser(req, res);
       if (!user) return;
-      const requests = await createRequestsBatch(await readJson(req));
+      const requests = await createRequestsBatch(await readJson(req), user.name);
       send(res, 201, { requests });
       return;
     }
 
+    if (req.method === "POST" && req.url === "/api/standing-orders") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can create standing orders.")) return;
+      const result = await createStandingOrder(await readJson(req), user);
+      send(res, 201, result);
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/standing-orders")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can view standing orders.")) return;
+      send(res, 200, { standingOrders: await listStandingOrders() });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/standing-orders/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can update standing orders.")) return;
+      const recordId = req.url.split("/")[3];
+      const standingOrder = await updateStandingOrderRecord(recordId, await readJson(req));
+      send(res, 200, { standingOrder });
+      return;
+    }
+
     if (req.method === "PATCH" && req.url.startsWith("/api/items/")) {
-      if (!requireUser(req, res)) return;
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can edit inventory setup.")) return;
       const recordId = req.url.split("/")[3];
       const item = await updateItemSettings(recordId, await readJson(req));
       send(res, 200, { item });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/items") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can add inventory items.")) return;
+      const item = await createInventoryItem(await readJson(req));
+      send(res, 201, { item });
       return;
     }
 
@@ -1472,6 +2159,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/invoice-captures") {
       const user = requireUser(req, res);
       if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
       const invoice = await createInvoiceCapture(await readJson(req), user.name);
       send(res, 201, { invoice });
       return;
@@ -1480,13 +2168,16 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/invoice-lines") {
       const user = requireUser(req, res);
       if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
       const invoiceLine = await createInvoiceLine(await readJson(req), user.name);
       send(res, 201, { invoiceLine });
       return;
     }
 
     if (req.method === "GET" && req.url.startsWith("/api/ocr-rules")) {
-      if (!requireUser(req, res)) return;
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
       const url = new URL(req.url, "http://localhost");
       const rules = await listOcrRules(url.searchParams.get("supplier"));
       send(res, 200, { rules });
@@ -1496,6 +2187,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/ocr-rules") {
       const user = requireUser(req, res);
       if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
       const payload = await readJson(req);
       const rule = await createOcrRule(payload, user.name);
       send(res, 201, { rule });
@@ -1505,13 +2197,16 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/email-invoice") {
       const user = requireUser(req, res);
       if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canSendInvoiceToAccounting, "Only admins can send invoices to accounting.")) return;
       const result = await emailInvoicePicture(await readJson(req), user.name);
       send(res, 200, { result });
       return;
     }
 
     if (req.method === "POST" && req.url === "/api/ocr-invoice") {
-      if (!requireUser(req, res)) return;
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
       const result = await ocrSpaceParseImage(await readJson(req));
       send(res, 200, { result });
       return;
@@ -1521,7 +2216,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       const recordId = req.url.split("/")[3];
-      const request = await markRequestReceived(recordId, user.name);
+      const request = await deliverRequest(recordId, user.name);
       send(res, 200, { request });
       return;
     }
@@ -1558,6 +2253,10 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       const recordId = req.url.split("/")[3];
+      if (!(await canDeleteRequest(recordId, user))) {
+        send(res, 403, { error: "Regular users can only remove order lines they added themselves." });
+        return;
+      }
       const result = await deleteRequest(recordId);
       send(res, 200, { result });
       return;

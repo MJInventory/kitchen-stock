@@ -39,7 +39,9 @@ function saveSession(data) {
 
 function showApp() {
   loginScreen.hidden = true;
-  currentUser.textContent = sessionUser;
+  const role = localStorage.getItem("kitchenStockRole") || "user";
+  const roleLabel = role === "admin" ? "Admin" : role === "power-user" ? "Power User" : "User";
+  currentUser.textContent = sessionUser ? `${sessionUser} / ${roleLabel}` : "";
 }
 
 function showLogin() {
@@ -90,6 +92,8 @@ function renderUsers(users) {
 }
 
 async function loadUsers() {
+  const me = await api("/api/me");
+  if (me.token) saveSession(me);
   if (!permissions.canAdminUsers) throw new Error("Only admins can open user administration.");
   setMessage("Loading users...");
   const data = await api("/api/app-users");

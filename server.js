@@ -851,6 +851,7 @@ async function listSchema() {
   const requestFields = new Set((requests?.fields || []).map((field) => field.name));
   const driverLineFields = new Set((driverSheetLines?.fields || []).map((field) => field.name));
   const tableByName = new Map(data.tables.map((table) => [table.name, table.id]));
+  const fieldsByTableName = new Map(data.tables.map((table) => [table.name, new Set((table.fields || []).map((field) => field.name))]));
   const lookupTables = Object.fromEntries(
     Object.entries(lookupConfigs).map(([key, config]) => [key, tableByName.get(config.tableName) || ""])
   );
@@ -874,6 +875,16 @@ async function listSchema() {
       hasDriver: driverLineFields.has("Driver"),
       hasDeliveryDay: driverLineFields.has("Delivery Day"),
       hasDeliveryDate: driverLineFields.has("Delivery Date")
+    },
+    lookupFields: {
+      storageLocations: {
+        hasActive: fieldsByTableName.get("Storage Locations")?.has("Active") || false
+      },
+      shelfCodes: {
+        hasStorageLocation: fieldsByTableName.get("Shelf Codes")?.has("Storage Location") || false,
+        hasStorageLocationLink: fieldsByTableName.get("Shelf Codes")?.has("Storage Location Link") || false,
+        hasActive: fieldsByTableName.get("Shelf Codes")?.has("Active") || false
+      }
     }
   };
 }
@@ -932,6 +943,106 @@ async function findOrCreateLookupRecord(lookupKey, value) {
   cache.lookups.expiresAt = 0;
   cache.schema.expiresAt = 0;
   return record.id;
+}
+
+function normalizeStorageLocation(record) {
+  return {
+    id: record.id,
+    name: String(record.fields["Storage Location"] || "").trim(),
+    active: record.fields.Active !== false
+  };
+}
+
+function normalizeShelfCode(record) {
+  return {
+    id: record.id,
+    name: String(record.fields["Shelf Code"] || "").trim(),
+    storageLocation: String(record.fields["Storage Location"] || "").trim(),
+    storageLocationId: record.fields["Storage Location Link"]?.[0] || "",
+    active: record.fields.Active !== false
+  };
+}
+
+async function listStorageLocationsAdmin() {
+  const schema = await getSchema();
+  const tableId = schema.tables.storageLocations;
+  if (!tableId) throw new Error("Storage Locations table was not found.");
+  const records = await listAirtableRecords(tableId, {
+    "sort[0][field]": "Storage Location",
+    "sort[0][direction]": "asc"
+  });
+  return records.map(normalizeStorageLocation).filter((entry) => entry.name);
+}
+
+async function listShelfCodesAdmin() {
+  const schema = await getSchema();
+  const tableId = schema.tables.shelfCodes;
+  if (!tableId) throw new Error("Shelf Codes table was not found.");
+  const records = await listAirtableRecords(tableId, {
+    "sort[0][field]": "Shelf Code",
+    "sort[0][direction]": "asc"
+  });
+  const locations = await listStorageLocationsAdmin();
+  const locationById = new Map(locations.map((location) => [location.id, location.name]));
+  return records
+    .map(normalizeShelfCode)
+    .map((shelf) => ({
+      ...shelf,
+      storageLocation: shelf.storageLocation || locationById.get(shelf.storageLocationId) || ""
+    }))
+    .filter((entry) => entry.name)
+    .sort((a, b) => {
+      const location = a.storageLocation.localeCompare(b.storageLocation);
+      if (location) return location;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
+}
+
+async function saveStorageLocation(payload, recordId = "") {
+  const schema = await getSchema();
+  const tableId = schema.tables.storageLocations;
+  if (!tableId) throw new Error("Storage Locations table was not found.");
+  const name = String(payload.name || payload.storageLocation || "").trim();
+  const active = payload.active !== false;
+  if (!name) throw new Error("Storage location name is required.");
+  const fields = { "Storage Location": name };
+  if (schema.lookupFields.storageLocations.hasActive) fields.Active = active;
+
+  const record = recordId
+    ? await airtable(`${tableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
+    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
+  cache.lookups.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return normalizeStorageLocation(record);
+}
+
+async function saveShelfCode(payload, recordId = "") {
+  const schema = await getSchema();
+  const tableId = schema.tables.shelfCodes;
+  if (!tableId) throw new Error("Shelf Codes table was not found.");
+  const name = String(payload.name || payload.shelfCode || "").trim();
+  const storageLocation = String(payload.storageLocation || "").trim();
+  const active = payload.active !== false;
+  if (!name) throw new Error("Shelf code is required.");
+  const fields = { "Shelf Code": name };
+  if (schema.lookupFields.shelfCodes.hasActive) fields.Active = active;
+  if (storageLocation) {
+    if (schema.lookupFields.shelfCodes.hasStorageLocationLink) {
+      const locationId = await findOrCreateLookupRecord("storageLocations", storageLocation);
+      fields["Storage Location Link"] = locationId ? [locationId] : [];
+    } else if (schema.lookupFields.shelfCodes.hasStorageLocation) {
+      fields["Storage Location"] = storageLocation;
+    } else {
+      throw new Error("Add Storage Location or Storage Location Link to the Shelf Codes table first.");
+    }
+  }
+
+  const record = recordId
+    ? await airtable(`${tableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
+    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
+  cache.lookups.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return normalizeShelfCode(record);
 }
 
 function normalizeCreatedRequest(record) {
@@ -2014,6 +2125,63 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can add inventory items.")) return;
       send(res, 200, await itemFormOptions());
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/setup/storage-locations")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      send(res, 200, { storageLocations: await listStorageLocationsAdmin() });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/setup/storage-locations") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const storageLocation = await saveStorageLocation(await readJson(req));
+      send(res, 201, { storageLocation });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/setup/storage-locations/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const recordId = req.url.split("/")[4];
+      const storageLocation = await saveStorageLocation(await readJson(req), recordId);
+      send(res, 200, { storageLocation });
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/setup/shelf-codes")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      send(res, 200, {
+        shelfCodes: await listShelfCodesAdmin(),
+        storageLocations: await listStorageLocationsAdmin()
+      });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/setup/shelf-codes") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const shelfCode = await saveShelfCode(await readJson(req));
+      send(res, 201, { shelfCode });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/setup/shelf-codes/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const recordId = req.url.split("/")[4];
+      const shelfCode = await saveShelfCode(await readJson(req), recordId);
+      send(res, 200, { shelfCode });
       return;
     }
 

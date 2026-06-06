@@ -73,7 +73,7 @@ function parseUsers() {
       .filter(Boolean)
       .map((entry) => {
         const [name, password, roleValue] = entry.split(":");
-        const role = normalizeRole(roleValue || (String(name || "").trim().toLowerCase() === "enno" ? "admin" : "user"));
+        const role = normalizeRole(roleValue || (String(name || "").trim().toLowerCase() === "enno" ? "god" : "user"));
         return [String(name || "").trim().toLowerCase(), {
           name: String(name || "").trim(),
           password: String(password || "").trim(),
@@ -91,6 +91,7 @@ const users = parseUsers();
 
 function normalizeRole(role) {
   const cleaned = String(role || "").trim().toLowerCase().replace(/[\s_-]+/g, "-");
+  if (cleaned === "god") return "god";
   if (cleaned === "admin") return "admin";
   if (cleaned === "power-user" || cleaned === "poweruser" || cleaned === "power") return "power-user";
   return "user";
@@ -98,12 +99,17 @@ function normalizeRole(role) {
 
 function userPermissions(role) {
   const normalized = normalizeRole(role);
+  const isGod = normalized === "god";
+  const isAdmin = normalized === "admin" || isGod;
+  const isPower = normalized === "power-user";
   return {
-    canAdminUsers: normalized === "admin",
-    canAddInventoryItems: normalized === "admin" || normalized === "power-user",
-    canDeleteAnyOrder: normalized === "admin" || normalized === "power-user",
-    canUseInvoices: normalized === "admin" || normalized === "power-user",
-    canSendInvoiceToAccounting: normalized === "admin"
+    canAdminUsers: isAdmin,
+    canManageAdminRoles: isGod,
+    canDeleteAdmins: isGod,
+    canAddInventoryItems: isAdmin || isPower,
+    canDeleteAnyOrder: isAdmin || isPower,
+    canUseInvoices: isAdmin || isPower,
+    canSendInvoiceToAccounting: isAdmin
   };
 }
 
@@ -120,12 +126,14 @@ function publicUser(user) {
   };
 }
 
-function publicUserForAdmin(user) {
+function publicUserForAdmin(user, actor = null) {
   return {
     ...publicUser(user),
     id: user.id || "",
     password: user.password || "",
-    editable: editableUserSources.has(user.source)
+    editable: editableUserSources.has(user.source),
+    canEditRole: actor ? canChangeAppUser(actor, user, user.role) : true,
+    canDelete: actor ? canDeleteAppUser(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
   };
 }
 
@@ -481,7 +489,7 @@ function normalizeAppUser(record) {
     id: record.id,
     name,
     password: String(fields.Password || "").trim(),
-    role: name.toLowerCase() === "enno" ? "admin" : normalizeRole(fields.Role || "user"),
+    role: name.toLowerCase() === "enno" ? "god" : normalizeRole(fields.Role || "user"),
     theme: String(fields.Theme || "dark").trim().toLowerCase() === "light" ? "light" : "dark",
     active: fields.Active !== false,
     mustChangePassword: Boolean(fields["Force Password Change"]),
@@ -542,7 +550,7 @@ async function refreshUserFromDirectory(user) {
   return freshUser;
 }
 
-function appUserFields(payload) {
+function appUserFields(payload, schema = null) {
   const name = String(payload.name || "").trim();
   const password = String(payload.password || "").trim();
   const role = normalizeRole(payload.role);
@@ -552,27 +560,55 @@ function appUserFields(payload) {
 
   if (!name) throw new Error("User name is required.");
   if (!password) throw new Error("Password is required.");
-  return {
+  const fields = {
     Name: name,
     Password: password,
-    Role: role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User",
-    Theme: theme,
-    Active: active,
-    "Force Password Change": mustChangePassword
+    Role: role === "god" ? "God" : role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User"
   };
+  if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
+  if (!schema || schema.appUsers.hasActive) fields.Active = active;
+  if (!schema || schema.appUsers.hasForcePasswordChange) fields["Force Password Change"] = mustChangePassword;
+  return fields;
+}
+
+function canChangeAppUser(actor, target, nextRole) {
+  const actorRole = normalizeRole(actor?.role);
+  const targetRole = normalizeRole(target?.role);
+  const wantedRole = normalizeRole(nextRole);
+  const actorIsGod = actorRole === "god";
+  const actorIsAdmin = actorRole === "admin";
+  if (actorIsGod) return true;
+  if (!actorIsAdmin) return false;
+  if (targetRole === "admin" || targetRole === "god") return false;
+  if (wantedRole === "admin" || wantedRole === "god") return false;
+  return true;
+}
+
+function canDeleteAppUser(actor, target) {
+  const actorRole = normalizeRole(actor?.role);
+  const targetRole = normalizeRole(target?.role);
+  if (actorRole === "god") return true;
+  if (actorRole !== "admin") return false;
+  return targetRole === "power-user" || targetRole === "user";
+}
+
+async function findAppUserById(recordId) {
+  const appUsers = await getAppUsers();
+  return appUsers.find((user) => user.id === recordId);
 }
 
 async function createAppUser(payload) {
   const tableId = await getAppUsersTableId();
   if (!tableId) throw new Error("App Users table is not configured yet. Create an Airtable table named App Users with fields Name, Password, Role, Active.");
 
-  const fields = appUserFields(payload);
+  const schema = await getSchema();
+  const fields = appUserFields(payload, schema);
   const existing = await findAppUserByName(fields.Name);
   if (existing && !String(existing.id).startsWith("env-")) throw new Error("That user already exists.");
 
   const record = await airtable(tableId, {
     method: "POST",
-    body: JSON.stringify({ fields })
+    body: JSON.stringify({ fields, typecast: true })
   });
   cache.appUsers.expiresAt = 0;
   return normalizeAppUser(record);
@@ -624,13 +660,39 @@ function addDays(dateText, days) {
 
 function normalizeStandingOrder(record) {
   const fields = record.fields || {};
+  let items = [];
+  try {
+    const parsed = fields["Items JSON"] ? JSON.parse(fields["Items JSON"]) : [];
+    if (Array.isArray(parsed)) {
+      items = parsed
+        .map((item) => ({
+          itemId: String(item.itemId || "").trim(),
+          itemName: String(item.itemName || "").trim(),
+          quantity: Number(item.quantity || item.quantityNeeded || 0)
+        }))
+        .filter((item) => item.itemId && Number.isFinite(item.quantity) && item.quantity > 0);
+    }
+  } catch {
+    items = [];
+  }
+
+  if (!items.length && (fields["Inventory Item"]?.[0] || fields["Inventory Item Record ID"])) {
+    items = [{
+      itemId: fields["Inventory Item"]?.[0] || fields["Inventory Item Record ID"] || "",
+      itemName: fields["Item Name"] || "",
+      quantity: Number(fields.Quantity ?? 1)
+    }];
+  }
+
+  const firstItem = items[0] || {};
   return {
     id: record.id,
     name: fields["Standing Order"] || fields.Name || "",
-    itemId: fields["Inventory Item"]?.[0] || fields["Inventory Item Record ID"] || "",
-    itemName: fields["Item Name"] || "",
+    itemId: firstItem.itemId || "",
+    itemName: firstItem.itemName || "",
+    items,
     supplierName: fields["Supplier Name"] || "",
-    quantity: fields.Quantity ?? 1,
+    quantity: firstItem.quantity ?? fields.Quantity ?? 1,
     expectedDate: fields["Expected Arrival Date"] || "",
     schedule: fields.Schedule || "Weekly",
     otherSchedule: fields["Other Schedule"] || "",
@@ -722,12 +784,17 @@ function isStandingOrderDue(order, selectedDate) {
   return order.expectedDate <= selectedDate;
 }
 
+function standingSupplierFromNotes(notes) {
+  const match = String(notes || "").match(/^Standing supplier:\s*(.+?)\.?$/im);
+  return match ? match[1].trim().replace(/\.$/, "") : "";
+}
+
 async function updateStandingOrderRecord(recordId, payload) {
   const tableId = await getStandingOrdersTableId();
   if (!tableId) throw new Error("Standing Orders table is not configured.");
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid standing order record.");
 
-  const fields = standingOrderFields(payload);
+  const fields = await standingOrderFields(payload);
   const record = await airtable(`${tableId}/${recordId}`, {
     method: "PATCH",
     body: JSON.stringify({ fields })
@@ -735,33 +802,58 @@ async function updateStandingOrderRecord(recordId, payload) {
   return normalizeStandingOrder(record);
 }
 
-function standingOrderFields(payload) {
-  const itemId = String(payload.itemId || "").trim();
-  const itemName = String(payload.itemName || "").trim();
+async function standingOrderFields(payload) {
+  const schema = await getSchema();
+  const rawItems = Array.isArray(payload.items) && payload.items.length
+    ? payload.items
+    : [{
+      itemId: payload.itemId,
+      itemName: payload.itemName,
+      quantity: payload.quantityNeeded || payload.quantity
+    }];
   const supplierName = String(payload.supplierName || "").trim();
-  const quantity = Number(payload.quantityNeeded || payload.quantity || 0);
+  const standingName = String(payload.name || payload.standingOrderName || "").trim();
   const expectedDate = String(payload.expectedDate || "").trim();
   const schedule = ["Daily", "Weekly", "Other", "One Time"].includes(payload.schedule) ? payload.schedule : "Weekly";
   const otherSchedule = String(payload.otherSchedule || payload.recurrence || "").trim();
   const active = payload.active !== false;
+  const items = rawItems.map((item) => ({
+    itemId: String(item.itemId || "").trim(),
+    itemName: String(item.itemName || "").trim(),
+    quantity: Number(item.quantityNeeded || item.quantity || 0)
+  }));
 
-  if (!/^rec[a-zA-Z0-9]+$/.test(itemId)) throw new Error("Choose an inventory item.");
-  if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
+  if (!items.length) throw new Error("Add at least one inventory item.");
+  if (!supplierName) throw new Error("Choose one supplier for this standing order.");
+  for (const item of items) {
+    if (!/^rec[a-zA-Z0-9]+$/.test(item.itemId)) throw new Error("Choose valid inventory items.");
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) throw new Error("Each standing-order item needs a quantity greater than zero.");
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedDate)) throw new Error("Choose the expected arrival date.");
+  if (items.length > 1 && !schema.standingOrders.hasItemsJson) {
+    throw new Error("Add a long text field named Items JSON to the Standing Orders table before saving multi-item standing orders.");
+  }
 
-  return {
-    "Standing Order": `${itemName || itemId} - ${schedule}`,
-    "Inventory Item": [itemId],
-    "Inventory Item Record ID": itemId,
-    "Item Name": itemName,
+  const firstItem = items[0];
+  const name = standingName || `${supplierName || "Standing order"} - ${schedule} - ${expectedDate}`;
+
+  const fields = {
+    "Standing Order": name,
     "Supplier Name": supplierName,
-    Quantity: quantity,
     "Expected Arrival Date": expectedDate,
     Schedule: schedule,
     "Other Schedule": otherSchedule,
     Active: active,
     Notes: String(payload.notes || "")
   };
+
+  if (schema.standingOrders.hasInventoryItem) fields["Inventory Item"] = [firstItem.itemId];
+  if (schema.standingOrders.hasInventoryItemRecordId) fields["Inventory Item Record ID"] = firstItem.itemId;
+  if (schema.standingOrders.hasItemName) fields["Item Name"] = firstItem.itemName;
+  if (schema.standingOrders.hasQuantity) fields.Quantity = firstItem.quantity;
+  if (schema.standingOrders.hasItemsJson) fields["Items JSON"] = JSON.stringify(items);
+
+  return fields;
 }
 
 async function saveStandingOrderDefinition(payload, user) {
@@ -769,14 +861,25 @@ async function saveStandingOrderDefinition(payload, user) {
   const tableId = await getStandingOrdersTableId();
   if (!tableId) throw new Error("Standing Orders table is not configured. Add an Airtable table named Standing Orders.");
 
-  const items = await getItems();
-  const item = items.find((candidate) => candidate.id === String(payload.itemId || ""));
-  if (!item) throw new Error("Inventory item was not found.");
+  const inventoryItems = await getItems();
+  const itemById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const rawItems = Array.isArray(payload.items) && payload.items.length
+    ? payload.items
+    : [{ itemId: payload.itemId, quantity: payload.quantityNeeded || payload.quantity }];
+  const standingItems = rawItems.map((line) => {
+    const item = itemById.get(String(line.itemId || ""));
+    if (!item) throw new Error("Inventory item was not found.");
+    return {
+      itemId: item.id,
+      itemName: item.name,
+      quantity: Number(line.quantityNeeded || line.quantity || 0)
+    };
+  });
 
-  const fields = standingOrderFields({
+  const fields = await standingOrderFields({
     ...payload,
-    itemName: item.name,
-    supplierName: payload.supplierName || item.supplierName || ""
+    items: standingItems,
+    supplierName: payload.supplierName || standingItems[0]?.supplierName || ""
   });
 
   const record = await airtable(tableId, {
@@ -796,25 +899,29 @@ async function generateStandingOrdersForDate(selectedDate, userName = "System") 
   const itemById = new Map(items.map((item) => [item.id, item]));
 
   for (const order of orders) {
-    const item = itemById.get(order.itemId);
-    if (!item) continue;
-    const request = await createRequest({
-      itemId: item.id,
-      quantityNeeded: order.quantity,
-      urgencyLevel: "Low",
-      storageLocation: item.storageLocation || "",
-      inventoryArea: item.inventoryArea || "",
-      inventorySubgroup: item.inventorySubgroup || "",
-      shelfCode: item.shelfCode || "",
-      notes: [
-        `Standing order: ${order.schedule}.`,
-        order.otherSchedule ? `Schedule detail: ${order.otherSchedule}.` : "",
-        `Expected arrival: ${selectedDate}.`,
-        order.notes
-      ].filter(Boolean).join("\n")
-    }, `Standing Order - ${userName}`);
+    for (const line of order.items || []) {
+      const item = itemById.get(line.itemId);
+      if (!item) continue;
+      const request = await createRequest({
+        itemId: item.id,
+        quantityNeeded: line.quantity,
+        urgencyLevel: "Low",
+        storageLocation: item.storageLocation || "",
+        inventoryArea: item.inventoryArea || "",
+        inventorySubgroup: item.inventorySubgroup || "",
+        shelfCode: item.shelfCode || "",
+        notes: [
+          `Standing order: ${order.schedule}.`,
+          order.name ? `Standing order name: ${order.name}.` : "",
+          order.supplierName ? `Standing supplier: ${order.supplierName}.` : "",
+          order.otherSchedule ? `Schedule detail: ${order.otherSchedule}.` : "",
+          `Expected arrival: ${selectedDate}.`,
+          order.notes
+        ].filter(Boolean).join("\n")
+      }, `Standing Order - ${userName}`);
 
-    generated.push(request);
+      generated.push(request);
+    }
     const nextDate = nextStandingOrderDate(order, selectedDate);
     await airtable(`${tableId}/${order.id}`, {
       method: "PATCH",
@@ -835,21 +942,34 @@ async function updateAppUser(recordId, payload) {
   const tableId = await getAppUsersTableId();
   if (!tableId || !/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid app user record.");
 
-  const fields = appUserFields(payload);
+  const schema = await getSchema();
+  const fields = appUserFields(payload, schema);
   const record = await airtable(`${tableId}/${recordId}`, {
     method: "PATCH",
-    body: JSON.stringify({ fields })
+    body: JSON.stringify({ fields, typecast: true })
   });
   cache.appUsers.expiresAt = 0;
   return normalizeAppUser(record);
+}
+
+async function deleteAppUser(recordId) {
+  const tableId = await getAppUsersTableId();
+  if (!tableId || !/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid app user record.");
+  const result = await airtable(`${tableId}/${recordId}`, { method: "DELETE" });
+  cache.appUsers.expiresAt = 0;
+  return { id: result.id || recordId, deleted: Boolean(result.deleted) };
 }
 
 async function listSchema() {
   const data = await airtable("tables", { meta: true });
   const requests = data.tables.find((table) => table.id === requestsTableId);
   const driverSheetLines = data.tables.find((table) => table.name === "Driver Sheet Lines");
+  const appUsers = data.tables.find((table) => table.name === "App Users");
+  const standingOrders = data.tables.find((table) => table.name === "Standing Orders");
   const requestFields = new Set((requests?.fields || []).map((field) => field.name));
   const driverLineFields = new Set((driverSheetLines?.fields || []).map((field) => field.name));
+  const appUserFields = new Set((appUsers?.fields || []).map((field) => field.name));
+  const standingOrderFields = new Set((standingOrders?.fields || []).map((field) => field.name));
   const tableByName = new Map(data.tables.map((table) => [table.name, table.id]));
   const fieldsByTableName = new Map(data.tables.map((table) => [table.name, new Set((table.fields || []).map((field) => field.name))]));
   const lookupTables = Object.fromEntries(
@@ -876,6 +996,13 @@ async function listSchema() {
       hasDeliveryDay: driverLineFields.has("Delivery Day"),
       hasDeliveryDate: driverLineFields.has("Delivery Date")
     },
+    standingOrders: {
+      hasItemsJson: standingOrderFields.has("Items JSON"),
+      hasInventoryItem: standingOrderFields.has("Inventory Item"),
+      hasInventoryItemRecordId: standingOrderFields.has("Inventory Item Record ID"),
+      hasItemName: standingOrderFields.has("Item Name"),
+      hasQuantity: standingOrderFields.has("Quantity")
+    },
     lookupFields: {
       storageLocations: {
         hasActive: fieldsByTableName.get("Storage Locations")?.has("Active") || false
@@ -885,6 +1012,11 @@ async function listSchema() {
         hasStorageLocationLink: fieldsByTableName.get("Shelf Codes")?.has("Storage Location Link") || false,
         hasActive: fieldsByTableName.get("Shelf Codes")?.has("Active") || false
       }
+    },
+    appUsers: {
+      hasTheme: appUserFields.has("Theme"),
+      hasActive: appUserFields.has("Active"),
+      hasForcePasswordChange: appUserFields.has("Force Password Change")
     }
   };
 }
@@ -1316,6 +1448,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
     if (existingKeys.has(key)) continue;
 
     const isStanding = String(request.requestedBy || "").includes("Standing Order") || String(request.notes || "").includes("Standing order:");
+    const standingSupplier = standingSupplierFromNotes(request.notes);
     const fields = {
       "Sheet Line": `${sheetDate} - ${request.requestId || request.id}`,
       "Sheet Date": sheetDate,
@@ -1323,7 +1456,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
       "Request ID": request.requestId || 0,
       "Inventory Item Record ID": request.itemId,
       "Item Name": request.itemName,
-      "Supplier Name": request.supplierName,
+      "Supplier Name": standingSupplier || request.supplierName,
       "Supplier Contact": request.supplierContact,
       Quantity: request.quantity || 0,
       Unit: request.unit,
@@ -2091,7 +2224,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
-      send(res, 200, { users: (await getAppUsers()).map(publicUserForAdmin) });
+      send(res, 200, { users: (await getAppUsers()).map((appUser) => publicUserForAdmin(appUser, user)) });
       return;
     }
 
@@ -2099,8 +2232,13 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
-      const created = await createAppUser(await readJson(req));
-      send(res, 201, { user: publicUserForAdmin(created) });
+      const payload = await readJson(req);
+      if (!canChangeAppUser(user, { role: "user" }, payload.role)) {
+        send(res, 403, { error: "Only God can create admin or god users." });
+        return;
+      }
+      const created = await createAppUser(payload);
+      send(res, 201, { user: publicUserForAdmin(created, user) });
       return;
     }
 
@@ -2109,8 +2247,41 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
       const recordId = req.url.split("/")[3];
-      const updated = await updateAppUser(recordId, await readJson(req));
-      send(res, 200, { user: publicUserForAdmin(updated) });
+      const payload = await readJson(req);
+      const target = await findAppUserById(recordId);
+      if (!target) {
+        send(res, 404, { error: "User was not found." });
+        return;
+      }
+      if (!canChangeAppUser(user, target, payload.role)) {
+        send(res, 403, { error: "Only God can change admin roles. Admins can manage power users and users only." });
+        return;
+      }
+      const updated = await updateAppUser(recordId, payload);
+      send(res, 200, { user: publicUserForAdmin(updated, user) });
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url.startsWith("/api/app-users/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
+      const recordId = req.url.split("/")[3];
+      const target = await findAppUserById(recordId);
+      if (!target) {
+        send(res, 404, { error: "User was not found." });
+        return;
+      }
+      if (String(target.name || "").toLowerCase() === String(user.name || "").toLowerCase()) {
+        send(res, 403, { error: "You cannot delete your own user." });
+        return;
+      }
+      if (!canDeleteAppUser(user, target)) {
+        send(res, 403, { error: "Only God can delete admin users. Admins can delete power users and users only." });
+        return;
+      }
+      const result = await deleteAppUser(recordId);
+      send(res, 200, { result });
       return;
     }
 

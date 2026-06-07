@@ -918,6 +918,23 @@ body.order-app {
   text-transform: uppercase;
 }
 
+@media (orientation: portrait) and (max-width: 900px) {
+  body.order-app::before {
+    content: "Turn your phone sideways to use MJ Stock Magic";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 28px;
+    background: var(--order-bg);
+    color: var(--order-ink);
+    font: 700 22px Arial, Helvetica, sans-serif;
+    line-height: 1.25;
+    text-align: center;
+  }
+}
+
 .order-app .user-chip {
   color: var(--order-muted);
   font-family: Arial, Helvetica, sans-serif;

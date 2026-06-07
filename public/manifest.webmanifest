@@ -1,6 +1,6 @@
-{
-  "name": "MJOrdering",
-  "short_name": "MJOrdering",
+﻿{
+  "name": "MJ Stock Magic",
+  "short_name": "MJ Stock Magic",
   "description": "Inventory counting, ordering, receiving, and driver sheets.",
   "start_url": "/",
   "scope": "/",
@@ -22,3 +22,5 @@
     }
   ]
 }
+
+

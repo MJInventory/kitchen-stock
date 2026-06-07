@@ -1700,8 +1700,8 @@ async function listDriverSheet(date) {
 }
 
 async function assignDriverToSheet(date, driverName, user) {
-  if (!user.permissions?.canAddInventoryItems) {
-    throw new Error("Only admins and power users can assign a driver.");
+  if (!user.permissions?.canAdminUsers) {
+    throw new Error("Only admins can assign a driver.");
   }
 
   const schema = await getSchema();
@@ -2698,7 +2698,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "PATCH" && req.url === "/api/driver-sheet/driver") {
       const user = requireUser(req, res);
       if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can assign a driver.")) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can assign a driver.")) return;
       const payload = await readJson(req);
       send(res, 200, await assignDriverToSheet(payload.date, payload.driverName, user));
       return;

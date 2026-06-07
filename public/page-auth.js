@@ -1,4 +1,4 @@
-export function authPage({ permission = "", messageSelector = "" } = {}) {
+﻿export function authPage({ permission = "", messageSelector = "" } = {}) {
   const loginScreen = document.querySelector("#loginScreen");
   const loginForm = document.querySelector("#loginForm");
   const usernameInput = document.querySelector("#usernameInput");
@@ -116,3 +116,5 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
     }
   };
 }
+
+

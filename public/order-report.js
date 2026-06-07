@@ -1,4 +1,4 @@
-const reportDate = document.querySelector("#reportDate");
+﻿const reportDate = document.querySelector("#reportDate");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -277,3 +277,5 @@ if (sessionToken && sessionUser) {
 } else {
   showLogin();
 }
+
+

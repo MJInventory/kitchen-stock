@@ -297,3 +297,4 @@ standingList.addEventListener("click", (event) => {
 page.ready(loadOptions);
 
 
+

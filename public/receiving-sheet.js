@@ -210,16 +210,20 @@ function updateRequestFromLine(line) {
 
 async function changeSupplier(row, select) {
   const lineId = row.dataset.lineId;
+  const itemName = row.querySelector("td:nth-child(2)")?.textContent?.trim() || "this item";
+  const updatePrimarySupplier = window.confirm(
+    `Make ${select.value || "this supplier"} the primary supplier for ${itemName}?\n\nOK = change the inventory item's primary supplier.\nCancel = temporary change for this order only.`
+  );
   select.disabled = true;
-  setMessage("Saving supplier...");
+  setMessage(updatePrimarySupplier ? "Saving supplier and updating primary supplier..." : "Saving temporary supplier...");
   try {
     const { line } = await api(`/api/driver-lines/${lineId}`, {
       method: "PATCH",
-      body: JSON.stringify({ supplierName: select.value })
+      body: JSON.stringify({ supplierName: select.value, updatePrimarySupplier })
     });
     updateRequestFromLine(line);
     renderSheet(currentSheet);
-    setMessage("");
+    setMessage(updatePrimarySupplier ? "Supplier saved and primary supplier updated." : "Temporary supplier saved for this order.");
   } catch (error) {
     setMessage(error.message, true);
   } finally {

@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "kitchen-stock-v57";
+﻿const CACHE_NAME = "kitchen-stock-v58";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -62,6 +62,7 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
 });
+
 
 
 

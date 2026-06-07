@@ -80,9 +80,8 @@ function renderUsers(users) {
     <article class="setting-row user-admin-row" data-user-id="${escapeHtml(user.id)}">
       <div>
         <strong>${escapeHtml(user.name)}</strong>
-        <span>${escapeHtml(user.source)}${user.editable ? "" : " / Render user"}</span>
+        <span>${user.editable ? "Online user" : "Render user - move to App Users to edit"}</span>
       </div>
-      <label>Password <input class="user-password" type="text" value="${escapeHtml(user.password)}" ${user.editable ? "" : "disabled"}></label>
       <label>Role
         <select class="user-role" ${user.editable && user.canEditRole ? "" : "disabled"}>
           <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
@@ -99,8 +98,8 @@ function renderUsers(users) {
       </label>
       <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
       <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
-      <button class="save-user" type="button" ${user.editable && user.canEditRole ? "" : "disabled"}>Save</button>
-      <button class="delete-user danger-button" type="button" ${user.editable && user.canDelete ? "" : "disabled"}>Delete</button>
+      <label class="check-label delete-check"><input class="user-delete" type="checkbox" ${user.editable && user.canDelete ? "" : "disabled"}> Delete user</label>
+      <button class="save-user" type="button" ${user.canSave || user.canDelete ? "" : "disabled"}>Save</button>
     </article>
   `).join("");
 }
@@ -117,11 +116,19 @@ async function loadUsers() {
 
 async function saveUser(row) {
   const id = row.dataset.userId;
+  const name = row.querySelector("strong").textContent;
+  const wantsDelete = row.querySelector(".user-delete")?.checked;
+  if (wantsDelete) {
+    if (!confirm(`Delete user ${name}?`)) return { deleted: false };
+    if (!confirm(`Really delete ${name}? This cannot be undone.`)) return { deleted: false };
+    await api(`/api/app-users/${id}`, { method: "DELETE" });
+    return { deleted: true };
+  }
+
   const data = await api(`/api/app-users/${id}`, {
     method: "PATCH",
     body: JSON.stringify({
-      name: row.querySelector("strong").textContent,
-      password: row.querySelector(".user-password").value,
+      name,
       role: row.querySelector(".user-role").value,
       theme: row.querySelector(".user-theme").value,
       active: row.querySelector(".user-active").checked,
@@ -179,26 +186,12 @@ newUserForm.addEventListener("submit", async (event) => {
 });
 
 userList.addEventListener("click", (event) => {
-  const deleteButton = event.target.closest(".delete-user");
-  if (deleteButton) {
-    const row = deleteButton.closest(".user-admin-row");
-    const name = row.querySelector("strong").textContent;
-    if (!confirm(`Delete user ${name}?`)) return;
-    deleteButton.disabled = true;
-    api(`/api/app-users/${row.dataset.userId}`, { method: "DELETE" })
-      .then(loadUsers)
-      .then(() => setMessage("User deleted."))
-      .catch((error) => setMessage(error.message, true))
-      .finally(() => { deleteButton.disabled = false; });
-    return;
-  }
-
   const button = event.target.closest(".save-user");
   if (!button) return;
   const row = button.closest(".user-admin-row");
   button.disabled = true;
   saveUser(row)
-    .then(() => setMessage("User saved."))
+    .then((result) => loadUsers().then(() => setMessage(result?.deleted ? "User deleted." : "User saved.")))
     .catch((error) => setMessage(error.message, true))
     .finally(() => { button.disabled = false; });
 });

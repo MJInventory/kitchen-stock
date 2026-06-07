@@ -12,6 +12,7 @@ const supplierSelect = document.querySelector("#standingSupplier");
 const message = document.querySelector("#standingMessage");
 const standingItems = document.querySelector("#standingItems");
 const standingList = document.querySelector("#standingList");
+const standingRunList = document.querySelector("#standingRunList");
 
 let items = [];
 let suppliers = [];
@@ -111,6 +112,7 @@ async function loadOptions() {
   document.querySelector("#expectedDate").value = todayLocal();
   renderSelectedItems();
   await loadStandingOrders();
+  await loadStandingOrderRuns();
   setMessage("");
 }
 
@@ -178,6 +180,42 @@ async function loadStandingOrders() {
   renderStandingOrders(data.standingOrders || []);
 }
 
+function renderStandingOrderRuns(runs) {
+  if (!runs.length) {
+    standingRunList.innerHTML = '<p class="empty-sheet">No standing order runs generated yet.</p>';
+    return;
+  }
+
+  standingRunList.innerHTML = runs.map((run) => `
+    <article class="setting-row standing-run-row">
+      <div>
+        <strong>${esc(run.name || run.standingOrderName || "Standing order run")}</strong>
+        <span>${esc(run.supplierName || "No supplier")} / ${esc(run.expectedDate || "No date")} / ${esc(run.status || "Open")}</span>
+      </div>
+      <div>
+        <strong>${esc(run.receivedLines ?? 0)} / ${esc(run.totalLines ?? 0)}</strong>
+        <span>Received lines</span>
+      </div>
+      <div>
+        <strong>${esc(run.closedBy || "")}</strong>
+        <span>${run.closedAt ? `Closed ${esc(run.closedAt.slice(0, 10))}` : "Not closed yet"}</span>
+      </div>
+      <div class="wide-field standing-run-lines">
+        ${(run.lines || []).map((line) => `
+          <span class="${line.received ? "received-text" : ""}">
+            ${line.received ? "Received" : "Open"} - ${esc(line.itemName)} - ${esc(line.quantity ?? "")} ${esc(line.unit || "")}${line.receivedBy ? ` by ${esc(line.receivedBy)}` : ""}
+          </span>
+        `).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+async function loadStandingOrderRuns() {
+  const data = await page.api("/api/standing-order-runs");
+  renderStandingOrderRuns(data.runs || []);
+}
+
 document.querySelector("#addStandingItem").addEventListener("click", addSelectedItem);
 
 standingItems.addEventListener("input", (event) => {
@@ -223,6 +261,7 @@ form.addEventListener("submit", async (event) => {
     document.querySelector("#expectedDate").value = todayLocal();
     renderSelectedItems();
     await loadStandingOrders();
+    await loadStandingOrderRuns();
     setMessage("Standing order saved. Due items will appear in the normal delivery workflow.");
   } catch (error) {
     setMessage(error.message, true);
@@ -249,6 +288,7 @@ standingList.addEventListener("click", (event) => {
     })
   })
     .then(loadStandingOrders)
+    .then(loadStandingOrderRuns)
     .then(() => setMessage("Standing order saved."))
     .catch((error) => setMessage(error.message, true))
     .finally(() => { button.disabled = false; });

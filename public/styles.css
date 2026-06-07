@@ -262,6 +262,42 @@ button:hover,
   margin-top: 16px;
 }
 
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(130px, 0.7fr)) auto;
+  gap: 12px;
+  align-items: end;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.setting-row strong,
+.setting-row span {
+  display: block;
+}
+
+.setting-row span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.standing-history-panel {
+  margin-top: 18px;
+}
+
+.standing-run-row {
+  grid-template-columns: minmax(220px, 1.4fr) minmax(120px, 0.4fr) minmax(170px, 0.7fr);
+}
+
+.standing-run-lines {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
 .setup-menu-panel {
   margin-bottom: 14px;
 }
@@ -1700,6 +1736,11 @@ body.order-app {
   }
 
   .settings-item {
+    grid-template-columns: 1fr;
+  }
+
+  .setting-row,
+  .standing-run-row {
     grid-template-columns: 1fr;
   }
 

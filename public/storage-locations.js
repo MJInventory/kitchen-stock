@@ -80,3 +80,4 @@ locationList.addEventListener("click", (event) => {
 page.ready(loadLocations);
 
 
+

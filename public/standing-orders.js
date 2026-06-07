@@ -1,4 +1,4 @@
-import { authPage } from "/page-auth.js";
+﻿import { authPage } from "/page-auth.js";
 
 const page = authPage({
   permission: "canAddInventoryItems",
@@ -295,3 +295,5 @@ standingList.addEventListener("click", (event) => {
 });
 
 page.ready(loadOptions);
+
+

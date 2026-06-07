@@ -127,12 +127,14 @@ function publicUser(user) {
 }
 
 function publicUserForAdmin(user, actor = null) {
+  const editable = editableUserSources.has(user.source);
+  const canEditRole = actor ? canChangeAppUser(actor, user, user.role) : true;
   return {
     ...publicUser(user),
     id: user.id || "",
-    password: user.password || "",
-    editable: editableUserSources.has(user.source),
-    canEditRole: actor ? canChangeAppUser(actor, user, user.role) : true,
+    editable,
+    canEditRole,
+    canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
     canDelete: actor ? canDeleteAppUser(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
   };
 }
@@ -527,11 +529,32 @@ async function listAppUsers() {
   });
 
   const tableUsers = records.map(normalizeAppUser).filter((user) => user.name && user.password);
-  if (!tableUsers.some((user) => user.name.toLowerCase() === "enno")) {
-    const enno = users.get("enno");
-    if (enno) tableUsers.unshift({ ...enno, id: "env-enno", source: "env" });
+  const tableUserNames = new Set(tableUsers.map((user) => user.name.toLowerCase()));
+  for (const envUser of users.values()) {
+    if (!tableUserNames.has(envUser.name.toLowerCase())) {
+      try {
+        const schema = await getSchema();
+        const fields = appUserFields({
+          name: envUser.name,
+          password: envUser.password,
+          role: envUser.role,
+          theme: envUser.theme || "dark",
+          active: true,
+          mustChangePassword: false
+        }, schema);
+        const record = await airtable(tableId, {
+          method: "POST",
+          body: JSON.stringify({ fields, typecast: true })
+        });
+        const createdUser = normalizeAppUser(record);
+        tableUsers.push(createdUser);
+        tableUserNames.add(createdUser.name.toLowerCase());
+      } catch {
+        tableUsers.push({ ...envUser, id: `env-${envUser.name.toLowerCase()}`, source: "env" });
+      }
+    }
   }
-  return tableUsers;
+  return tableUsers.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function getAppUsers() {
@@ -565,6 +588,26 @@ function appUserFields(payload, schema = null) {
     Password: password,
     Role: role === "god" ? "God" : role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User"
   };
+  if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
+  if (!schema || schema.appUsers.hasActive) fields.Active = active;
+  if (!schema || schema.appUsers.hasForcePasswordChange) fields["Force Password Change"] = mustChangePassword;
+  return fields;
+}
+
+function appUserUpdateFields(payload, currentUser, schema = null) {
+  const name = String(payload.name || currentUser?.name || "").trim();
+  const role = normalizeRole(payload.role || currentUser?.role || "user");
+  const theme = String(payload.theme || currentUser?.theme || "dark").trim().toLowerCase() === "light" ? "Light" : "Dark";
+  const active = payload.active !== false;
+  const mustChangePassword = Boolean(payload.mustChangePassword);
+  const password = String(payload.password || "").trim();
+
+  if (!name) throw new Error("User name is required.");
+  const fields = {
+    Name: name,
+    Role: role === "god" ? "God" : role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User"
+  };
+  if (password) fields.Password = password;
   if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
   if (!schema || schema.appUsers.hasActive) fields.Active = active;
   if (!schema || schema.appUsers.hasForcePasswordChange) fields["Force Password Change"] = mustChangePassword;
@@ -1184,7 +1227,9 @@ async function updateAppUser(recordId, payload) {
   if (!tableId || !/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid app user record.");
 
   const schema = await getSchema();
-  const fields = appUserFields(payload, schema);
+  const currentUser = await findAppUserById(recordId);
+  if (!currentUser) throw new Error("User was not found.");
+  const fields = appUserUpdateFields(payload, currentUser, schema);
   const record = await airtable(`${tableId}/${recordId}`, {
     method: "PATCH",
     body: JSON.stringify({ fields, typecast: true })

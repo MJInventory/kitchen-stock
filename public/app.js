@@ -47,7 +47,7 @@ function setLoginMessage(text, isError = false) {
 
 function showApp() {
   loginScreen.hidden = true;
-  const roleLabel = sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
+  const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
   currentUser.textContent = sessionUser ? `${sessionUser} / ${roleLabel}` : "";
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];

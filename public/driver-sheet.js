@@ -38,7 +38,11 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   currentUser.textContent = sessionUser;
-  if (!driverName.value) {
+  const canAssignDriver = Boolean(sessionPermissions.canAdminUsers);
+  driverName.disabled = !canAssignDriver;
+  saveDriverButton.hidden = !canAssignDriver;
+  saveDriverButton.disabled = !canAssignDriver;
+  if (canAssignDriver && !driverName.value) {
     driverName.value = sessionUser || "";
   }
 }
@@ -303,8 +307,8 @@ async function toggleToDeliver(row, button) {
 }
 
 async function saveDriverAssignment() {
-  if (!sessionPermissions.canAddInventoryItems) {
-    setMessage("Only admins and power users can assign a driver.", true);
+  if (!sessionPermissions.canAdminUsers) {
+    setMessage("Only admins can assign a driver.", true);
     return;
   }
   setMessage("Assigning driver...");

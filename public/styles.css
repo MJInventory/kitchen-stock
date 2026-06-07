@@ -910,12 +910,16 @@ body.order-app {
 }
 
 .app-version {
-  padding: 18px 16px 22px;
+  padding: 22px 16px 46px;
   color: rgba(242, 236, 219, 0.45);
   font: 11px Arial, Helvetica, sans-serif;
   letter-spacing: 1px;
   text-align: center;
   text-transform: uppercase;
+}
+
+:root[data-theme="light"] .app-version {
+  color: rgba(31, 27, 20, 0.62);
 }
 
 @media (orientation: portrait) and (max-width: 900px) {

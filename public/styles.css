@@ -466,6 +466,10 @@ button:hover,
   justify-content: center;
 }
 
+.delete-check {
+  color: var(--danger);
+}
+
 .sheet-actions {
   margin-top: 4px;
 }

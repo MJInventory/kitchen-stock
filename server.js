@@ -1938,6 +1938,27 @@ async function updateItemSettings(recordId, payload) {
   return normalizeItem(record, supplierById, lookups);
 }
 
+async function updateItemPrimarySupplier(itemRecordId, supplier) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(itemRecordId || "")) {
+    throw new Error("This driver line is not linked to an inventory item.");
+  }
+  if (!supplier?.id) {
+    throw new Error("Choose a known supplier before changing the primary supplier.");
+  }
+
+  await airtable(`${inventoryTableId}/${itemRecordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fields: {
+        "Supplier/Vendor": [supplier.id],
+        "Last Updated Date": new Date().toISOString()
+      }
+    })
+  });
+
+  cache.items.expiresAt = 0;
+}
+
 async function createInventoryItem(payload) {
   const itemName = String(payload.itemName || "").trim();
   const category = String(payload.category || "").trim();
@@ -2392,6 +2413,12 @@ async function updateDriverLine(recordId, payload, userName) {
     const supplier = suppliers.find((entry) => entry.name.toLowerCase() === supplierName.toLowerCase());
     fields["Supplier Name"] = supplierName || "Unassigned Supplier";
     fields["Supplier Contact"] = supplier?.contact || "";
+
+    if (payload.updatePrimarySupplier) {
+      if (!supplier) throw new Error("Choose a known supplier before changing the primary supplier.");
+      const currentLine = normalizeDriverLine(await airtable(`${tableId}/${recordId}`));
+      await updateItemPrimarySupplier(currentLine.itemRecordId, supplier);
+    }
   }
 
   if (!Object.keys(fields).length) {

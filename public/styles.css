@@ -761,6 +761,20 @@ body.order-app {
   color: var(--order-ink);
 }
 
+:root[data-theme="light"] .order-app .icon-button,
+:root[data-theme="light"] .feature-select select,
+:root[data-theme="light"] .order-filters select {
+  background: #fffdf8;
+  color: var(--order-muted);
+  border-color: var(--order-line);
+}
+
+:root[data-theme="light"] .order-app .icon-button:hover,
+:root[data-theme="light"] .order-app .icon-button:focus-visible {
+  background: var(--order-panel-soft);
+  color: var(--order-ink);
+}
+
 :root[data-theme="light"] .selected-chip,
 :root[data-theme="light"] .save-pill {
   color: #fffdf8;

@@ -704,6 +704,7 @@ body.order-app {
   --order-bg: #050505;
   --order-panel: #171717;
   --order-panel-soft: #101010;
+  --order-topbar-bg: rgba(5, 5, 5, 0.94);
   --order-line: #292929;
   --order-line-soft: #1c1c1c;
   --order-ink: #f7f2e8;
@@ -723,6 +724,7 @@ body.order-app {
   --order-bg: #f6f3ea;
   --order-panel: #ffffff;
   --order-panel-soft: #f1eee4;
+  --order-topbar-bg: rgba(246, 243, 234, 0.96);
   --order-line: #d8caa6;
   --order-line-soft: #ebe2ca;
   --order-ink: #1f1b14;
@@ -805,7 +807,7 @@ body.order-app {
   align-items: center;
   gap: 18px;
   padding: 16px 18px;
-  background: rgba(5, 5, 5, 0.92);
+  background: var(--order-topbar-bg);
   position: sticky;
   top: 0;
   z-index: 5;

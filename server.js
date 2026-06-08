@@ -1424,6 +1424,13 @@ function normalizeStorageLocation(record) {
   };
 }
 
+function normalizeCategory(record) {
+  return {
+    id: record.id,
+    name: String(record.fields.Category || "").trim()
+  };
+}
+
 function normalizeShelfCode(record) {
   return {
     id: record.id,
@@ -1443,6 +1450,17 @@ async function listStorageLocationsAdmin() {
     "sort[0][direction]": "asc"
   });
   return records.map(normalizeStorageLocation).filter((entry) => entry.name);
+}
+
+async function listCategoriesAdmin() {
+  const schema = await getSchema();
+  const tableId = schema.tables.categories;
+  if (!tableId) throw new Error("Categories table was not found.");
+  const records = await listAirtableRecords(tableId, {
+    "sort[0][field]": "Category",
+    "sort[0][direction]": "asc"
+  });
+  return records.map(normalizeCategory).filter((entry) => entry.name);
 }
 
 async function listShelfCodesAdmin() {
@@ -1504,6 +1522,17 @@ async function findExistingShelfCodeRecordId(name, storageLocation, excludeRecor
   return match?.id || "";
 }
 
+async function findExistingCategoryRecordId(name, excludeRecordId = "") {
+  const wantedName = String(name || "").trim().toLowerCase();
+  if (!wantedName) return "";
+  const categories = await listCategoriesAdmin();
+  const match = categories.find((category) =>
+    category.id !== excludeRecordId &&
+    String(category.name || "").trim().toLowerCase() === wantedName
+  );
+  return match?.id || "";
+}
+
 async function resolveShelfCodeRecord(name, storageLocation) {
   const shelfName = String(name || "").trim();
   const locationName = String(storageLocation || "").trim();
@@ -1540,6 +1569,42 @@ async function saveStorageLocation(payload, recordId = "") {
   cache.lookups.expiresAt = 0;
   cache.items.expiresAt = 0;
   return normalizeStorageLocation(record);
+}
+
+async function saveCategory(payload, recordId = "") {
+  const schema = await getSchema();
+  const tableId = schema.tables.categories;
+  if (!tableId) throw new Error("Categories table was not found.");
+  const name = String(payload.name || payload.category || "").trim();
+  if (!name) throw new Error("Category name is required.");
+
+  const duplicateId = await findExistingCategoryRecordId(name, recordId);
+  if (duplicateId && !recordId) {
+    recordId = duplicateId;
+  } else if (duplicateId && recordId && duplicateId !== recordId) {
+    throw new Error(`Category "${name}" already exists.`);
+  }
+
+  const fields = { Category: name };
+  const record = recordId
+    ? await airtable(`${tableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
+    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
+  cache.lookups.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return normalizeCategory(record);
+}
+
+async function deleteCategory(recordId) {
+  const schema = await getSchema();
+  const tableId = schema.tables.categories;
+  if (!tableId) throw new Error("Categories table was not found.");
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid category record.");
+  }
+  await airtable(`${tableId}/${recordId}`, { method: "DELETE" });
+  cache.lookups.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return { ok: true, recordId };
 }
 
 async function saveShelfCode(payload, recordId = "") {
@@ -2123,7 +2188,6 @@ async function createInventoryItem(payload) {
 
   const fields = {
     "Item Name": itemName,
-    Category: category,
     "Storage Location": storageLocation,
     "Inventory Area": inventoryArea,
     "Inventory Subgroup": inventorySubgroup,
@@ -2788,6 +2852,43 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       send(res, 200, { storageLocations: await listStorageLocationsAdmin() });
+      return;
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/setup/categories")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      send(res, 200, { categories: await listCategoriesAdmin() });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/setup/categories") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const category = await saveCategory(await readJson(req));
+      send(res, 201, { category });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/setup/categories/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const recordId = req.url.split("/")[4];
+      const category = await saveCategory(await readJson(req), recordId);
+      send(res, 200, { category });
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url.startsWith("/api/setup/categories/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const recordId = req.url.split("/")[4];
+      const result = await deleteCategory(recordId);
+      send(res, 200, { result });
       return;
     }
 

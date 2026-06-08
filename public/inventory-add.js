@@ -7,27 +7,60 @@ const page = authPage({
 });
 
 const form = document.querySelector("#itemForm");
+const categoryInput = document.querySelector("#category");
+const inventoryAreaInput = document.querySelector("#inventoryArea");
 const supplierId = document.querySelector("#supplierId");
+const storageLocationInput = document.querySelector("#storageLocation");
+const inventorySubgroupInput = document.querySelector("#inventorySubgroup");
+const shelfCodeSelect = document.querySelector("#shelfCode");
+const unitInput = document.querySelector("#unit");
 const itemMessage = document.querySelector("#itemMessage");
+let shelfCodes = [];
 
 function setMessage(text, isError = false) {
   itemMessage.textContent = text;
   itemMessage.classList.toggle("error", isError);
 }
 
-function fillDatalist(id, records) {
-  document.querySelector(id).innerHTML = records.map((record) => `<option value="${record.name}"></option>`).join("");
+function fillSelect(select, records, selectedValue = "", placeholder = "Choose...") {
+  const normalized = (records || []).map((record) => typeof record === "string" ? { name: record } : record);
+  select.innerHTML = [
+    `<option value="">${placeholder}</option>`,
+    ...normalized.map((record) => {
+      const value = record.name ?? "";
+      const label = record.displayName || record.name || value;
+      return `<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+  ].join("");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+}
+
+function renderShelfOptions(selectedValue = "") {
+  const selectedLocation = String(storageLocationInput.value || "").trim().toLowerCase();
+  const matching = shelfCodes.filter((shelf) => !selectedLocation || String(shelf.storageLocation || "").trim().toLowerCase() === selectedLocation);
+  const options = matching.length ? matching : shelfCodes;
+  shelfCodeSelect.innerHTML = [
+    '<option value="">Choose shelf code</option>',
+    ...options.map((shelf) => `<option value="${escapeHtml(shelf.name)}"${shelf.name === selectedValue ? " selected" : ""}>${escapeHtml(shelf.displayName || shelf.name)}</option>`)
+  ].join("");
+  if (!shelfCodeSelect.value && options.length) {
+    shelfCodeSelect.value = selectedValue || options[0].name || "";
+  }
 }
 
 async function loadOptions() {
   setMessage("Loading options...");
   const data = await page.api("/api/item-form-options");
-  fillDatalist("#categoryOptions", data.categories || []);
-  fillDatalist("#areaOptions", data.inventoryAreas || []);
-  fillDatalist("#locationOptions", data.storageLocations || []);
-  fillDatalist("#subgroupOptions", data.inventorySubgroups || []);
-  fillDatalist("#shelfOptions", data.shelfCodes || []);
-  fillDatalist("#unitOptions", data.units || []);
+  fillSelect(categoryInput, data.categories || [], "", "Choose category");
+  fillSelect(inventoryAreaInput, data.inventoryAreas || [], "", "Choose area");
+  fillSelect(storageLocationInput, data.storageLocations || [], "", "Choose storage location");
+  fillSelect(inventorySubgroupInput, data.inventorySubgroups || [], "", "Choose subgroup");
+  fillSelect(unitInput, (data.units || []).map((name) => ({ name })), "item", "Choose unit");
+  shelfCodes = data.shelfCodes || [];
+  renderShelfOptions("TBD");
   supplierId.innerHTML = '<option value="">Unassigned</option>' + (data.suppliers || [])
     .map((supplier) => `<option value="${supplier.id}">${supplier.name}</option>`)
     .join("");
@@ -47,13 +80,20 @@ form.addEventListener("submit", async (event) => {
     payload.minimumThreshold = document.querySelector("#minimumThreshold").value;
     await page.api("/api/items", { method: "POST", body: JSON.stringify(payload) });
     form.reset();
-    document.querySelector("#unit").value = "item";
-    document.querySelector("#shelfCode").value = "TBD";
+    categoryInput.value = "";
+    inventoryAreaInput.value = "";
+    storageLocationInput.value = "";
+    inventorySubgroupInput.value = "";
+    unitInput.value = "item";
+    renderShelfOptions("TBD");
     setMessage("Item added.");
   } catch (error) {
     setMessage(error.message, true);
   }
 });
+
+storageLocationInput.addEventListener("change", () => renderShelfOptions(shelfCodeSelect.value));
+storageLocationInput.addEventListener("input", () => renderShelfOptions(shelfCodeSelect.value));
 
 page.ready(loadOptions);
 

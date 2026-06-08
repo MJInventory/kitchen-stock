@@ -14,6 +14,7 @@ const storageLocationInput = document.querySelector("#storageLocation");
 const shelfCodeSelect = document.querySelector("#shelfCode");
 const unitInput = document.querySelector("#unit");
 const itemMessage = document.querySelector("#itemMessage");
+const itemNameInput = document.querySelector("#itemName");
 let shelfCodes = [];
 
 function setMessage(text, isError = false) {
@@ -50,6 +51,20 @@ function renderShelfOptions(selectedValue = "") {
   }
 }
 
+function applyPrefillFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const prefillName = String(params.get("itemName") || "").trim();
+  const prefillArea = String(params.get("inventoryArea") || "").trim();
+  const prefillLocation = String(params.get("storageLocation") || "").trim();
+
+  if (prefillName) itemNameInput.value = prefillName;
+  if (prefillArea) inventoryAreaInput.value = prefillArea;
+  if (prefillLocation) {
+    storageLocationInput.value = prefillLocation;
+    renderShelfOptions("");
+  }
+}
+
 async function loadOptions() {
   setMessage("Loading options...");
   const data = await page.api("/api/item-form-options");
@@ -62,6 +77,7 @@ async function loadOptions() {
   supplierId.innerHTML = '<option value="">Unassigned</option>' + (data.suppliers || [])
     .map((supplier) => `<option value="${supplier.id}">${supplier.name}</option>`)
     .join("");
+  applyPrefillFromQuery();
   setMessage("");
 }
 

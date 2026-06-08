@@ -113,7 +113,7 @@ function requestArea(request) {
 }
 
 function requestCategory(request) {
-  return request.inventorySubgroup || itemForRequest(request)?.category || itemForRequest(request)?.inventorySubgroup || "";
+  return itemForRequest(request)?.category || request.inventorySubgroup || itemForRequest(request)?.inventorySubgroup || "";
 }
 
 function requestLocation(request) {
@@ -124,7 +124,7 @@ function requestSortValue(request) {
   const item = itemForRequest(request);
   return {
     supplier: item?.supplierName || request.supplierName || "",
-    category: requestCategory(request),
+    category: item?.category || requestCategory(request),
     name: item?.name || "Requested item"
   };
 }
@@ -179,7 +179,9 @@ function renderDailyOrder() {
           <span>${requests.length} item${requests.length === 1 ? "" : "s"}</span>
         </div>
         <div class="daily-order-group-list">
-          ${requests.map((request) => `
+          ${requests
+            .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
+            .map((request) => `
             <article class="daily-order-row">
               <div>
                 <strong>${escapeHtml(itemNameFromRequest(request))}</strong>

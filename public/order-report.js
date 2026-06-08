@@ -109,7 +109,7 @@ function groupBySupplier(rows) {
 }
 
 function logicalRowCompare(a, b) {
-  const category = String(a.inventorySubgroup || a.category || "").localeCompare(String(b.inventorySubgroup || b.category || ""));
+  const category = String(a.category || "").localeCompare(String(b.category || ""));
   if (category) return category;
   const item = String(a.itemName || "").localeCompare(String(b.itemName || ""));
   if (item) return item;

@@ -228,7 +228,7 @@ function requestSortValue(request) {
   const item = allItems.find((candidate) => candidate.id === request.itemId);
   return {
     supplier: item?.supplierName || request.supplierName || "",
-    category: request.inventorySubgroup || item?.inventorySubgroup || item?.category || "",
+    category: item?.category || request.inventorySubgroup || item?.inventorySubgroup || "",
     name: item?.name || "Requested item"
   };
 }
@@ -256,7 +256,7 @@ function renderDailyOrder() {
           <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
           <span>${escapeHtml([
             request.quantity,
-            request.inventorySubgroup,
+            allItems.find((candidate) => candidate.id === request.itemId)?.category || request.inventorySubgroup,
             request.inventoryArea,
             request.storageLocation,
             isStandingOrder(request) ? `Standing order${expectedDateFromRequest(request) ? ` expected ${expectedDateFromRequest(request)}` : ""}` : ""

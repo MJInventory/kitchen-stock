@@ -243,30 +243,52 @@ function logicalRequestCompare(a, b) {
   return left.name.localeCompare(right.name);
 }
 
+function groupRequestsByCategory(requests) {
+  const groups = new Map();
+  for (const request of requests) {
+    const category = allItems.find((candidate) => candidate.id === request.itemId)?.category || request.inventorySubgroup || "Uncategorized";
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(request);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
 function renderDailyOrder() {
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
-  dailyOrderList.innerHTML = activeRequests
-    .slice(0, 100)
-    .map((request) => `
-      <article class="daily-order-row">
-        <div>
-          <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
-          <span>${escapeHtml([
-            request.quantity,
-            allItems.find((candidate) => candidate.id === request.itemId)?.category || request.inventorySubgroup,
-            request.inventoryArea,
-            request.storageLocation,
-            isStandingOrder(request) ? `Standing order${expectedDateFromRequest(request) ? ` expected ${expectedDateFromRequest(request)}` : ""}` : ""
-          ].filter(Boolean).join(" / "))}</span>
+  const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
+  dailyOrderList.innerHTML = grouped
+    .map(([category, requests]) => `
+      <section class="daily-order-group">
+        <div class="daily-order-group-heading">
+          <h3>${escapeHtml(category)}</h3>
+          <span>${requests.length} item${requests.length === 1 ? "" : "s"}</span>
         </div>
-        <div class="daily-order-actions">
-          <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
-          ${sessionPermissions.canDeleteAnyOrder || request.requestedBy === sessionUser ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
+        <div class="daily-order-group-list">
+          ${requests
+            .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
+            .map((request) => `
+              <article class="daily-order-row">
+                <div>
+                  <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
+                  <span>${escapeHtml([
+                    request.quantity,
+                    allItems.find((candidate) => candidate.id === request.itemId)?.category || request.inventorySubgroup,
+                    request.inventoryArea,
+                    request.storageLocation,
+                    isStandingOrder(request) ? `Standing order${expectedDateFromRequest(request) ? ` expected ${expectedDateFromRequest(request)}` : ""}` : ""
+                  ].filter(Boolean).join(" / "))}</span>
+                </div>
+                <div class="daily-order-actions">
+                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
+                  ${sessionPermissions.canDeleteAnyOrder || request.requestedBy === sessionUser ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
+                </div>
+              </article>
+            `).join("")}
         </div>
-      </article>
+      </section>
     `)
     .join("");
 

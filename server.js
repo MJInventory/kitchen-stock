@@ -1995,22 +1995,6 @@ async function createRequest(payload, requestedByOverride = "") {
     Notes: notes
   };
 
-  if (schema.requests.hasStorageLocation && storageLocation) {
-    fields["Storage Location"] = storageLocation;
-  }
-
-  if (schema.requests.hasInventoryArea && inventoryArea) {
-    fields["Inventory Area"] = inventoryArea;
-  }
-
-  if (inventorySubgroup) {
-    fields["Inventory Subgroup"] = inventorySubgroup;
-  }
-
-  if (shelfCode) {
-    fields["Shelf Code"] = shelfCode;
-  }
-
   const record = await airtable(requestsTableId, {
     method: "POST",
     body: JSON.stringify({ fields })
@@ -2044,11 +2028,6 @@ function createRequestFields(payload, schema, requestedByOverride = "") {
     Status: "Approved",
     Notes: notes
   };
-
-  if (schema.requests.hasStorageLocation && storageLocation) fields["Storage Location"] = storageLocation;
-  if (schema.requests.hasInventoryArea && inventoryArea) fields["Inventory Area"] = inventoryArea;
-  if (inventorySubgroup) fields["Inventory Subgroup"] = inventorySubgroup;
-  if (shelfCode) fields["Shelf Code"] = shelfCode;
 
   return fields;
 }

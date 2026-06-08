@@ -82,6 +82,9 @@ function renderUsers(users) {
         <strong>${escapeHtml(user.name)}</strong>
         <span>${user.editable ? "Online user" : "Render user - move to App Users to edit"}</span>
       </div>
+      <label>New password
+        <input class="user-password" type="text" placeholder="Leave blank to keep current" ${user.editable && user.canSave ? "" : "disabled"}>
+      </label>
       <label>Role
         <select class="user-role" ${user.editable && user.canEditRole ? "" : "disabled"}>
           <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
@@ -129,12 +132,14 @@ async function saveUser(row) {
     method: "PATCH",
     body: JSON.stringify({
       name,
+      password: row.querySelector(".user-password").value,
       role: row.querySelector(".user-role").value,
       theme: row.querySelector(".user-theme").value,
       active: row.querySelector(".user-active").checked,
       mustChangePassword: row.querySelector(".user-must-change").checked
     })
   });
+  row.querySelector(".user-password").value = "";
   row.querySelector(".user-must-change").checked = data.user.mustChangePassword;
 }
 

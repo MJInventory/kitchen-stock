@@ -71,7 +71,7 @@ async function api(path, options = {}) {
 }
 
 function itemCategory(item) {
-  return item.category || item.inventorySubgroup || "Unsorted";
+  return item.category || "Unsorted";
 }
 
 function itemUnit(item) {

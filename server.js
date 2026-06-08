@@ -389,10 +389,15 @@ function normalizeItem(record, supplierById, lookups) {
     id: record.id,
     name: record.fields["Item Name"] || "",
     category: linkedValue(record, "Category Link", "Category", lookups.categories),
+    categoryId: record.fields["Category Link"]?.[0] || "",
     storageLocation: linkedValue(record, "Storage Location Link", "Storage Location", lookups.storageLocations),
+    storageLocationId: record.fields["Storage Location Link"]?.[0] || "",
     inventoryArea: linkedValue(record, "Inventory Area Link", "Inventory Area", lookups.inventoryAreas),
+    inventoryAreaId: record.fields["Inventory Area Link"]?.[0] || "",
     inventorySubgroup: linkedValue(record, "Inventory Subgroup Link", "Inventory Subgroup", lookups.inventorySubgroups),
+    inventorySubgroupId: record.fields["Inventory Subgroup Link"]?.[0] || "",
     shelfCode: linkedValue(record, "Shelf Code Link", "Shelf Code", lookups.shelfCodes),
+    shelfCodeId: record.fields["Shelf Code Link"]?.[0] || "",
     supplierId,
     supplierName: supplier?.name || "Unassigned Supplier",
     supplierContact: supplier?.contact || "",
@@ -681,14 +686,19 @@ async function changeOwnPassword(userName, currentPassword, newPassword, options
 }
 
 async function itemFormOptions() {
-  const [suppliers, lookups] = await Promise.all([getSuppliers(), getLookups()]);
+  const [suppliers, lookups, shelfCodes] = await Promise.all([getSuppliers(), getLookups(), listShelfCodesAdmin()]);
   return {
     suppliers,
     categories: lookups.categories.records,
     storageLocations: lookups.storageLocations.records,
     inventoryAreas: lookups.inventoryAreas.records,
     inventorySubgroups: lookups.inventorySubgroups.records,
-    shelfCodes: lookups.shelfCodes.records,
+    shelfCodes: shelfCodes.map((shelf) => ({
+      id: shelf.id,
+      name: shelf.name,
+      storageLocation: shelf.storageLocation || "",
+      displayName: [shelf.storageLocation, shelf.name].filter(Boolean).join(" / ") || shelf.name
+    })),
     units: lookups.unitOfMeasurement.records.length
       ? lookups.unitOfMeasurement.records
       : [...allowedUnits].map((name) => ({ id: name, name }))
@@ -1460,6 +1470,26 @@ async function listShelfCodesAdmin() {
     });
 }
 
+async function resolveShelfCodeRecord(name, storageLocation) {
+  const shelfName = String(name || "").trim();
+  const locationName = String(storageLocation || "").trim();
+  if (!shelfName) return "";
+
+  const shelves = await listShelfCodesAdmin();
+  const match = shelves.find((shelf) =>
+    shelf.name.toLowerCase() === shelfName.toLowerCase() &&
+    (!locationName || String(shelf.storageLocation || "").toLowerCase() === locationName.toLowerCase())
+  );
+  if (match) return match.id;
+
+  const created = await saveShelfCode({
+    name: shelfName,
+    storageLocation: locationName,
+    active: true
+  });
+  return created.id;
+}
+
 async function saveStorageLocation(payload, recordId = "") {
   const schema = await getSchema();
   const tableId = schema.tables.storageLocations;
@@ -1939,6 +1969,8 @@ async function updateItemSettings(recordId, payload) {
 
   const minimum = Number(payload.minimumThreshold);
   const unit = String(payload.unit || "").trim().toLowerCase();
+  const inventoryArea = String(payload.inventoryArea || "").trim();
+  const storageLocation = String(payload.storageLocation || "").trim();
   const inventorySubgroup = String(payload.inventorySubgroup || "").trim();
   const shelfCode = String(payload.shelfCode || "").trim();
 
@@ -1951,16 +1983,22 @@ async function updateItemSettings(recordId, payload) {
   }
 
   const unitRecordId = await findOrCreateLookupRecord("unitOfMeasurement", unit);
+  const areaRecordId = await findOrCreateLookupRecord("inventoryAreas", inventoryArea);
+  const storageLocationRecordId = await findOrCreateLookupRecord("storageLocations", storageLocation);
   const subgroupRecordId = await findOrCreateLookupRecord("inventorySubgroups", inventorySubgroup);
-  const shelfRecordId = await findOrCreateLookupRecord("shelfCodes", shelfCode);
+  const shelfRecordId = await resolveShelfCodeRecord(shelfCode, storageLocation);
   const fields = {
     "Minimum Threshold": minimum,
     "Unit of Measure": unit,
+    "Inventory Area": inventoryArea,
+    "Storage Location": storageLocation,
     "Inventory Subgroup": inventorySubgroup,
     "Shelf Code": shelfCode
   };
 
   if (unitRecordId) fields["Unit Of Measurement Link"] = [unitRecordId];
+  fields["Inventory Area Link"] = areaRecordId ? [areaRecordId] : [];
+  fields["Storage Location Link"] = storageLocationRecordId ? [storageLocationRecordId] : [];
   fields["Inventory Subgroup Link"] = subgroupRecordId ? [subgroupRecordId] : [];
   fields["Shelf Code Link"] = shelfRecordId ? [shelfRecordId] : [];
 
@@ -2019,7 +2057,7 @@ async function createInventoryItem(payload) {
   const storageLocationId = await findOrCreateLookupRecord("storageLocations", storageLocation);
   const inventoryAreaId = await findOrCreateLookupRecord("inventoryAreas", inventoryArea);
   const subgroupId = await findOrCreateLookupRecord("inventorySubgroups", inventorySubgroup);
-  const shelfId = await findOrCreateLookupRecord("shelfCodes", shelfCode);
+  const shelfId = await resolveShelfCodeRecord(shelfCode, storageLocation);
   const unitId = await findOrCreateLookupRecord("unitOfMeasurement", unit);
 
   const fields = {

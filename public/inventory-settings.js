@@ -13,6 +13,12 @@ const itemSettingsList = document.querySelector("#itemSettingsList");
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let items = [];
+let optionsData = {
+  inventoryAreas: [],
+  storageLocations: [],
+  inventorySubgroups: [],
+  shelfCodes: []
+};
 
 function setLoginMessage(text, isError = false) {
   loginMessage.textContent = text;
@@ -52,6 +58,39 @@ async function api(path, options) {
   return data;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+}
+
+function optionList(records, selectedValue, placeholder = "") {
+  return [
+    placeholder ? `<option value="">${escapeHtml(placeholder)}</option>` : "",
+    ...records.map((record) => {
+      const value = record.name ?? record.displayName ?? "";
+      return `<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(record.displayName || record.name || value)}</option>`;
+    })
+  ].join("");
+}
+
+function fillFilter(select, records, selectedValue, allLabel) {
+  select.innerHTML = `<option value="">${allLabel}</option>` + records
+    .map((record) => `<option value="${escapeHtml(record.name)}"${record.name === selectedValue ? " selected" : ""}>${escapeHtml(record.name)}</option>`)
+    .join("");
+}
+
+function shelvesForLocation(location) {
+  const wanted = String(location || "").trim().toLowerCase();
+  return (optionsData.shelfCodes || []).filter((shelf) => {
+    if (!wanted) return true;
+    return String(shelf.storageLocation || "").trim().toLowerCase() === wanted;
+  });
+}
+
+function shelfDisplay(item) {
+  if (!item.shelfCode) return "";
+  return item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode;
+}
+
 function renderItems() {
   const area = areaFilter.value;
   const location = locationFilter.value;
@@ -67,16 +106,32 @@ function renderItems() {
         <div>
           <strong>${item.name}</strong>
           <span>${[item.inventoryArea, item.storageLocation].filter(Boolean).join(" / ")}</span>
-          <span>${[item.inventorySubgroup, item.shelfCode ? `Shelf ${item.shelfCode}` : ""].filter(Boolean).join(" / ")}</span>
+          <span>${[item.inventorySubgroup, item.shelfCode ? `Shelf ${shelfDisplay(item)}` : ""].filter(Boolean).join(" / ")}</span>
           <span>Current: ${item.quantity ?? ""} ${item.unit || ""}</span>
         </div>
         <label>
+          Area
+          <select class="area-select">
+            ${optionList(optionsData.inventoryAreas || [], item.inventoryArea)}
+          </select>
+        </label>
+        <label>
+          Location
+          <select class="location-select">
+            ${optionList(optionsData.storageLocations || [], item.storageLocation)}
+          </select>
+        </label>
+        <label>
           Subgroup
-          <input class="subgroup-input" type="text" value="${item.inventorySubgroup || ""}" placeholder="e.g. Produce">
+          <select class="subgroup-select">
+            ${optionList(optionsData.inventorySubgroups || [], item.inventorySubgroup)}
+          </select>
         </label>
         <label>
           Shelf code
-          <input class="shelf-input" type="text" value="${item.shelfCode || ""}" placeholder="e.g. C-02">
+          <select class="shelf-select">
+            ${optionList(shelvesForLocation(item.storageLocation), item.shelfCode, "Choose shelf")}
+          </select>
         </label>
         <label>
           Minimum stock
@@ -100,8 +155,11 @@ function renderItems() {
 
 async function loadItems() {
   setSetupMessage("Loading...");
-  const data = await api("/api/items");
+  const [data, formOptions] = await Promise.all([api("/api/items"), api("/api/item-form-options")]);
   items = data.items;
+  optionsData = formOptions;
+  fillFilter(areaFilter, optionsData.inventoryAreas || [], areaFilter.value, "All");
+  fillFilter(locationFilter, optionsData.storageLocations || [], locationFilter.value, "All");
   renderItems();
   setSetupMessage("");
 }
@@ -110,11 +168,13 @@ async function saveItem(article) {
   const id = article.dataset.itemId;
   const minimumThreshold = article.querySelector(".minimum-input").value;
   const unit = article.querySelector(".unit-select").value;
-  const inventorySubgroup = article.querySelector(".subgroup-input").value;
-  const shelfCode = article.querySelector(".shelf-input").value;
+  const inventoryArea = article.querySelector(".area-select").value;
+  const storageLocation = article.querySelector(".location-select").value;
+  const inventorySubgroup = article.querySelector(".subgroup-select").value;
+  const shelfCode = article.querySelector(".shelf-select").value;
   const data = await api(`/api/items/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ minimumThreshold, unit, inventorySubgroup, shelfCode })
+    body: JSON.stringify({ minimumThreshold, unit, inventoryArea, storageLocation, inventorySubgroup, shelfCode })
   });
 
   items = items.map((item) => (item.id === id ? data.item : item));
@@ -156,6 +216,18 @@ loginForm.addEventListener("submit", async (event) => {
 logoutButton.addEventListener("click", showLogin);
 areaFilter.addEventListener("change", renderItems);
 locationFilter.addEventListener("change", renderItems);
+itemSettingsList.addEventListener("change", (event) => {
+  const locationSelect = event.target.closest(".location-select");
+  if (!locationSelect) return;
+  const article = locationSelect.closest(".settings-item");
+  const shelfSelect = article?.querySelector(".shelf-select");
+  if (!shelfSelect) return;
+  const currentValue = shelfSelect.value;
+  shelfSelect.innerHTML = optionList(shelvesForLocation(locationSelect.value), currentValue, "Choose shelf");
+  if (![...shelfSelect.options].some((option) => option.value === currentValue)) {
+    shelfSelect.value = "";
+  }
+});
 itemSettingsList.addEventListener("click", (event) => {
   const button = event.target.closest(".save-item-button");
   if (!button) return;

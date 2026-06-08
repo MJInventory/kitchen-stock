@@ -794,11 +794,13 @@ async function getDailyGuestCountsTableId() {
 }
 
 async function getDailyGuestCount(date) {
-  const tableId = await getDailyGuestCountsTableId();
+  const schema = await getSchema();
+  const tableId = schema.tables.dailyGuestCounts;
   if (!tableId) return null;
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
+  const dateField = schema.dailyGuestCounts?.dateField || "Date";
   const records = await listAirtableRecords(tableId, {
-    filterByFormula: `IS_SAME({Date}, '${selectedDate}', 'day')`,
+    filterByFormula: `IS_SAME({${dateField}}, '${selectedDate}', 'day')`,
     pageSize: "1"
   });
   return records[0] ? normalizeDailyGuestCount(records[0]) : null;
@@ -806,7 +808,8 @@ async function getDailyGuestCount(date) {
 
 async function saveDailyGuestCount(payload, user) {
   if (!user.permissions?.canAdminUsers) throw new Error("Only admins can enter daily guest counts.");
-  const tableId = await getDailyGuestCountsTableId();
+  const schema = await getSchema();
+  const tableId = schema.tables.dailyGuestCounts;
   if (!tableId) throw new Error("Daily Guest Counts table is not configured. Add an Airtable table named Daily Guest Counts.");
 
   const selectedDate = String(payload.date || "").trim();
@@ -816,12 +819,17 @@ async function saveDailyGuestCount(payload, user) {
   if (!Number.isFinite(guests) || guests < 0) throw new Error("Guest count must be zero or greater.");
 
   const existing = await getDailyGuestCount(selectedDate);
+  const dateField = schema.dailyGuestCounts?.dateField || "Date";
+  const guestField = schema.dailyGuestCounts?.guestField || "Guest Count";
+  const notesField = schema.dailyGuestCounts?.notesField || "Notes";
+  const enteredByField = schema.dailyGuestCounts?.enteredByField || "Entered By";
+  const enteredAtField = schema.dailyGuestCounts?.enteredAtField || "Entered At";
   const fields = {
-    Date: selectedDate,
-    "Guest Count": guests,
-    Notes: notes,
-    "Entered By": user.name,
-    "Entered At": new Date().toISOString()
+    [dateField]: selectedDate,
+    [guestField]: guests,
+    [notesField]: notes,
+    [enteredByField]: user.name,
+    [enteredAtField]: new Date().toISOString()
   };
 
   const record = existing
@@ -1269,12 +1277,21 @@ async function listSchema() {
     }
     return "";
   };
+  const findTable = (...candidates) => {
+    for (const candidate of candidates) {
+      const expected = normalizeFieldName(candidate);
+      const match = data.tables.find((table) => normalizeFieldName(table.name) === expected);
+      if (match) return match;
+    }
+    return null;
+  };
   const requests = data.tables.find((table) => table.id === requestsTableId);
   const driverSheetLines = data.tables.find((table) => table.name === "Driver Sheet Lines");
   const appUsers = data.tables.find((table) => table.name === "App Users");
   const standingOrders = data.tables.find((table) => table.name === "Standing Orders");
   const standingOrderRuns = data.tables.find((table) => table.name === "Standing Order Runs");
   const standingOrderRunLines = data.tables.find((table) => table.name === "Standing Order Run Lines");
+  const dailyGuestCounts = findTable("Daily Guest Counts", "Daily Guests", "Guest Counts", "Daily Guest Count");
   const requestFields = new Set((requests?.fields || []).map((field) => field.name));
   const driverLineFields = new Set((driverSheetLines?.fields || []).map((field) => field.name));
   const appUserFields = new Set((appUsers?.fields || []).map((field) => field.name));
@@ -1295,7 +1312,7 @@ async function listSchema() {
       standingOrders: tableByName.get("Standing Orders") || "",
       standingOrderRuns: standingOrderRuns?.id || "",
       standingOrderRunLines: standingOrderRunLines?.id || "",
-      dailyGuestCounts: tableByName.get("Daily Guest Counts") || "",
+      dailyGuestCounts: dailyGuestCounts?.id || "",
       ...lookupTables
     },
     requests: {
@@ -1315,6 +1332,24 @@ async function listSchema() {
       hasInventoryItemRecordId: standingOrderFields.has("Inventory Item Record ID"),
       hasItemName: standingOrderFields.has("Item Name"),
       hasQuantity: standingOrderFields.has("Quantity")
+    },
+    dailyGuestCounts: {
+      tableName: dailyGuestCounts?.name || "",
+      dateField: dailyGuestCounts
+        ? findFieldName(dailyGuestCounts.name, "Date", "Guest Date", "Report Date")
+        : "",
+      guestField: dailyGuestCounts
+        ? findFieldName(dailyGuestCounts.name, "Guest Count", "Guests", "Guest Total", "Daily Guests")
+        : "",
+      notesField: dailyGuestCounts
+        ? findFieldName(dailyGuestCounts.name, "Notes", "Guest Notes")
+        : "",
+      enteredByField: dailyGuestCounts
+        ? findFieldName(dailyGuestCounts.name, "Entered By", "Created By", "User")
+        : "",
+      enteredAtField: dailyGuestCounts
+        ? findFieldName(dailyGuestCounts.name, "Entered At", "Created At", "Timestamp")
+        : ""
     },
     lookupFields: {
       storageLocations: {

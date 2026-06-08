@@ -1870,7 +1870,13 @@ async function listDriverSheet(date) {
       supplierName: line?.supplierName || request.supplierName,
       supplierContact: line?.supplierContact || request.supplierContact
     };
-  }).sort(logicalOrderCompare);
+  })
+    .filter((request) => {
+      if (!request.requestedAt) return true;
+      const requestDate = String(request.requestedAt).slice(0, 10);
+      return !requestDate || requestDate <= selectedDate;
+    })
+    .sort(logicalOrderCompare);
 
   return {
     date: selectedDate,

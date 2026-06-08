@@ -158,6 +158,16 @@ function itemUnit(item) {
   return item.unit || "item";
 }
 
+function addItemHrefFromSearch() {
+  const params = new URLSearchParams();
+  const term = searchInput.value.trim();
+  if (term) params.set("itemName", term);
+  if (areaFilter.value) params.set("inventoryArea", areaFilter.value);
+  if (locationFilter.value) params.set("storageLocation", locationFilter.value);
+  const query = params.toString();
+  return `/inventory-add.html${query ? `?${query}` : ""}`;
+}
+
 function defaultQuantity(item) {
   const minimum = Number(item.minimum || 0);
   const current = Number(item.quantity || 0);
@@ -368,7 +378,15 @@ function renderProductList() {
     .join("");
 
   if (!items.length) {
-    productList.innerHTML = '<p class="empty-sheet">No products in this category.</p>';
+    const addButton = hasSearchTerm() && sessionPermissions.canAddInventoryItems
+      ? `<a class="button" href="${escapeHtml(addItemHrefFromSearch())}">Add "${escapeHtml(searchInput.value.trim())}"</a>`
+      : "";
+    productList.innerHTML = `
+      <div class="empty-sheet empty-sheet-action">
+        <p>No products found.</p>
+        ${addButton}
+      </div>
+    `;
   }
 }
 

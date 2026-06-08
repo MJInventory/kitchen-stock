@@ -2848,8 +2848,20 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && req.url.startsWith("/api/bootstrap")) {
       if (!requireUser(req, res)) return;
-      const [items, requests] = await Promise.all([getItems(), listOpenRequests()]);
-      send(res, 200, { items, requests });
+      const [items, requests, standingOrders] = await Promise.all([getItems(), listOpenRequests(), listStandingOrders()]);
+      send(res, 200, {
+        items,
+        requests,
+        standingOrders: standingOrders
+          .filter((order) => order.active !== false)
+          .sort((a, b) => {
+            const dateCompare = String(a.expectedDate || "").localeCompare(String(b.expectedDate || ""));
+            if (dateCompare) return dateCompare;
+            const supplierCompare = String(a.supplierName || "").localeCompare(String(b.supplierName || ""));
+            if (supplierCompare) return supplierCompare;
+            return String(a.name || "").localeCompare(String(b.name || ""));
+          })
+      });
       return;
     }
 

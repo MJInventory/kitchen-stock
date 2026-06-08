@@ -780,11 +780,11 @@ function normalizeDailyGuestCount(record) {
   const fields = record.fields || {};
   return {
     id: record.id,
-    date: fields.Date || fields["Guest Date"] || "",
-    guests: fields["Guest Count"] ?? fields.Guests ?? null,
-    notes: fields.Notes || "",
-    enteredBy: fields["Entered By"] || "",
-    enteredAt: fields["Entered At"] || ""
+    date: fields.Date || fields["Guest Date"] || fields["Report Date"] || "",
+    guests: fields["Guest Count"] ?? fields.Guests ?? fields["Guest Total"] ?? fields["Daily Guests"] ?? null,
+    notes: fields.Notes || fields["Guest Notes"] || "",
+    enteredBy: fields["Entered By"] || fields["Created By"] || fields.User || "",
+    enteredAt: fields["Entered At"] || fields["Created At"] || fields.Timestamp || ""
   };
 }
 
@@ -793,12 +793,66 @@ async function getDailyGuestCountsTableId() {
   return schema.tables.dailyGuestCounts || "";
 }
 
-async function getDailyGuestCount(date) {
+async function resolveDailyGuestCountsSchema() {
   const schema = await getSchema();
-  const tableId = schema.tables.dailyGuestCounts;
+  if (schema.tables.dailyGuestCounts) {
+    return {
+      tableId: schema.tables.dailyGuestCounts,
+      tableName: schema.dailyGuestCounts?.tableName || "",
+      dateField: schema.dailyGuestCounts?.dateField || "Date",
+      guestField: schema.dailyGuestCounts?.guestField || "Guest Count",
+      notesField: schema.dailyGuestCounts?.notesField || "Notes",
+      enteredByField: schema.dailyGuestCounts?.enteredByField || "Entered By",
+      enteredAtField: schema.dailyGuestCounts?.enteredAtField || "Entered At"
+    };
+  }
+
+  const data = await airtable("tables", { meta: true });
+  const normalizeName = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const findField = (table, ...candidates) => {
+    const fields = table?.fields || [];
+    for (const candidate of candidates) {
+      const expected = normalizeName(candidate);
+      const match = fields.find((field) => normalizeName(field.name) === expected);
+      if (match) return match.name;
+    }
+    return "";
+  };
+
+  const table = data.tables.find((entry) => {
+    const name = normalizeName(entry.name);
+    return name.includes("dailyguest") || name.includes("guestcount") || name.includes("guestcounts");
+  });
+
+  if (!table) {
+    return {
+      tableId: "",
+      tableName: "",
+      dateField: "Date",
+      guestField: "Guest Count",
+      notesField: "Notes",
+      enteredByField: "Entered By",
+      enteredAtField: "Entered At"
+    };
+  }
+
+  return {
+    tableId: table.id,
+    tableName: table.name,
+    dateField: findField(table, "Date", "Guest Date", "Report Date") || "Date",
+    guestField: findField(table, "Guest Count", "Guests", "Guest Total", "Daily Guests") || "Guest Count",
+    notesField: findField(table, "Notes", "Guest Notes") || "Notes",
+    enteredByField: findField(table, "Entered By", "Created By", "User") || "Entered By",
+    enteredAtField: findField(table, "Entered At", "Created At", "Timestamp") || "Entered At"
+  };
+}
+
+async function getDailyGuestCount(date) {
+  const guestSchema = await resolveDailyGuestCountsSchema();
+  const tableId = guestSchema.tableId;
   if (!tableId) return null;
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
-  const dateField = schema.dailyGuestCounts?.dateField || "Date";
+  const dateField = guestSchema.dateField || "Date";
   const records = await listAirtableRecords(tableId, {
     filterByFormula: `IS_SAME({${dateField}}, '${selectedDate}', 'day')`,
     pageSize: "1"
@@ -808,8 +862,8 @@ async function getDailyGuestCount(date) {
 
 async function saveDailyGuestCount(payload, user) {
   if (!user.permissions?.canAdminUsers) throw new Error("Only admins can enter daily guest counts.");
-  const schema = await getSchema();
-  const tableId = schema.tables.dailyGuestCounts;
+  const guestSchema = await resolveDailyGuestCountsSchema();
+  const tableId = guestSchema.tableId;
   if (!tableId) throw new Error("Daily Guest Counts table is not configured. Add an Airtable table named Daily Guest Counts.");
 
   const selectedDate = String(payload.date || "").trim();
@@ -819,11 +873,11 @@ async function saveDailyGuestCount(payload, user) {
   if (!Number.isFinite(guests) || guests < 0) throw new Error("Guest count must be zero or greater.");
 
   const existing = await getDailyGuestCount(selectedDate);
-  const dateField = schema.dailyGuestCounts?.dateField || "Date";
-  const guestField = schema.dailyGuestCounts?.guestField || "Guest Count";
-  const notesField = schema.dailyGuestCounts?.notesField || "Notes";
-  const enteredByField = schema.dailyGuestCounts?.enteredByField || "Entered By";
-  const enteredAtField = schema.dailyGuestCounts?.enteredAtField || "Entered At";
+  const dateField = guestSchema.dateField || "Date";
+  const guestField = guestSchema.guestField || "Guest Count";
+  const notesField = guestSchema.notesField || "Notes";
+  const enteredByField = guestSchema.enteredByField || "Entered By";
+  const enteredAtField = guestSchema.enteredAtField || "Entered At";
   const fields = {
     [dateField]: selectedDate,
     [guestField]: guests,

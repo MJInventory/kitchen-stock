@@ -2103,11 +2103,7 @@ async function updateItemSettings(recordId, payload) {
   const storageLocationRecordId = await findOrCreateLookupRecord("storageLocations", storageLocation);
   const shelfRecordId = await resolveShelfCodeRecord(shelfCode, storageLocation);
   const fields = {
-    "Minimum Threshold": minimum,
-    "Unit of Measure": unit,
-    "Inventory Area": inventoryArea,
-    "Storage Location": storageLocation,
-    "Shelf Code": shelfCode
+    "Minimum Threshold": minimum
   };
 
   if (unitRecordId) fields["Unit Of Measurement Link"] = [unitRecordId];
@@ -2187,13 +2183,8 @@ async function createInventoryItem(payload) {
 
   const fields = {
     "Item Name": itemName,
-    "Storage Location": storageLocation,
-    "Inventory Area": inventoryArea,
-    "Inventory Subgroup": inventorySubgroup,
-    "Shelf Code": shelfCode,
     "Current Quantity": currentQuantity,
     "Minimum Threshold": minimum,
-    "Unit of Measure": unit,
     "Last Updated Date": new Date().toISOString()
   };
 

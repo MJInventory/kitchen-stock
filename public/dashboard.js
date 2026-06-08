@@ -6,6 +6,7 @@ const loginMessage = document.querySelector("#loginMessage");
 const currentUser = document.querySelector("#currentUser");
 const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
+const featureMenu = document.querySelector("#featureMenu");
 const dailyAreaFilter = document.querySelector("#dailyAreaFilter");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
@@ -68,6 +69,7 @@ function showApp() {
     option.hidden = !sessionPermissions[option.dataset.permission];
     option.disabled = !sessionPermissions[option.dataset.permission];
   });
+  if (featureMenu) featureMenu.value = "/";
 }
 
 function showLogin() {
@@ -263,7 +265,7 @@ loginForm.addEventListener("submit", async (event) => {
 logoutButton.addEventListener("click", showLogin);
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
 dailyAreaFilter.addEventListener("change", renderDailyOrder);
-document.querySelector("#featureMenu")?.addEventListener("change", (event) => {
+featureMenu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 });
 dailyOrderList.addEventListener("click", (event) => {

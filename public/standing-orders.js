@@ -17,6 +17,7 @@ const standingRunList = document.querySelector("#standingRunList");
 let items = [];
 let suppliers = [];
 let selectedItems = [];
+const requestedOrderId = new URLSearchParams(window.location.search).get("orderId") || "";
 
 function esc(value) {
   return String(value ?? "")
@@ -172,6 +173,15 @@ function renderStandingOrders(orders) {
   `).join("");
   if (!standingList.innerHTML) {
     standingList.innerHTML = '<p class="empty-sheet">No standing orders yet.</p>';
+  }
+
+  if (requestedOrderId) {
+    const row = standingList.querySelector(`.standing-order-row[data-order-id="${CSS.escape(requestedOrderId)}"]`);
+    if (row) {
+      row.classList.add("jump-highlight");
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      window.setTimeout(() => row.classList.remove("jump-highlight"), 2600);
+    }
   }
 }
 

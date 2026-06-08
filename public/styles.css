@@ -1750,6 +1750,15 @@ body.order-app {
   gap: 8px;
 }
 
+.daily-order-filters {
+  margin-bottom: 12px;
+  justify-content: flex-start;
+}
+
+.daily-order-filters select {
+  flex: 0 1 240px;
+}
+
 .daily-order-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

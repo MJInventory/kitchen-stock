@@ -8,10 +8,13 @@ const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
+const standingOrderCount = document.querySelector("#standingOrderCount");
+const standingOrderList = document.querySelector("#standingOrderList");
 const message = document.querySelector("#message");
 
 let allItems = [];
 let recentRequests = [];
+let standingOrders = [];
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
@@ -148,12 +151,37 @@ function renderDailyOrder() {
   }
 }
 
+function renderStandingOrders() {
+  standingOrderCount.textContent = `${standingOrders.length} scheduled`;
+  if (!standingOrders.length) {
+    standingOrderList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
+    return;
+  }
+  standingOrderList.innerHTML = standingOrders
+    .slice(0, 100)
+    .map((order) => `
+      <article class="daily-order-row">
+        <div>
+          <strong>${escapeHtml(order.supplierName || order.name || "Standing Order")}</strong>
+          <span>${escapeHtml([
+            order.expectedDate ? `Delivery ${order.expectedDate}` : "",
+            order.schedule || "",
+            order.items?.length ? `${order.items.length} item(s)` : ""
+          ].filter(Boolean).join(" / "))}</span>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
 async function refresh() {
   setMessage("Loading today's orders...");
   const data = await api("/api/bootstrap");
   allItems = data.items || [];
   recentRequests = data.requests || [];
+  standingOrders = data.standingOrders || [];
   renderDailyOrder();
+  renderStandingOrders();
   setMessage("");
 }
 

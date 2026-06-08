@@ -95,14 +95,7 @@ function shelvesForLocation(location) {
 }
 
 function compareItems(left, right) {
-  const parts = [
-    normalize(left.inventoryArea).localeCompare(normalize(right.inventoryArea)),
-    normalize(left.storageLocation).localeCompare(normalize(right.storageLocation)),
-    normalize(left.category).localeCompare(normalize(right.category)),
-    normalize(left.shelfCode).localeCompare(normalize(right.shelfCode), undefined, { numeric: true }),
-    normalize(left.name).localeCompare(normalize(right.name), undefined, { numeric: true })
-  ];
-  return parts.find((value) => value !== 0) || 0;
+  return normalize(left.name).localeCompare(normalize(right.name), undefined, { numeric: true });
 }
 
 function effectiveItem(item) {

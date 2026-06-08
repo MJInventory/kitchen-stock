@@ -10,6 +10,8 @@ const featureMenu = document.querySelector("#featureMenu");
 const dailyAreaFilter = document.querySelector("#dailyAreaFilter");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
+const openOrderCount = document.querySelector("#openOrderCount");
+const openOrderList = document.querySelector("#openOrderList");
 const standingOrderCount = document.querySelector("#standingOrderCount");
 const standingOrderList = document.querySelector("#standingOrderList");
 const message = document.querySelector("#message");
@@ -120,6 +122,11 @@ function requestLocation(request) {
   return request.storageLocation || itemForRequest(request)?.storageLocation || "";
 }
 
+function requestDay(request) {
+  const stamp = String(request.requestedAt || "").trim();
+  return stamp ? stamp.slice(0, 10) : "";
+}
+
 function requestSortValue(request) {
   const item = itemForRequest(request);
   return {
@@ -165,9 +172,11 @@ function populateDailyAreaFilter() {
 }
 
 function renderDailyOrder() {
+  const selectedDay = todayLocal();
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
+    .filter((request) => requestDay(request) === selectedDay)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
@@ -208,6 +217,57 @@ function renderDailyOrder() {
   }
 }
 
+function renderOpenOrders() {
+  const selectedDay = todayLocal();
+  const openRequests = recentRequests
+    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
+    .filter((request) => {
+      const day = requestDay(request);
+      return !day || day < selectedDay;
+    })
+    .sort(logicalRequestCompare);
+
+  openOrderCount.textContent = `${openRequests.length} open`;
+  const grouped = groupRequestsByCategory(openRequests.slice(0, 100));
+  openOrderList.innerHTML = grouped
+    .map(([category, requests]) => `
+      <section class="daily-order-group">
+        <div class="daily-order-group-heading">
+          <h3>${escapeHtml(category)}</h3>
+          <span>${requests.length} item${requests.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="daily-order-group-list">
+          ${requests
+            .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
+            .map((request) => `
+              <article class="daily-order-row">
+                <div>
+                  <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
+                  <span>${escapeHtml([
+                    request.quantity,
+                    requestCategory(request),
+                    requestArea(request),
+                    requestLocation(request),
+                    requestDay(request) ? `Requested ${requestDay(request)}` : ""
+                  ].filter(Boolean).join(" / "))}</span>
+                </div>
+                <div class="daily-order-actions">
+                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
+                  ${sessionPermissions.canDeleteAnyOrder || request.requestedBy === sessionUser ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
+                </div>
+              </article>
+            `).join("")}
+        </div>
+      </section>
+    `)
+    .join("");
+
+  if (!openOrderList.innerHTML) {
+    openOrderList.innerHTML = '<p class="empty-sheet">No older open orders.</p>';
+  }
+}
+
 function renderStandingOrders() {
   standingOrderCount.textContent = `${standingOrders.length} scheduled`;
   if (!standingOrders.length) {
@@ -245,6 +305,7 @@ async function refresh() {
   standingOrders = data.standingOrders || [];
   populateDailyAreaFilter();
   renderDailyOrder();
+  renderOpenOrders();
   renderStandingOrders();
   setMessage("");
 }

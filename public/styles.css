@@ -1782,6 +1782,12 @@ body.order-app {
   outline: none;
 }
 
+.empty-sheet-action {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
 .daily-order-actions {
   display: flex;
   gap: 8px;

@@ -28,6 +28,12 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
+function todayLocal() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
 function setMessage(text, isError = false) {
   message.textContent = text;
   message.classList.toggle("error", isError);

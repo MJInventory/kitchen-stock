@@ -128,6 +128,10 @@ function normalize(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function hasSearchTerm() {
+  return Boolean(normalize(searchInput.value));
+}
+
 function itemCategory(item) {
   return item.category || item.inventorySubgroup || item.storageLocation || "Unsorted";
 }
@@ -324,8 +328,10 @@ function renderProductList() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const selectedCount = items.filter((item) => selected.has(item.id)).length;
 
-  categoryTitle.textContent = activeCategory || "All Products";
+  const searchMode = hasSearchTerm();
+  categoryTitle.textContent = searchMode ? "Search Results" : (activeCategory || "All Products");
   categoryMeta.textContent = `${items.length} products${selectedCount ? ` / ${selectedCount} selected` : ""}`;
+  backButton.hidden = searchMode;
   productList.innerHTML = items
     .map((item) => {
       const entry = selected.get(item.id);
@@ -367,8 +373,19 @@ function renderProductList() {
 }
 
 function render() {
-  if (productView.hidden) renderCategories();
-  else renderProductList();
+  const searchMode = hasSearchTerm();
+  if (searchMode) {
+    activeCategory = "";
+    categoryView.hidden = true;
+    productView.hidden = false;
+    renderProductList();
+  } else if (productView.hidden) {
+    backButton.hidden = false;
+    renderCategories();
+  } else {
+    backButton.hidden = false;
+    renderProductList();
+  }
   renderSelectedChips();
   renderDailyOrder();
   renderStandingOrders();
@@ -619,7 +636,7 @@ dailyOrderList.addEventListener("click", (event) => {
 
 [areaFilter, locationFilter, searchInput].forEach((control) => {
   control.addEventListener("input", () => {
-    if (!productView.hidden) {
+    if (!productView.hidden && !hasSearchTerm()) {
       activeCategory = "";
       productView.hidden = true;
       categoryView.hidden = false;

@@ -58,7 +58,7 @@ async function loadOptions() {
   fillSelect(inventoryAreaInput, data.inventoryAreas || [], "", "Choose area");
   fillSelect(storageLocationInput, data.storageLocations || [], "", "Choose storage location");
   fillSelect(inventorySubgroupInput, data.inventorySubgroups || [], "", "Choose subgroup");
-  fillSelect(unitInput, (data.units || []).map((name) => ({ name })), "item", "Choose unit");
+  fillSelect(unitInput, data.units || [], "item", "Choose unit");
   shelfCodes = data.shelfCodes || [];
   renderShelfOptions("TBD");
   supplierId.innerHTML = '<option value="">Unassigned</option>' + (data.suppliers || [])

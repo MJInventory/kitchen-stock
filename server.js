@@ -443,11 +443,11 @@ async function listRequests() {
 async function listOpenRequests() {
   const records = await listAirtableRecords(requestsTableId, {
     filterByFormula: "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))",
-    "sort[0][field]": "Inventory Subgroup",
+    "sort[0][field]": "Requested By",
     "sort[0][direction]": "asc",
-    "sort[1][field]": "Requested By",
+    "sort[1][field]": "Request ID",
     "sort[1][direction]": "asc",
-    "sort[2][field]": "Request ID",
+    "sort[2][field]": "Request Date/Time",
     "sort[2][direction]": "desc"
   });
   return records.map(normalizeRequest);
@@ -1200,7 +1200,6 @@ async function generateStandingOrdersForDate(selectedDate, userName = "System") 
         urgencyLevel: "Low",
         storageLocation: item.storageLocation || "",
         inventoryArea: item.inventoryArea || "",
-        inventorySubgroup: item.inventorySubgroup || "",
         shelfCode: item.shelfCode || "",
         notes
       }, `Standing Order - ${userName}`);
@@ -1718,7 +1717,7 @@ function normalizeDriverLine(record) {
 }
 
 function orderCategory(value) {
-  return String(value?.inventorySubgroup || value?.category || value?.inventoryArea || "").trim();
+  return String(value?.category || value?.inventoryArea || "").trim();
 }
 
 function logicalOrderCompare(a, b) {
@@ -1837,9 +1836,9 @@ async function listDriverSheet(date) {
       unit: item?.unit || "",
       supplierName: item?.supplierName || "Unassigned Supplier",
       supplierContact: item?.supplierContact || "",
+      category: request.category || item?.category || "",
       storageLocation: request.storageLocation || item?.storageLocation || "",
       inventoryArea: request.inventoryArea || item?.inventoryArea || "",
-      inventorySubgroup: request.inventorySubgroup || item?.inventorySubgroup || "",
       shelfCode: request.shelfCode || item?.shelfCode || ""
     };
   });
@@ -1941,7 +1940,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
       Unit: request.unit,
       "Inventory Area": request.inventoryArea || undefined,
       "Storage Location": request.storageLocation || undefined,
-      "Inventory Subgroup": request.inventorySubgroup || "",
+      "Inventory Subgroup": request.category || "",
       "Shelf Code": request.shelfCode || "",
       "Request Status": request.status,
       Received: Boolean(request.received),
@@ -1975,10 +1974,6 @@ async function createRequest(payload, requestedByOverride = "") {
   const urgency = String(payload.urgencyLevel || "Medium");
   const requestedBy = String(requestedByOverride || payload.requestedBy || "Kitchen");
   const notes = String(payload.notes || "");
-  const storageLocation = String(payload.storageLocation || "");
-  const inventoryArea = String(payload.inventoryArea || "");
-  const inventorySubgroup = String(payload.inventorySubgroup || "");
-  const shelfCode = String(payload.shelfCode || "");
 
   if (!itemId) throw new Error("Choose an item.");
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
@@ -2010,10 +2005,6 @@ function createRequestFields(payload, schema, requestedByOverride = "") {
   const urgency = String(payload.urgencyLevel || "Medium");
   const requestedBy = String(requestedByOverride || payload.requestedBy || "Kitchen");
   const notes = String(payload.notes || "");
-  const storageLocation = String(payload.storageLocation || "");
-  const inventoryArea = String(payload.inventoryArea || "");
-  const inventorySubgroup = String(payload.inventorySubgroup || "");
-  const shelfCode = String(payload.shelfCode || "");
 
   if (!itemId) throw new Error("Choose an item.");
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
@@ -2217,7 +2208,7 @@ async function createStockCount(payload, userName) {
         Unit: item.unit || "",
         "Inventory Area": item.inventoryArea || undefined,
         "Storage Location": item.storageLocation || undefined,
-        "Inventory Subgroup": item.inventorySubgroup || "",
+        "Inventory Subgroup": item.category || "",
         "Shelf Code": item.shelfCode || "",
         "Counted By": userName,
         Notes: notes

@@ -1690,6 +1690,14 @@ async function listOrderReport(date) {
   const guestCount = await getDailyGuestCount(selectedDate);
   const lines = await listDriverSheetLines(driverLinesTableId, selectedDate);
   const requestById = await listRequestsByRecordIds(lines.map((line) => line.requestRecordId));
+  const standingOrders = (await listStandingOrders())
+    .sort((a, b) => {
+      const dateCompare = String(a.expectedDate || "").localeCompare(String(b.expectedDate || ""));
+      if (dateCompare) return dateCompare;
+      const supplierCompare = String(a.supplierName || "").localeCompare(String(b.supplierName || ""));
+      if (supplierCompare) return supplierCompare;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
 
   const rows = lines
     .map((line) => {
@@ -1730,7 +1738,8 @@ async function listOrderReport(date) {
       toDeliverLines: rows.filter((row) => row.toDeliver).length
     },
     guestCount,
-    rows
+    rows,
+    standingOrders
   };
 }
 

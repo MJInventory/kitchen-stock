@@ -20,7 +20,8 @@ let optionsData = {
   inventoryAreas: [],
   storageLocations: [],
   inventorySubgroups: [],
-  shelfCodes: []
+  shelfCodes: [],
+  suppliers: []
 };
 
 function setLoginMessage(text, isError = false) {
@@ -123,8 +124,10 @@ function currentValuesFromArticle(article) {
     storageLocation: article.querySelector(".location-select")?.value || "",
     inventorySubgroup: article.querySelector(".subgroup-select")?.value || "",
     shelfCode: article.querySelector(".shelf-select")?.value || "",
+    supplierId: article.querySelector(".supplier-select")?.value || "",
     minimumThreshold: String(article.querySelector(".minimum-input")?.value || "0"),
-    unit: article.querySelector(".unit-select")?.value || ""
+    unit: article.querySelector(".unit-select")?.value || "",
+    deleteRequested: article.querySelector(".delete-item-check")?.checked || false
   };
 }
 
@@ -134,8 +137,10 @@ function itemSnapshot(item) {
     storageLocation: item.storageLocation || "",
     inventorySubgroup: item.inventorySubgroup || "",
     shelfCode: item.shelfCode || "",
+    supplierId: item.supplierId || "",
     minimumThreshold: String(item.minimum ?? 0),
-    unit: item.unit || ""
+    unit: item.unit || "",
+    deleteRequested: false
   };
 }
 
@@ -174,6 +179,7 @@ function renderItems() {
           <strong>${escapeHtml(item.name)}</strong>
           <span>${escapeHtml([item.inventoryArea, item.storageLocation].filter(Boolean).join(" / "))}</span>
           <span>${escapeHtml([item.inventorySubgroup, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
+          <span>Supplier: ${escapeHtml(item.supplierName || "Unassigned Supplier")}</span>
           <span>Current: ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
         </div>
         <label>
@@ -201,6 +207,13 @@ function renderItems() {
           </select>
         </label>
         <label>
+          Primary supplier
+          <select class="supplier-select">
+            <option value="">Unassigned</option>
+            ${(optionsData.suppliers || []).map((supplier) => `<option value="${escapeHtml(supplier.id)}"${supplier.id === item.supplierId ? " selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
           Minimum stock
           <input class="minimum-input" type="number" min="0" step="1" value="${item.minimum ?? 0}">
         </label>
@@ -209,6 +222,10 @@ function renderItems() {
           <select class="unit-select">
             ${["box", "bag", "item", "bottle"].map((unit) => `<option${item.unit === unit ? " selected" : ""}>${unit}</option>`).join("")}
           </select>
+        </label>
+        <label class="check-label delete-item-label">
+          <input class="delete-item-check" type="checkbox">
+          Delete item
         </label>
       </article>
     `)
@@ -238,7 +255,15 @@ async function saveItem(article) {
   const payload = draftValues.get(id) || currentValuesFromArticle(article);
   const data = await api(`/api/items/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      minimumThreshold: payload.minimumThreshold,
+      unit: payload.unit,
+      inventoryArea: payload.inventoryArea,
+      storageLocation: payload.storageLocation,
+      inventorySubgroup: payload.inventorySubgroup,
+      shelfCode: payload.shelfCode,
+      supplierId: payload.supplierId
+    })
   });
   items = items.map((item) => (item.id === id ? data.item : item));
   draftValues.delete(id);
@@ -248,19 +273,39 @@ async function saveItem(article) {
 async function saveAllChanges() {
   const dirtyItemIds = [...dirtyIds];
   if (!dirtyItemIds.length) return;
+  const deletions = dirtyItemIds.filter((itemId) => draftValues.get(itemId)?.deleteRequested);
+  if (deletions.length && !window.confirm(`Delete ${deletions.length} inventory item(s)? This cannot be undone.`)) {
+    saveAllButton.disabled = false;
+    return;
+  }
   saveAllButton.disabled = true;
   setSetupMessage(`Saving ${dirtyItemIds.length} item change(s)...`);
   for (const itemId of dirtyItemIds) {
+    const payload = draftValues.get(itemId);
+    if (payload?.deleteRequested) {
+      await api(`/api/items/${itemId}`, { method: "DELETE" });
+      items = items.filter((item) => item.id !== itemId);
+      draftValues.delete(itemId);
+      markDirty(itemId, false);
+      continue;
+    }
     const article = itemSettingsList.querySelector(`.settings-item[data-item-id="${itemId}"]`);
     if (article) {
       await saveItem(article);
       continue;
     }
-    const payload = draftValues.get(itemId);
     if (!payload) continue;
     const data = await api(`/api/items/${itemId}`, {
       method: "PATCH",
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        minimumThreshold: payload.minimumThreshold,
+        unit: payload.unit,
+        inventoryArea: payload.inventoryArea,
+        storageLocation: payload.storageLocation,
+        inventorySubgroup: payload.inventorySubgroup,
+        shelfCode: payload.shelfCode,
+        supplierId: payload.supplierId
+      })
     });
     items = items.map((item) => (item.id === itemId ? data.item : item));
     draftValues.delete(itemId);

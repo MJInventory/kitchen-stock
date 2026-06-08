@@ -113,7 +113,7 @@ function requestArea(request) {
 }
 
 function requestCategory(request) {
-  return itemForRequest(request)?.category || request.inventorySubgroup || itemForRequest(request)?.inventorySubgroup || "";
+  return itemForRequest(request)?.category || request.category || "";
 }
 
 function requestLocation(request) {

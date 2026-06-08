@@ -17,6 +17,7 @@ const guestNotesInput = document.querySelector("#guestNotesInput");
 const printDate = document.querySelector("#printDate");
 const reportSummary = document.querySelector("#reportSummary");
 const reportList = document.querySelector("#reportList");
+const standingReportList = document.querySelector("#standingReportList");
 
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
@@ -137,11 +138,66 @@ function renderSummary(summary) {
     .join("");
 }
 
+function renderStandingOrders(orders) {
+  if (!orders.length) {
+    standingReportList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
+    return;
+  }
+
+  standingReportList.innerHTML = orders
+    .map((order) => {
+      const items = Array.isArray(order.items) && order.items.length
+        ? order.items
+        : [{ itemName: order.itemName, quantity: order.quantity }];
+      return `
+        <section class="sheet-group">
+          <div class="supplier-heading">
+            <h2>${escapeHtml(order.supplierName || order.name || "Standing Order")}</h2>
+            <pre>${escapeHtml([
+              order.expectedDate ? `Expected: ${order.expectedDate}` : "",
+              order.schedule || "",
+              order.active ? "Active" : "Inactive"
+            ].filter(Boolean).join(" / "))}</pre>
+          </div>
+          <table class="order-report-table">
+            <thead>
+              <tr>
+                <th>Standing order</th>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Expected delivery</th>
+                <th>Schedule</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((line) => `
+                <tr>
+                  <td>
+                    ${escapeHtml(order.name || "Standing Order")}
+                    <small>${escapeHtml(order.notes || "")}</small>
+                  </td>
+                  <td>${escapeHtml(line.itemName || order.itemName || "")}</td>
+                  <td>${escapeHtml(line.quantity ?? order.quantity ?? "")}</td>
+                  <td>${escapeHtml(order.expectedDate || "")}</td>
+                  <td>${escapeHtml(order.schedule || "")}</td>
+                  <td>${escapeHtml(order.active ? "Scheduled" : "Inactive")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </section>
+      `;
+    })
+    .join("");
+}
+
 function renderReport(data) {
   printDate.textContent = `Date: ${data.date}`;
   guestCountInput.value = data.guestCount?.guests ?? "";
   guestNotesInput.value = data.guestCount?.notes ?? "";
   renderSummary(data.summary || {});
+  renderStandingOrders(data.standingOrders || []);
 
   if (!data.rows.length) {
     reportList.innerHTML = '<p class="empty-sheet">No order lines found for this date.</p>';

@@ -284,6 +284,10 @@ button:hover,
   margin-top: 4px;
 }
 
+.category-row {
+  grid-template-columns: minmax(260px, 1fr) 140px 140px;
+}
+
 .standing-history-panel {
   margin-top: 18px;
 }
@@ -854,7 +858,7 @@ body.order-app {
 :root[data-theme="light"] .feature-select select,
 :root[data-theme="light"] .order-filters select {
   background: #fffdf8;
-  color: var(--order-muted);
+  color: var(--order-ink);
   border-color: var(--order-line);
 }
 

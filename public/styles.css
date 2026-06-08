@@ -288,6 +288,10 @@ button:hover,
   grid-template-columns: minmax(260px, 1fr) 140px 140px;
 }
 
+.user-admin-row {
+  grid-template-columns: minmax(200px, 1.15fr) minmax(180px, 1fr) minmax(130px, 0.75fr) minmax(120px, 0.7fr) minmax(110px, 0.55fr) minmax(150px, 0.7fr) minmax(120px, 0.55fr);
+}
+
 .standing-history-panel {
   margin-top: 18px;
 }

@@ -17,9 +17,9 @@ let items = [];
 let dirtyIds = new Set();
 let draftValues = new Map();
 let optionsData = {
+  categories: [],
   inventoryAreas: [],
   storageLocations: [],
-  inventorySubgroups: [],
   shelfCodes: [],
   suppliers: []
 };
@@ -98,7 +98,7 @@ function compareItems(left, right) {
   const parts = [
     normalize(left.inventoryArea).localeCompare(normalize(right.inventoryArea)),
     normalize(left.storageLocation).localeCompare(normalize(right.storageLocation)),
-    normalize(left.inventorySubgroup).localeCompare(normalize(right.inventorySubgroup)),
+    normalize(left.category).localeCompare(normalize(right.category)),
     normalize(left.shelfCode).localeCompare(normalize(right.shelfCode), undefined, { numeric: true }),
     normalize(left.name).localeCompare(normalize(right.name), undefined, { numeric: true })
   ];
@@ -122,7 +122,7 @@ function currentValuesFromArticle(article) {
   return {
     inventoryArea: article.querySelector(".area-select")?.value || "",
     storageLocation: article.querySelector(".location-select")?.value || "",
-    inventorySubgroup: article.querySelector(".subgroup-select")?.value || "",
+    category: article.querySelector(".category-select")?.value || "",
     shelfCode: article.querySelector(".shelf-select")?.value || "",
     supplierId: article.querySelector(".supplier-select")?.value || "",
     minimumThreshold: String(article.querySelector(".minimum-input")?.value || "0"),
@@ -135,7 +135,7 @@ function itemSnapshot(item) {
   return {
     inventoryArea: item.inventoryArea || "",
     storageLocation: item.storageLocation || "",
-    inventorySubgroup: item.inventorySubgroup || "",
+    category: item.category || "",
     shelfCode: item.shelfCode || "",
     supplierId: item.supplierId || "",
     minimumThreshold: String(item.minimum ?? 0),
@@ -179,7 +179,7 @@ function renderItems() {
           <strong>${escapeHtml(item.name)}</strong>
           <span>Supplier: ${escapeHtml(item.supplierName || "Unassigned Supplier")}</span>
           <span>${escapeHtml([item.inventoryArea, item.storageLocation].filter(Boolean).join(" / "))}</span>
-          <span>${escapeHtml([item.inventorySubgroup, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
+          <span>${escapeHtml([item.category, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
           <span>Current: ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
         </div>
         <label>
@@ -195,9 +195,9 @@ function renderItems() {
           </select>
         </label>
         <label>
-          Subgroup
-          <select class="subgroup-select">
-            ${optionList(optionsData.inventorySubgroups || [], item.inventorySubgroup)}
+          Category
+          <select class="category-select">
+            ${optionList(optionsData.categories || [], item.category)}
           </select>
         </label>
         <label>
@@ -260,7 +260,7 @@ async function saveItem(article) {
       unit: payload.unit,
       inventoryArea: payload.inventoryArea,
       storageLocation: payload.storageLocation,
-      inventorySubgroup: payload.inventorySubgroup,
+      category: payload.category,
       shelfCode: payload.shelfCode,
       supplierId: payload.supplierId
     })
@@ -302,7 +302,7 @@ async function saveAllChanges() {
         unit: payload.unit,
         inventoryArea: payload.inventoryArea,
         storageLocation: payload.storageLocation,
-        inventorySubgroup: payload.inventorySubgroup,
+        category: payload.category,
         shelfCode: payload.shelfCode,
         supplierId: payload.supplierId
       })

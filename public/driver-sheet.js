@@ -87,7 +87,7 @@ function groupRequests(requests) {
 
   for (const request of requests) {
     const supplier = request.supplierName || "Unassigned Supplier";
-    const category = request.inventorySubgroup || request.category || "Unassigned Category";
+    const category = request.category || "Unassigned Category";
 
     if (!groups.has(supplier)) {
       groups.set(supplier, {
@@ -112,7 +112,7 @@ function groupRequests(requests) {
 }
 
 function logicalRequestCompare(a, b) {
-  const category = String(a.inventorySubgroup || a.category || "").localeCompare(String(b.inventorySubgroup || b.category || ""));
+  const category = String(a.category || "").localeCompare(String(b.category || ""));
   if (category) return category;
   const shelf = String(a.shelfCode || "").localeCompare(String(b.shelfCode || ""), undefined, { numeric: true });
   if (shelf) return shelf;

@@ -2085,7 +2085,7 @@ async function updateItemSettings(recordId, payload) {
   const unit = String(payload.unit || "").trim().toLowerCase();
   const inventoryArea = String(payload.inventoryArea || "").trim();
   const storageLocation = String(payload.storageLocation || "").trim();
-  const inventorySubgroup = String(payload.inventorySubgroup || "").trim();
+  const category = String(payload.category || "").trim();
   const shelfCode = String(payload.shelfCode || "").trim();
   const supplierId = String(payload.supplierId || "").trim();
 
@@ -2098,23 +2098,22 @@ async function updateItemSettings(recordId, payload) {
   }
 
   const unitRecordId = await findOrCreateLookupRecord("unitOfMeasurement", unit);
+  const categoryRecordId = await findOrCreateLookupRecord("categories", category);
   const areaRecordId = await findOrCreateLookupRecord("inventoryAreas", inventoryArea);
   const storageLocationRecordId = await findOrCreateLookupRecord("storageLocations", storageLocation);
-  const subgroupRecordId = await findOrCreateLookupRecord("inventorySubgroups", inventorySubgroup);
   const shelfRecordId = await resolveShelfCodeRecord(shelfCode, storageLocation);
   const fields = {
     "Minimum Threshold": minimum,
     "Unit of Measure": unit,
     "Inventory Area": inventoryArea,
     "Storage Location": storageLocation,
-    "Inventory Subgroup": inventorySubgroup,
     "Shelf Code": shelfCode
   };
 
   if (unitRecordId) fields["Unit Of Measurement Link"] = [unitRecordId];
+  fields["Category Link"] = categoryRecordId ? [categoryRecordId] : [];
   fields["Inventory Area Link"] = areaRecordId ? [areaRecordId] : [];
   fields["Storage Location Link"] = storageLocationRecordId ? [storageLocationRecordId] : [];
-  fields["Inventory Subgroup Link"] = subgroupRecordId ? [subgroupRecordId] : [];
   fields["Shelf Code Link"] = shelfRecordId ? [shelfRecordId] : [];
   fields["Supplier/Vendor"] = /^rec[a-zA-Z0-9]+$/.test(supplierId) ? [supplierId] : [];
 

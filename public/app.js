@@ -20,10 +20,13 @@ const categoryMeta = document.querySelector("#categoryMeta");
 const backButton = document.querySelector("#backButton");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
+const standingOrderCount = document.querySelector("#standingOrderCount");
+const standingOrderList = document.querySelector("#standingOrderList");
 const message = document.querySelector("#message");
 
 let allItems = [];
 let recentRequests = [];
+let standingOrders = [];
 let activeCategory = "";
 let selected = new Map();
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
@@ -256,6 +259,29 @@ function renderDailyOrder() {
   }
 }
 
+function renderStandingOrders() {
+  standingOrderCount.textContent = `${standingOrders.length} scheduled`;
+  if (!standingOrders.length) {
+    standingOrderList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
+    return;
+  }
+  standingOrderList.innerHTML = standingOrders
+    .slice(0, 100)
+    .map((order) => `
+      <article class="daily-order-row">
+        <div>
+          <strong>${escapeHtml(order.supplierName || order.name || "Standing Order")}</strong>
+          <span>${escapeHtml([
+            order.expectedDate ? `Delivery ${order.expectedDate}` : "",
+            order.schedule || "",
+            order.items?.length ? `${order.items.length} item(s)` : ""
+          ].filter(Boolean).join(" / "))}</span>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
 function renderCategories() {
   const items = filterItems();
   const groups = new Map();
@@ -343,6 +369,7 @@ function render() {
   else renderProductList();
   renderSelectedChips();
   renderDailyOrder();
+  renderStandingOrders();
   updateSaveButton();
 }
 
@@ -382,6 +409,7 @@ async function refresh() {
   const data = await api("/api/bootstrap");
   allItems = data.items;
   recentRequests = data.requests;
+  standingOrders = data.standingOrders || [];
   selected = new Map(
     [...selected.entries()].filter(([itemId]) => allItems.some((item) => item.id === itemId))
   );

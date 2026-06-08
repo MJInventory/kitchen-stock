@@ -1853,6 +1853,15 @@ body.order-app {
     grid-template-columns: 1fr;
   }
 
+  .settings-item > * {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  .delete-item-label {
+    align-self: start;
+  }
+
   .setup-save-bar {
     flex-direction: column;
     align-items: stretch;

@@ -11,7 +11,6 @@ const categoryInput = document.querySelector("#category");
 const inventoryAreaInput = document.querySelector("#inventoryArea");
 const supplierId = document.querySelector("#supplierId");
 const storageLocationInput = document.querySelector("#storageLocation");
-const inventorySubgroupInput = document.querySelector("#inventorySubgroup");
 const shelfCodeSelect = document.querySelector("#shelfCode");
 const unitInput = document.querySelector("#unit");
 const itemMessage = document.querySelector("#itemMessage");
@@ -57,7 +56,6 @@ async function loadOptions() {
   fillSelect(categoryInput, data.categories || [], "", "Choose category");
   fillSelect(inventoryAreaInput, data.inventoryAreas || [], "", "Choose area");
   fillSelect(storageLocationInput, data.storageLocations || [], "", "Choose storage location");
-  fillSelect(inventorySubgroupInput, data.inventorySubgroups || [], "", "Choose subgroup");
   fillSelect(unitInput, data.units || [], "item", "Choose unit");
   shelfCodes = data.shelfCodes || [];
   renderShelfOptions("TBD");
@@ -72,7 +70,7 @@ form.addEventListener("submit", async (event) => {
   setMessage("Adding item...");
   try {
     const payload = Object.fromEntries(new FormData(form).entries());
-    ["itemName", "category", "storageLocation", "inventoryArea", "inventorySubgroup", "shelfCode", "unit"].forEach((id) => {
+    ["itemName", "category", "storageLocation", "inventoryArea", "shelfCode", "unit"].forEach((id) => {
       payload[id] = document.querySelector(`#${id}`).value;
     });
     payload.supplierId = supplierId.value;
@@ -83,7 +81,6 @@ form.addEventListener("submit", async (event) => {
     categoryInput.value = "";
     inventoryAreaInput.value = "";
     storageLocationInput.value = "";
-    inventorySubgroupInput.value = "";
     unitInput.value = "item";
     renderShelfOptions("TBD");
     setMessage("Item added.");

@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>MJ Stock Magic</title>
+    <title>MJ Stock Magic Home</title>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
@@ -44,81 +44,39 @@
           <span>Go to</span>
           <select id="featureMenu" aria-label="Inventory tools">
             <option value="">Select where we go</option>
-            <option value="/">Ordering</option>
-            <option value="/stock-count.html">Stock Count</option>
-            <option value="/driver-sheet.html">Driver Sheet</option>
+            <option value="/ordering.html">Ordering</option>
             <option value="/receiving-sheet.html">Receiving</option>
+            <option value="/driver-sheet.html">Driver Sheet</option>
             <option value="/order-report.html">Reports</option>
-            <option value="/inventory-settings.html" data-permission="canAddInventoryItems">Inventory Setup</option>
-            <option value="/storage-locations.html" data-permission="canAddInventoryItems">Storage Locations</option>
-            <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Shelf Codes</option>
-            <option value="/inventory-add.html" data-permission="canAddInventoryItems">Add Item</option>
             <option value="/standing-orders.html" data-permission="canAddInventoryItems">Standing Orders</option>
+            <option value="/stock-count.html">Stock Count</option>
+            <option value="/inventory-settings.html" data-permission="canAddInventoryItems">Inventory Admin</option>
+            <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Storage Locations</option>
+            <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Shelf Codes</option>
             <option value="/invoice-capture.html" data-permission="canUseInvoices">Invoices</option>
             <option value="/user-admin.html" data-permission="canAdminUsers">User Admin</option>
           </select>
         </label>
         <div class="top-actions">
           <span id="currentUser" class="user-chip"></span>
-          <button id="submitButton" class="save-pill" type="button">0 Saved</button>
           <button id="refreshButton" class="icon-button" type="button" title="Refresh">Refresh</button>
           <button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>
         </div>
       </header>
 
-      <section class="order-search-band">
-        <label class="search-box">
-          <span>Search</span>
-          <input id="searchInput" type="search" placeholder="Quick search products..." autocomplete="off">
-        </label>
-        <div class="order-filters">
-          <select id="areaFilter" aria-label="Inventory area">
-            <option value="">All Areas</option>
-            <option>Bar</option>
-            <option>Kitchen</option>
-            <option>FOH</option>
-          </select>
-          <select id="locationFilter" aria-label="Storage location">
-            <option value="">All Locations</option>
-            <option>Dry Storage</option>
-            <option>Cooler</option>
-            <option>Freezer</option>
-            <option>Liquor Storage</option>
-            <option>General Storage</option>
-          </select>
-        </div>
-        <div id="selectedChips" class="selected-chips"></div>
-        <p id="message" class="order-message" role="status"></p>
-      </section>
-
-      <section id="categoryView" class="category-view">
-        <div class="order-divider"><span>All Categories</span></div>
-        <div id="categoryGrid" class="category-grid"></div>
-      </section>
-
-      <section id="productView" class="product-view" hidden>
-        <div class="product-heading">
-          <button id="backButton" class="back-button" type="button">Back Home</button>
-          <div>
-            <h2 id="categoryTitle">Products</h2>
-            <p id="categoryMeta"></p>
-          </div>
-        </div>
-        <div id="productList" class="product-list"></div>
-      </section>
-
-      <section class="daily-order-panel">
+      <section class="daily-order-panel home-order-panel">
         <div class="daily-order-heading">
           <h2>Today's Order</h2>
           <span id="dailyOrderCount"></span>
         </div>
+        <p id="message" class="order-message" role="status"></p>
         <div id="dailyOrderList" class="daily-order-list"></div>
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v63</footer>
+    <footer class="app-version">MJ Stock Magic v64</footer>
     <script src="/theme.js"></script>
-    <script src="/app.js" type="module"></script>
+    <script src="/dashboard.js" type="module"></script>
   </body>
 </html>
 

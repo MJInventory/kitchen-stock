@@ -44,6 +44,7 @@
           <span>Go to</span>
           <select id="featureMenu" aria-label="Inventory tools">
             <option value="">Select where we go</option>
+            <option value="/">Front Page</option>
             <option value="/ordering.html">Ordering</option>
             <option value="/receiving-sheet.html">Receiving</option>
             <option value="/driver-sheet.html">Driver Sheet</option>
@@ -69,6 +70,11 @@
           <h2>Today's Order</h2>
           <span id="dailyOrderCount"></span>
         </div>
+        <div class="order-filters daily-order-filters">
+          <select id="dailyAreaFilter" aria-label="Filter today's orders by area">
+            <option value="">All Areas</option>
+          </select>
+        </div>
         <p id="message" class="order-message" role="status"></p>
         <div id="dailyOrderList" class="daily-order-list"></div>
       </section>
@@ -82,7 +88,7 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v78</footer>
+    <footer class="app-version">MJ Stock Magic v79</footer>
     <script src="/theme.js"></script>
     <script src="/dashboard.js" type="module"></script>
   </body>

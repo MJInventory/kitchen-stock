@@ -133,7 +133,7 @@ function hasSearchTerm() {
 }
 
 function itemCategory(item) {
-  return item.category || item.inventorySubgroup || item.storageLocation || "Unsorted";
+  return item.category || "Uncategorized";
 }
 
 function itemMeta(item) {
@@ -186,7 +186,6 @@ function filterItems() {
     const searchText = normalize([
       item.name,
       item.category,
-      item.inventorySubgroup,
       item.storageLocation,
       item.inventoryArea,
       item.shelfCode,
@@ -228,7 +227,7 @@ function requestSortValue(request) {
   const item = allItems.find((candidate) => candidate.id === request.itemId);
   return {
     supplier: item?.supplierName || request.supplierName || "",
-    category: item?.category || request.inventorySubgroup || item?.inventorySubgroup || "",
+    category: item?.category || request.category || "",
     name: item?.name || "Requested item"
   };
 }
@@ -246,7 +245,7 @@ function logicalRequestCompare(a, b) {
 function groupRequestsByCategory(requests) {
   const groups = new Map();
   for (const request of requests) {
-    const category = allItems.find((candidate) => candidate.id === request.itemId)?.category || request.inventorySubgroup || "Uncategorized";
+    const category = allItems.find((candidate) => candidate.id === request.itemId)?.category || request.category || "Uncategorized";
     if (!groups.has(category)) groups.set(category, []);
     groups.get(category).push(request);
   }
@@ -275,7 +274,7 @@ function renderDailyOrder() {
                   <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
                   <span>${escapeHtml([
                     request.quantity,
-                    allItems.find((candidate) => candidate.id === request.itemId)?.category || request.inventorySubgroup,
+                    allItems.find((candidate) => candidate.id === request.itemId)?.category || request.category,
                     request.inventoryArea,
                     request.storageLocation,
                     isStandingOrder(request) ? `Standing order${expectedDateFromRequest(request) ? ` expected ${expectedDateFromRequest(request)}` : ""}` : ""
@@ -489,7 +488,6 @@ async function submitSelected() {
       urgencyLevel: entry.urgency,
       storageLocation: entry.item.storageLocation || "",
       inventoryArea: entry.item.inventoryArea || "",
-      inventorySubgroup: entry.item.inventorySubgroup || "",
       shelfCode: entry.item.shelfCode || "",
       requestedBy: sessionUser || "Kitchen",
       notes: ""

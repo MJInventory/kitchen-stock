@@ -388,7 +388,7 @@ function normalizeItem(record, supplierById, lookups) {
   return {
     id: record.id,
     name: record.fields["Item Name"] || "",
-    category: linkedValue(record, "Category Link", "Category", lookups.categories),
+    category: linkedValue(record, "Category Link", "Category", lookups.categories) || record.fields.Category || "",
     categoryId: record.fields["Category Link"]?.[0] || "",
     storageLocation: linkedValue(record, "Storage Location Link", "Storage Location", lookups.storageLocations),
     storageLocationId: record.fields["Storage Location Link"]?.[0] || "",
@@ -1649,6 +1649,7 @@ function normalizeCreatedRequest(record) {
     itemId: record.fields["Requested Item"]?.[0] || "",
     quantity: record.fields["Quantity Needed"] ?? null,
     urgency: record.fields["Urgency Level"] || "",
+    category: record.fields.Category || "",
     storageLocation: record.fields["Storage Location"] || "",
     inventoryArea: record.fields["Inventory Area"] || "",
     inventorySubgroup: record.fields["Inventory Subgroup"] || "",
@@ -1670,6 +1671,7 @@ function normalizeRequest(record) {
     itemId: record.fields["Requested Item"]?.[0] || "",
     quantity: record.fields["Quantity Needed"] ?? null,
     urgency: record.fields["Urgency Level"] || "",
+    category: record.fields.Category || "",
     storageLocation: record.fields["Storage Location"] || "",
     inventoryArea: record.fields["Inventory Area"] || "",
     inventorySubgroup: record.fields["Inventory Subgroup"] || "",
@@ -1696,6 +1698,7 @@ function normalizeDriverLine(record) {
     supplierContact: record.fields["Supplier Contact"] || "",
     quantity: record.fields.Quantity ?? null,
     unit: record.fields.Unit || "",
+    category: record.fields.Category || "",
     inventoryArea: record.fields["Inventory Area"] || "",
     storageLocation: record.fields["Storage Location"] || "",
     inventorySubgroup: record.fields["Inventory Subgroup"] || "",
@@ -1918,6 +1921,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
   const existingKeys = new Set(
     existing.records.map((record) => `${record.fields["Item Request Record ID"] || ""}|${record.fields["Sheet Date"] || ""}`)
   );
+  const inheritedDriver = existing.records.find((record) => record.fields.Driver)?.fields.Driver || "";
 
   for (const request of requests) {
     const key = `${request.id}|${sheetDate}`;
@@ -1934,6 +1938,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
       "Request ID": request.requestId || 0,
       "Inventory Item Record ID": request.itemId,
       "Item Name": request.itemName,
+      Category: request.category || undefined,
       "Supplier Name": standingSupplier || request.supplierName,
       "Supplier Contact": request.supplierContact,
       Quantity: request.quantity || 0,
@@ -1947,6 +1952,7 @@ async function persistDriverSheetLines(tableId, sheetDate, requests) {
       "2Deliver": isStanding,
       Notes: request.notes || ""
     };
+    if (schema.driverLines.hasDriver && inheritedDriver) fields.Driver = inheritedDriver;
     if (isStanding && schema.driverLines.hasDeliveryDay) fields["Delivery Day"] = sheetDate;
     if (isStanding && schema.driverLines.hasDeliveryDate) fields["Delivery Date"] = sheetDate;
     if (standingRunId && schema.driverLines.hasStandingRunId) fields["Standing Order Run ID"] = standingRunId;

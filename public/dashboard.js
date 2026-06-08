@@ -6,6 +6,7 @@ const loginMessage = document.querySelector("#loginMessage");
 const currentUser = document.querySelector("#currentUser");
 const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
+const dailyAreaFilter = document.querySelector("#dailyAreaFilter");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
 const standingOrderCount = document.querySelector("#standingOrderCount");
@@ -101,11 +102,27 @@ function itemNameFromRequest(request) {
   return allItems.find((item) => item.id === request.itemId)?.name || "Requested item";
 }
 
+function itemForRequest(request) {
+  return allItems.find((item) => item.id === request.itemId) || null;
+}
+
+function requestArea(request) {
+  return request.inventoryArea || itemForRequest(request)?.inventoryArea || "";
+}
+
+function requestCategory(request) {
+  return request.inventorySubgroup || itemForRequest(request)?.category || itemForRequest(request)?.inventorySubgroup || "";
+}
+
+function requestLocation(request) {
+  return request.storageLocation || itemForRequest(request)?.storageLocation || "";
+}
+
 function requestSortValue(request) {
-  const item = allItems.find((candidate) => candidate.id === request.itemId);
+  const item = itemForRequest(request);
   return {
     supplier: item?.supplierName || request.supplierName || "",
-    category: request.inventorySubgroup || item?.inventorySubgroup || item?.category || "",
+    category: requestCategory(request),
     name: item?.name || "Requested item"
   };
 }
@@ -120,9 +137,25 @@ function logicalRequestCompare(a, b) {
   return left.name.localeCompare(right.name);
 }
 
+function populateDailyAreaFilter() {
+  const areas = [...new Set(
+    recentRequests
+      .map((request) => requestArea(request))
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
+  const selected = dailyAreaFilter.value;
+  dailyAreaFilter.innerHTML = [
+    '<option value="">All Areas</option>',
+    ...areas.map((area) => `<option value="${escapeHtml(area)}"${area === selected ? " selected" : ""}>${escapeHtml(area)}</option>`)
+  ].join("");
+  dailyAreaFilter.value = areas.includes(selected) ? selected : "";
+}
+
 function renderDailyOrder() {
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   dailyOrderList.innerHTML = activeRequests
@@ -133,9 +166,9 @@ function renderDailyOrder() {
           <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
           <span>${escapeHtml([
             request.quantity,
-            request.inventorySubgroup,
-            request.inventoryArea,
-            request.storageLocation
+            requestCategory(request),
+            requestArea(request),
+            requestLocation(request)
           ].filter(Boolean).join(" / "))}</span>
         </div>
         <div class="daily-order-actions">
@@ -180,6 +213,7 @@ async function refresh() {
   allItems = data.items || [];
   recentRequests = data.requests || [];
   standingOrders = data.standingOrders || [];
+  populateDailyAreaFilter();
   renderDailyOrder();
   renderStandingOrders();
   setMessage("");
@@ -228,6 +262,7 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", showLogin);
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
+dailyAreaFilter.addEventListener("change", renderDailyOrder);
 document.querySelector("#featureMenu")?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 });

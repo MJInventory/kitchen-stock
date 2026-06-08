@@ -2141,7 +2141,6 @@ async function createInventoryItem(payload) {
   const category = String(payload.category || "").trim();
   const storageLocation = String(payload.storageLocation || "").trim();
   const inventoryArea = String(payload.inventoryArea || "").trim();
-  const inventorySubgroup = String(payload.inventorySubgroup || "").trim();
   const shelfCode = String(payload.shelfCode || "TBD").trim();
   const supplierId = String(payload.supplierId || "").trim();
   const unit = String(payload.unit || "item").trim().toLowerCase();
@@ -2156,7 +2155,6 @@ async function createInventoryItem(payload) {
   const categoryId = await findOrCreateLookupRecord("categories", category);
   const storageLocationId = await findOrCreateLookupRecord("storageLocations", storageLocation);
   const inventoryAreaId = await findOrCreateLookupRecord("inventoryAreas", inventoryArea);
-  const subgroupId = await findOrCreateLookupRecord("inventorySubgroups", inventorySubgroup);
   const shelfId = await resolveShelfCodeRecord(shelfCode, storageLocation);
   const unitId = await findOrCreateLookupRecord("unitOfMeasurement", unit);
 
@@ -2170,7 +2168,6 @@ async function createInventoryItem(payload) {
   if (categoryId) fields["Category Link"] = [categoryId];
   if (storageLocationId) fields["Storage Location Link"] = [storageLocationId];
   if (inventoryAreaId) fields["Inventory Area Link"] = [inventoryAreaId];
-  if (subgroupId) fields["Inventory Subgroup Link"] = [subgroupId];
   if (shelfId) fields["Shelf Code Link"] = [shelfId];
   if (unitId) fields["Unit Of Measurement Link"] = [unitId];
   if (/^rec[a-zA-Z0-9]+$/.test(supplierId)) fields["Supplier/Vendor"] = [supplierId];

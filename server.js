@@ -2013,6 +2013,7 @@ async function updateItemSettings(recordId, payload) {
   const storageLocation = String(payload.storageLocation || "").trim();
   const inventorySubgroup = String(payload.inventorySubgroup || "").trim();
   const shelfCode = String(payload.shelfCode || "").trim();
+  const supplierId = String(payload.supplierId || "").trim();
 
   if (!Number.isFinite(minimum) || minimum < 0) {
     throw new Error("Minimum stock must be zero or greater.");
@@ -2041,6 +2042,7 @@ async function updateItemSettings(recordId, payload) {
   fields["Storage Location Link"] = storageLocationRecordId ? [storageLocationRecordId] : [];
   fields["Inventory Subgroup Link"] = subgroupRecordId ? [subgroupRecordId] : [];
   fields["Shelf Code Link"] = shelfRecordId ? [shelfRecordId] : [];
+  fields["Supplier/Vendor"] = /^rec[a-zA-Z0-9]+$/.test(supplierId) ? [supplierId] : [];
 
   const record = await airtable(`${inventoryTableId}/${recordId}`, {
     method: "PATCH",
@@ -2053,6 +2055,16 @@ async function updateItemSettings(recordId, payload) {
   const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
 
   return normalizeItem(record, supplierById, lookups);
+}
+
+async function deleteInventoryItem(recordId) {
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid item record.");
+  }
+  await airtable(`${inventoryTableId}/${recordId}`, { method: "DELETE" });
+  cache.items.expiresAt = 0;
+  cache.requests.expiresAt = 0;
+  return { ok: true, recordId };
 }
 
 async function updateItemPrimarySupplier(itemRecordId, supplier) {
@@ -2963,6 +2975,16 @@ const server = http.createServer(async (req, res) => {
       const recordId = req.url.split("/")[3];
       const item = await updateItemSettings(recordId, await readJson(req));
       send(res, 200, { item });
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url.startsWith("/api/items/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can delete inventory items.")) return;
+      const recordId = req.url.split("/")[3];
+      const result = await deleteInventoryItem(recordId);
+      send(res, 200, { result });
       return;
     }
 

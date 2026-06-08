@@ -1,4 +1,4 @@
-﻿const loginScreen = document.querySelector("#loginScreen");
+const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");
@@ -9,10 +9,13 @@ const areaFilter = document.querySelector("#areaFilter");
 const locationFilter = document.querySelector("#locationFilter");
 const setupMessage = document.querySelector("#setupMessage");
 const itemSettingsList = document.querySelector("#itemSettingsList");
+const saveAllButton = document.querySelector("#saveAllButton");
 
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let items = [];
+let dirtyIds = new Set();
+let draftValues = new Map();
 let optionsData = {
   inventoryAreas: [],
   storageLocations: [],
@@ -62,6 +65,10 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
+function normalize(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function optionList(records, selectedValue, placeholder = "") {
   return [
     placeholder ? `<option value="">${escapeHtml(placeholder)}</option>` : "",
@@ -79,35 +86,95 @@ function fillFilter(select, records, selectedValue, allLabel) {
 }
 
 function shelvesForLocation(location) {
-  const wanted = String(location || "").trim().toLowerCase();
+  const wanted = normalize(location);
   return (optionsData.shelfCodes || []).filter((shelf) => {
     if (!wanted) return true;
-    return String(shelf.storageLocation || "").trim().toLowerCase() === wanted;
+    return normalize(shelf.storageLocation) === wanted;
   });
 }
 
-function shelfDisplay(item) {
-  if (!item.shelfCode) return "";
-  return item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode;
+function compareItems(left, right) {
+  const parts = [
+    normalize(left.inventoryArea).localeCompare(normalize(right.inventoryArea)),
+    normalize(left.storageLocation).localeCompare(normalize(right.storageLocation)),
+    normalize(left.inventorySubgroup).localeCompare(normalize(right.inventorySubgroup)),
+    normalize(left.shelfCode).localeCompare(normalize(right.shelfCode), undefined, { numeric: true }),
+    normalize(left.name).localeCompare(normalize(right.name), undefined, { numeric: true })
+  ];
+  return parts.find((value) => value !== 0) || 0;
+}
+
+function effectiveItem(item) {
+  return { ...item, ...(draftValues.get(item.id) || {}) };
+}
+
+function markDirty(itemId, isDirty = true) {
+  if (isDirty) {
+    dirtyIds.add(itemId);
+  } else {
+    dirtyIds.delete(itemId);
+  }
+  saveAllButton.disabled = dirtyIds.size === 0;
+}
+
+function currentValuesFromArticle(article) {
+  return {
+    inventoryArea: article.querySelector(".area-select")?.value || "",
+    storageLocation: article.querySelector(".location-select")?.value || "",
+    inventorySubgroup: article.querySelector(".subgroup-select")?.value || "",
+    shelfCode: article.querySelector(".shelf-select")?.value || "",
+    minimumThreshold: String(article.querySelector(".minimum-input")?.value || "0"),
+    unit: article.querySelector(".unit-select")?.value || ""
+  };
+}
+
+function itemSnapshot(item) {
+  return {
+    inventoryArea: item.inventoryArea || "",
+    storageLocation: item.storageLocation || "",
+    inventorySubgroup: item.inventorySubgroup || "",
+    shelfCode: item.shelfCode || "",
+    minimumThreshold: String(item.minimum ?? 0),
+    unit: item.unit || ""
+  };
+}
+
+function syncDirtyState(article) {
+  const itemId = article.dataset.itemId;
+  const original = items.find((item) => item.id === itemId);
+  if (!original) return;
+  const current = currentValuesFromArticle(article);
+  const snapshot = itemSnapshot(original);
+  const isDirty = Object.keys(snapshot).some((key) => current[key] !== snapshot[key]);
+  article.classList.toggle("dirty", isDirty);
+  if (isDirty) {
+    draftValues.set(itemId, current);
+  } else {
+    draftValues.delete(itemId);
+  }
+  markDirty(itemId, isDirty);
 }
 
 function renderItems() {
   const area = areaFilter.value;
   const location = locationFilter.value;
-  const filtered = items.filter((item) => {
-    const areaMatches = !area || item.inventoryArea === area;
-    const locationMatches = !location || item.storageLocation === location;
-    return areaMatches && locationMatches;
-  });
+  const filtered = items
+    .map(effectiveItem)
+    .filter((item) => {
+      const areaMatches = !area || item.inventoryArea === area;
+      const locationMatches = !location || item.storageLocation === location;
+      return areaMatches && locationMatches;
+    })
+    .sort(compareItems);
 
   itemSettingsList.innerHTML = filtered
     .map((item) => `
-      <article class="settings-item" data-item-id="${item.id}">
+      <article class="settings-item${dirtyIds.has(item.id) ? " dirty" : ""}" data-item-id="${item.id}">
         <div>
-          <strong>${item.name}</strong>
-          <span>${[item.inventoryArea, item.storageLocation].filter(Boolean).join(" / ")}</span>
-          <span>${[item.inventorySubgroup, item.shelfCode ? `Shelf ${shelfDisplay(item)}` : ""].filter(Boolean).join(" / ")}</span>
-          <span>Current: ${item.quantity ?? ""} ${item.unit || ""}</span>
+          <strong>${escapeHtml(item.name)}</strong>
+          <span>${escapeHtml([item.inventoryArea, item.storageLocation].filter(Boolean).join(" / "))}</span>
+          <span>${escapeHtml([item.inventorySubgroup, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
+          <span>Current: ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
         </div>
         <label>
           Area
@@ -143,7 +210,6 @@ function renderItems() {
             ${["box", "bag", "item", "bottle"].map((unit) => `<option${item.unit === unit ? " selected" : ""}>${unit}</option>`).join("")}
           </select>
         </label>
-        <button class="save-item-button" type="button">Save</button>
       </article>
     `)
     .join("");
@@ -158,29 +224,57 @@ async function loadItems() {
   const [data, formOptions] = await Promise.all([api("/api/items"), api("/api/item-form-options")]);
   items = data.items;
   optionsData = formOptions;
+  dirtyIds.clear();
+  draftValues.clear();
   fillFilter(areaFilter, optionsData.inventoryAreas || [], areaFilter.value, "All");
   fillFilter(locationFilter, optionsData.storageLocations || [], locationFilter.value, "All");
   renderItems();
+  saveAllButton.disabled = true;
   setSetupMessage("");
 }
 
 async function saveItem(article) {
   const id = article.dataset.itemId;
-  const minimumThreshold = article.querySelector(".minimum-input").value;
-  const unit = article.querySelector(".unit-select").value;
-  const inventoryArea = article.querySelector(".area-select").value;
-  const storageLocation = article.querySelector(".location-select").value;
-  const inventorySubgroup = article.querySelector(".subgroup-select").value;
-  const shelfCode = article.querySelector(".shelf-select").value;
+  const payload = draftValues.get(id) || currentValuesFromArticle(article);
   const data = await api(`/api/items/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ minimumThreshold, unit, inventoryArea, storageLocation, inventorySubgroup, shelfCode })
+    body: JSON.stringify(payload)
   });
-
   items = items.map((item) => (item.id === id ? data.item : item));
-  renderItems();
-  setSetupMessage("Item settings saved.");
+  draftValues.delete(id);
+  markDirty(id, false);
 }
+
+async function saveAllChanges() {
+  const dirtyItemIds = [...dirtyIds];
+  if (!dirtyItemIds.length) return;
+  saveAllButton.disabled = true;
+  setSetupMessage(`Saving ${dirtyItemIds.length} item change(s)...`);
+  for (const itemId of dirtyItemIds) {
+    const article = itemSettingsList.querySelector(`.settings-item[data-item-id="${itemId}"]`);
+    if (article) {
+      await saveItem(article);
+      continue;
+    }
+    const payload = draftValues.get(itemId);
+    if (!payload) continue;
+    const data = await api(`/api/items/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+    items = items.map((item) => (item.id === itemId ? data.item : item));
+    draftValues.delete(itemId);
+    markDirty(itemId, false);
+  }
+  renderItems();
+  setSetupMessage("All item settings saved.");
+}
+
+window.addEventListener("beforeunload", (event) => {
+  if (!dirtyIds.size) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -213,31 +307,38 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-logoutButton.addEventListener("click", showLogin);
+logoutButton.addEventListener("click", () => {
+  if (dirtyIds.size && !window.confirm("You have unsaved inventory changes. Leave this screen anyway?")) return;
+  showLogin();
+});
 areaFilter.addEventListener("change", renderItems);
 locationFilter.addEventListener("change", renderItems);
-itemSettingsList.addEventListener("change", (event) => {
-  const locationSelect = event.target.closest(".location-select");
-  if (!locationSelect) return;
-  const article = locationSelect.closest(".settings-item");
-  const shelfSelect = article?.querySelector(".shelf-select");
-  if (!shelfSelect) return;
-  const currentValue = shelfSelect.value;
-  shelfSelect.innerHTML = optionList(shelvesForLocation(locationSelect.value), currentValue, "Choose shelf");
-  if (![...shelfSelect.options].some((option) => option.value === currentValue)) {
-    shelfSelect.value = "";
-  }
+saveAllButton.addEventListener("click", () => {
+  saveAllChanges().catch((error) => {
+    saveAllButton.disabled = false;
+    setSetupMessage(error.message, true);
+  });
 });
-itemSettingsList.addEventListener("click", (event) => {
-  const button = event.target.closest(".save-item-button");
-  if (!button) return;
+
+itemSettingsList.addEventListener("change", (event) => {
   const article = event.target.closest(".settings-item");
-  button.disabled = true;
-  saveItem(article)
-    .catch((error) => setSetupMessage(error.message, true))
-    .finally(() => {
-      button.disabled = false;
-    });
+  if (!article) return;
+  const locationSelect = event.target.closest(".location-select");
+  if (locationSelect) {
+    const shelfSelect = article.querySelector(".shelf-select");
+    const currentValue = shelfSelect.value;
+    shelfSelect.innerHTML = optionList(shelvesForLocation(locationSelect.value), currentValue, "Choose shelf");
+    if (![...shelfSelect.options].some((option) => option.value === currentValue)) {
+      shelfSelect.value = "";
+    }
+  }
+  syncDirtyState(article);
+});
+
+itemSettingsList.addEventListener("input", (event) => {
+  const article = event.target.closest(".settings-item");
+  if (!article) return;
+  syncDirtyState(article);
 });
 
 if (sessionToken && sessionUser) {
@@ -246,10 +347,3 @@ if (sessionToken && sessionUser) {
 } else {
   showLogin();
 }
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -37,13 +37,13 @@
       <section class="panel">
         <form id="itemForm" class="admin-form-grid">
           <label>Item name <input id="itemName" type="text" required></label>
-          <label>Category <input id="category" list="categoryOptions" required></label>
-          <label>Area <input id="inventoryArea" list="areaOptions" required></label>
-          <label>Storage location <input id="storageLocation" list="locationOptions" required></label>
-          <label>Subgroup <input id="inventorySubgroup" list="subgroupOptions"></label>
-          <label>Shelf code <input id="shelfCode" list="shelfOptions" value="TBD"></label>
+          <label>Category <select id="category" required></select></label>
+          <label>Area <select id="inventoryArea" required></select></label>
+          <label>Storage location <select id="storageLocation" required></select></label>
+          <label>Subgroup <select id="inventorySubgroup"></select></label>
+          <label>Shelf code <select id="shelfCode"></select></label>
           <label>Supplier <select id="supplierId"></select></label>
-          <label>Unit <input id="unit" list="unitOptions" value="item" required></label>
+          <label>Unit <select id="unit" required></select></label>
           <label>Current stock <input id="currentQuantity" type="number" min="0" step="0.01" value="0" required></label>
           <label>Minimum stock <input id="minimumThreshold" type="number" min="0" step="0.01" value="0" required></label>
           <button type="submit">Add Item</button>
@@ -52,13 +52,7 @@
       </section>
     </main>
 
-    <datalist id="categoryOptions"></datalist>
-    <datalist id="areaOptions"></datalist>
-    <datalist id="locationOptions"></datalist>
-    <datalist id="subgroupOptions"></datalist>
-    <datalist id="shelfOptions"></datalist>
-    <datalist id="unitOptions"></datalist>
-    <footer class="app-version">MJ Stock Magic v61</footer>
+    <footer class="app-version">MJ Stock Magic v62</footer>
     <script src="/theme.js"></script>
     <script src="/inventory-add.js" type="module"></script>
   </body>

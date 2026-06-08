@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0f766e">
     <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
-    <title>Shelf Codes</title>
+    <title>Storage & Shelf Admin</title>
     <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
     <link rel="stylesheet" href="/styles.css">
   </head>
@@ -13,7 +13,7 @@
     <section id="loginScreen" class="login-screen">
       <form id="loginForm" class="login-panel">
         <p class="eyebrow">Inventory Setup</p>
-        <h1>Shelf Codes</h1>
+        <h1>Storage &amp; Shelf Admin</h1>
         <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
         <label>Password <input id="passwordInput" type="password" autocomplete="current-password" required></label>
         <button type="submit">Log In</button>
@@ -25,7 +25,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Inventory Setup</p>
-          <h1>Shelf Codes</h1>
+          <h1>Storage &amp; Shelf Admin</h1>
         </div>
         <div class="top-actions">
           <span id="currentUser" class="user-chip"></span>
@@ -34,6 +34,18 @@
           <button id="logoutButton" class="secondary" type="button">Log Out</button>
         </div>
       </header>
+
+      <section class="panel">
+        <h2>Storage Locations</h2>
+        <form id="locationForm" class="admin-form-grid">
+          <label>Name <input id="locationName" type="text" required></label>
+          <label class="check-label"><input id="locationActive" type="checkbox" checked> Active</label>
+          <button type="submit">Add Location</button>
+          <p id="locationMessage" role="status"></p>
+        </form>
+      </section>
+
+      <section id="locationList" class="settings-list"></section>
 
       <section class="panel">
         <h2>Add Shelf Code</h2>
@@ -49,7 +61,7 @@
       <section id="shelfList" class="settings-list"></section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v63</footer>
+    <footer class="app-version">MJ Stock Magic v64</footer>
     <script src="/theme.js"></script>
     <script src="/shelf-codes.js" type="module"></script>
   </body>

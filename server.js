@@ -1456,18 +1456,52 @@ async function listShelfCodesAdmin() {
   });
   const locations = await listStorageLocationsAdmin();
   const locationById = new Map(locations.map((location) => [location.id, location.name]));
-  return records
+  const unique = new Map();
+  for (const shelf of records
     .map(normalizeShelfCode)
     .map((shelf) => ({
       ...shelf,
       storageLocation: shelf.storageLocation || locationById.get(shelf.storageLocationId) || ""
     }))
-    .filter((entry) => entry.name)
-    .sort((a, b) => {
-      const location = a.storageLocation.localeCompare(b.storageLocation);
-      if (location) return location;
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
-    });
+    .filter((entry) => entry.name)) {
+    const key = `${String(shelf.storageLocation || "").trim().toLowerCase()}::${String(shelf.name || "").trim().toLowerCase()}`;
+    if (!unique.has(key)) unique.set(key, shelf);
+  }
+  return [...unique.values()].sort((a, b) => {
+    const location = a.storageLocation.localeCompare(b.storageLocation);
+    if (location) return location;
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
+  });
+}
+
+async function findExistingShelfCodeRecordId(name, storageLocation, excludeRecordId = "") {
+  let schema = await getSchema();
+  schema = await ensureShelfCodeStorageLocationField(schema);
+  const tableId = schema.tables.shelfCodes;
+  if (!tableId) return "";
+
+  const wantedName = String(name || "").trim().toLowerCase();
+  const wantedLocation = String(storageLocation || "").trim().toLowerCase();
+  if (!wantedName) return "";
+
+  const records = await listAirtableRecords(tableId, {
+    "sort[0][field]": "Shelf Code",
+    "sort[0][direction]": "asc"
+  });
+  const locations = await listStorageLocationsAdmin();
+  const locationById = new Map(locations.map((location) => [location.id, location.name]));
+  const match = records
+    .map(normalizeShelfCode)
+    .map((shelf) => ({
+      ...shelf,
+      storageLocation: shelf.storageLocation || locationById.get(shelf.storageLocationId) || ""
+    }))
+    .find((shelf) =>
+      shelf.id !== excludeRecordId &&
+      String(shelf.name || "").trim().toLowerCase() === wantedName &&
+      String(shelf.storageLocation || "").trim().toLowerCase() === wantedLocation
+    );
+  return match?.id || "";
 }
 
 async function resolveShelfCodeRecord(name, storageLocation) {
@@ -1517,6 +1551,12 @@ async function saveShelfCode(payload, recordId = "") {
   const storageLocation = String(payload.storageLocation || "").trim();
   const active = payload.active !== false;
   if (!name) throw new Error("Shelf code is required.");
+  const duplicateId = await findExistingShelfCodeRecordId(name, storageLocation, recordId);
+  if (duplicateId && !recordId) {
+    recordId = duplicateId;
+  } else if (duplicateId && recordId && duplicateId !== recordId) {
+    throw new Error(`Shelf code "${name}" already exists for ${storageLocation}.`);
+  }
   const fields = { "Shelf Code": name };
   if (schema.lookupFields.shelfCodes.hasActive) fields.Active = active;
   if (storageLocation) {

@@ -177,9 +177,9 @@ function renderItems() {
       <article class="settings-item${dirtyIds.has(item.id) ? " dirty" : ""}" data-item-id="${item.id}">
         <div>
           <strong>${escapeHtml(item.name)}</strong>
+          <span>Supplier: ${escapeHtml(item.supplierName || "Unassigned Supplier")}</span>
           <span>${escapeHtml([item.inventoryArea, item.storageLocation].filter(Boolean).join(" / "))}</span>
           <span>${escapeHtml([item.inventorySubgroup, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
-          <span>Supplier: ${escapeHtml(item.supplierName || "Unassigned Supplier")}</span>
           <span>Current: ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
         </div>
         <label>

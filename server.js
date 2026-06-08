@@ -1248,6 +1248,18 @@ async function deleteAppUser(recordId) {
 
 async function listSchema() {
   const data = await airtable("tables", { meta: true });
+  const normalizeFieldName = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const findFieldName = (tableName, ...candidates) => {
+    const table = data.tables.find((entry) => entry.name === tableName);
+    if (!table) return "";
+    const fields = table.fields || [];
+    for (const candidate of candidates) {
+      const expected = normalizeFieldName(candidate);
+      const match = fields.find((field) => normalizeFieldName(field.name) === expected);
+      if (match) return match.name;
+    }
+    return "";
+  };
   const requests = data.tables.find((table) => table.id === requestsTableId);
   const driverSheetLines = data.tables.find((table) => table.name === "Driver Sheet Lines");
   const appUsers = data.tables.find((table) => table.name === "App Users");
@@ -1300,8 +1312,10 @@ async function listSchema() {
         hasActive: fieldsByTableName.get("Storage Locations")?.has("Active") || false
       },
       shelfCodes: {
-        hasStorageLocation: fieldsByTableName.get("Shelf Codes")?.has("Storage Location") || false,
-        hasStorageLocationLink: fieldsByTableName.get("Shelf Codes")?.has("Storage Location Link") || false,
+        storageLocationFieldName: findFieldName("Shelf Codes", "Storage Location", "Storage Locations"),
+        storageLocationLinkFieldName: findFieldName("Shelf Codes", "Storage Location Link", "Storage Locations Link", "Storage Location Links"),
+        hasStorageLocation: Boolean(findFieldName("Shelf Codes", "Storage Location", "Storage Locations")),
+        hasStorageLocationLink: Boolean(findFieldName("Shelf Codes", "Storage Location Link", "Storage Locations Link", "Storage Location Links")),
         hasActive: fieldsByTableName.get("Shelf Codes")?.has("Active") || false
       }
     },
@@ -1381,8 +1395,8 @@ function normalizeShelfCode(record) {
   return {
     id: record.id,
     name: String(record.fields["Shelf Code"] || "").trim(),
-    storageLocation: String(record.fields["Storage Location"] || "").trim(),
-    storageLocationId: record.fields["Storage Location Link"]?.[0] || "",
+    storageLocation: String(record.fields["Storage Location"] || record.fields["Storage Locations"] || "").trim(),
+    storageLocationId: record.fields["Storage Location Link"]?.[0] || record.fields["Storage Locations Link"]?.[0] || record.fields["Storage Location Links"]?.[0] || "",
     active: record.fields.Active !== false
   };
 }
@@ -1453,9 +1467,9 @@ async function saveShelfCode(payload, recordId = "") {
   if (storageLocation) {
     if (schema.lookupFields.shelfCodes.hasStorageLocationLink) {
       const locationId = await findOrCreateLookupRecord("storageLocations", storageLocation);
-      fields["Storage Location Link"] = locationId ? [locationId] : [];
+      fields[schema.lookupFields.shelfCodes.storageLocationLinkFieldName || "Storage Location Link"] = locationId ? [locationId] : [];
     } else if (schema.lookupFields.shelfCodes.hasStorageLocation) {
-      fields["Storage Location"] = storageLocation;
+      fields[schema.lookupFields.shelfCodes.storageLocationFieldName || "Storage Location"] = storageLocation;
     } else {
       throw new Error("Add Storage Location or Storage Location Link to the Shelf Codes table first.");
     }

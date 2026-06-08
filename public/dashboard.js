@@ -160,7 +160,7 @@ function renderStandingOrders() {
   standingOrderList.innerHTML = standingOrders
     .slice(0, 100)
     .map((order) => `
-      <article class="daily-order-row">
+      <a class="daily-order-row daily-order-link" href="/standing-orders.html?orderId=${encodeURIComponent(order.id)}">
         <div>
           <strong>${escapeHtml(order.supplierName || order.name || "Standing Order")}</strong>
           <span>${escapeHtml([
@@ -169,7 +169,7 @@ function renderStandingOrders() {
             order.items?.length ? `${order.items.length} item(s)` : ""
           ].filter(Boolean).join(" / "))}</span>
         </div>
-      </article>
+      </a>
     `)
     .join("");
 }

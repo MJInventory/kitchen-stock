@@ -1331,6 +1331,29 @@ async function getSchema() {
   return cached("schema", 10 * 60 * 1000, listSchema);
 }
 
+async function ensureShelfCodeStorageLocationField(schema = null) {
+  const currentSchema = schema || await getSchema();
+  if (currentSchema.lookupFields.shelfCodes.hasStorageLocation || currentSchema.lookupFields.shelfCodes.hasStorageLocationLink) {
+    return currentSchema;
+  }
+
+  const shelfCodesTableId = currentSchema.tables.shelfCodes;
+  if (!shelfCodesTableId) throw new Error("Shelf Codes table was not found.");
+
+  await airtable(`tables/${shelfCodesTableId}/fields`, {
+    meta: true,
+    method: "POST",
+    body: JSON.stringify({
+      name: "Storage Location",
+      type: "singleLineText"
+    })
+  });
+
+  cache.schema.expiresAt = 0;
+  cache.lookups.expiresAt = 0;
+  return getSchema();
+}
+
 async function listLookupRecords() {
   const schema = await getSchema();
   const result = {};
@@ -1413,7 +1436,8 @@ async function listStorageLocationsAdmin() {
 }
 
 async function listShelfCodesAdmin() {
-  const schema = await getSchema();
+  let schema = await getSchema();
+  schema = await ensureShelfCodeStorageLocationField(schema);
   const tableId = schema.tables.shelfCodes;
   if (!tableId) throw new Error("Shelf Codes table was not found.");
   const records = await listAirtableRecords(tableId, {
@@ -1455,7 +1479,8 @@ async function saveStorageLocation(payload, recordId = "") {
 }
 
 async function saveShelfCode(payload, recordId = "") {
-  const schema = await getSchema();
+  let schema = await getSchema();
+  schema = await ensureShelfCodeStorageLocationField(schema);
   const tableId = schema.tables.shelfCodes;
   if (!tableId) throw new Error("Shelf Codes table was not found.");
   const name = String(payload.name || payload.shelfCode || "").trim();

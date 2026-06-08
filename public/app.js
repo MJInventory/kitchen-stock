@@ -9,6 +9,7 @@ const areaFilter = document.querySelector("#areaFilter");
 const locationFilter = document.querySelector("#locationFilter");
 const refreshButton = document.querySelector("#refreshButton");
 const submitButton = document.querySelector("#submitButton");
+const featureMenu = document.querySelector("#featureMenu");
 const searchInput = document.querySelector("#searchInput");
 const selectedChips = document.querySelector("#selectedChips");
 const categoryView = document.querySelector("#categoryView");
@@ -59,6 +60,7 @@ function showApp() {
     option.hidden = !sessionPermissions[option.dataset.permission];
     option.disabled = !sessionPermissions[option.dataset.permission];
   });
+  if (featureMenu) featureMenu.value = "/ordering.html";
 }
 
 function saveSession(data) {
@@ -513,7 +515,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
-document.querySelector("#featureMenu")?.addEventListener("change", (event) => {
+featureMenu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 });
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));

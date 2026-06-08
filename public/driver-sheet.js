@@ -319,8 +319,10 @@ async function saveDriverAssignment() {
       driverName: driverName.value
     })
   });
+  driverName.value = result.driverName || driverName.value;
   currentSheet.driverName = result.driverName;
   printDriver.textContent = `Driver: ${result.driverName}`;
+  await loadSheet();
   setMessage(`Driver assigned to ${result.updated} line(s).`);
 }
 

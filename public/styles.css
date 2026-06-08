@@ -775,6 +775,12 @@ body.order-app {
   color: var(--order-ink);
 }
 
+:root[data-theme="light"] .order-app select option,
+:root[data-theme="light"] .stock-location-picker select option {
+  background: #fffdf8;
+  color: var(--order-ink);
+}
+
 :root[data-theme="light"] .selected-chip,
 :root[data-theme="light"] .save-pill {
   color: #fffdf8;

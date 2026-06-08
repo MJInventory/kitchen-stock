@@ -1884,6 +1884,23 @@ async function listDriverSheet(date) {
   };
 }
 
+async function listReceivingSheet(date) {
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
+  const sheet = await listDriverSheet(selectedDate);
+  const visibleRequests = sheet.requests.filter((request) => {
+    if (request.delivered || request.status === "Fulfilled") return false;
+    if (!request.requestedAt) return true;
+    const requestDate = String(request.requestedAt).slice(0, 10);
+    return !requestDate || requestDate <= selectedDate;
+  });
+
+  return {
+    ...sheet,
+    date: selectedDate,
+    requests: visibleRequests
+  };
+}
+
 async function assignDriverToSheet(date, driverName, user) {
   if (!user.permissions?.canAdminUsers) {
     throw new Error("Only admins can assign a driver.");
@@ -2948,11 +2965,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url.startsWith("/api/receiving-sheet")) {
       if (!requireUser(req, res)) return;
       const url = new URL(req.url, "http://localhost");
-      const sheet = await listDriverSheet(url.searchParams.get("date"));
-      send(res, 200, {
-        ...sheet,
-        requests: sheet.requests.filter((request) => !request.delivered)
-      });
+      send(res, 200, await listReceivingSheet(url.searchParams.get("date")));
       return;
     }
 

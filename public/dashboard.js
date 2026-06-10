@@ -44,6 +44,23 @@ function setLoginMessage(text, isError = false) {
   loginMessage.classList.toggle("error", isError);
 }
 
+function formatUserDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
+function sameUser(left, right) {
+  return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -69,7 +86,7 @@ function saveSession(data) {
 function showApp() {
   loginScreen.hidden = true;
   const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
-  currentUser.textContent = sessionUser ? `${sessionUser} / ${roleLabel}` : "";
+  currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];
   });
@@ -210,7 +227,7 @@ function renderDailyOrder() {
               </div>
               <div class="daily-order-actions">
                 <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
-                ${sessionPermissions.canDeleteAnyOrder || request.requestedBy === sessionUser ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
+                ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
               </div>
             </article>
           `).join("")}
@@ -262,7 +279,7 @@ function renderOpenOrders() {
                 </div>
                 <div class="daily-order-actions">
                   <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
-                  ${sessionPermissions.canDeleteAnyOrder || request.requestedBy === sessionUser ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
+                  ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
                 </div>
               </article>
             `).join("")}

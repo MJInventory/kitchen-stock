@@ -66,6 +66,12 @@ function sameUser(left, right) {
   return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
 }
 
+function todayLocal() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
 function showApp() {
   loginScreen.hidden = true;
   const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
@@ -459,6 +465,38 @@ function selectItem(item, quantity = defaultQuantity(item), urgency = "Medium") 
   });
 }
 
+function buildSelectedFromRecentRequests() {
+  const map = new Map();
+  const currentDay = todayLocal();
+  const userRequests = recentRequests
+    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !request.standingRunId)
+    .filter((request) => sameUser(request.requestedBy, sessionUser))
+    .filter((request) => {
+      const requestDay = String(request.requestedAt || "").slice(0, 10);
+      return !requestDay || requestDay === currentDay;
+    })
+    .sort((left, right) => {
+      const leftTime = new Date(left.requestedAt || 0).getTime() || 0;
+      const rightTime = new Date(right.requestedAt || 0).getTime() || 0;
+      if (leftTime !== rightTime) return rightTime - leftTime;
+      return Number(right.requestId || 0) - Number(left.requestId || 0);
+    });
+
+  for (const request of userRequests) {
+    if (map.has(request.itemId)) continue;
+    const item = allItems.find((candidate) => candidate.id === request.itemId);
+    if (!item) continue;
+    map.set(request.itemId, {
+      item,
+      quantity: Math.max(1, Number(request.quantity || 1)),
+      urgency: request.urgency || "Medium"
+    });
+  }
+
+  return map;
+}
+
 function syncProductRow(row) {
   const item = allItems.find((candidate) => candidate.id === row.dataset.itemId);
   if (!item || !selected.has(item.id)) return;
@@ -488,9 +526,7 @@ async function refresh() {
   allItems = data.items;
   recentRequests = data.requests;
   standingOrders = data.standingOrders || [];
-  selected = new Map(
-    [...selected.entries()].filter(([itemId]) => allItems.some((item) => item.id === itemId))
-  );
+  selected = buildSelectedFromRecentRequests();
   render();
   setMessage("");
 }
@@ -516,9 +552,20 @@ async function submitSelected() {
       method: "POST",
       body: JSON.stringify({ requests })
     });
-    recentRequests = [...data.requests, ...recentRequests].slice(0, 100);
+    const byId = new Map(recentRequests.map((request) => [request.id, request]));
+    for (const request of data.requests || []) {
+      byId.set(request.id, request);
+    }
+    recentRequests = [...byId.values()]
+      .sort((left, right) => {
+        const leftTime = new Date(left.requestedAt || 0).getTime() || 0;
+        const rightTime = new Date(right.requestedAt || 0).getTime() || 0;
+        if (leftTime !== rightTime) return rightTime - leftTime;
+        return Number(right.requestId || 0) - Number(left.requestId || 0);
+      })
+      .slice(0, 100);
     const saved = selected.size;
-    selected.clear();
+    selected = buildSelectedFromRecentRequests();
     render();
     setMessage(`${saved} item(s) saved to today's order.`);
   } catch (error) {
@@ -531,6 +578,7 @@ async function submitSelected() {
 async function deleteDailyOrder(requestId) {
   await api(`/api/requests/${requestId}`, { method: "DELETE" });
   recentRequests = recentRequests.filter((request) => request.id !== requestId);
+  selected = buildSelectedFromRecentRequests();
   render();
   setMessage("Item removed from today's order.");
 }

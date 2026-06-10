@@ -1439,16 +1439,63 @@ async function pgCreateRequest(payload, requestedByOverride = "") {
   if (!isValidId(itemId)) throw new Error("Choose an item.");
   if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Quantity must be greater than zero.");
   if (!["Low", "Medium", "High", "Critical"].includes(urgency)) throw new Error("Invalid urgency level.");
-  const result = await db().query(`
-    insert into order_requests (
-      inventory_item_id, quantity_needed, urgency_level, status, requested_by_username, requested_at, notes
-    )
-    values ($1, $2, $3, 'Approved', $4, now(), $5)
-    returning id, request_number
-  `, [itemId, quantity, urgency, requestedBy, notes]);
+  const client = await db().connect();
+  let requestId = "";
+  try {
+    await client.query("begin");
+    const existingResult = await client.query(`
+      select id, request_number
+      from order_requests
+      where inventory_item_id = $1
+        and lower(requested_by_username) = lower($2)
+        and delivered = false
+        and status in ('Pending', 'Approved')
+        and coalesce(standing_order_run_id, '') = ''
+      order by requested_at desc, request_number desc
+      for update
+    `, [itemId, requestedBy]);
+    const existingRows = existingResult.rows || [];
+    const primary = existingRows[0];
+
+    if (primary) {
+      await client.query(`
+        update order_requests
+        set quantity_needed = $2,
+            urgency_level = $3,
+            notes = $4,
+            status = 'Approved',
+            updated_at = now()
+        where id = $1
+      `, [primary.id, quantity, urgency, notes]);
+      if (existingRows.length > 1) {
+        const duplicateIds = existingRows.slice(1).map((row) => row.id).filter(Boolean);
+        if (duplicateIds.length) {
+          await client.query(`delete from driver_sheet_lines where order_request_id = any($1::uuid[])`, [duplicateIds]);
+          await client.query(`delete from order_requests where id = any($1::uuid[])`, [duplicateIds]);
+        }
+      }
+      requestId = primary.id;
+    } else {
+      const insertResult = await client.query(`
+        insert into order_requests (
+          inventory_item_id, quantity_needed, urgency_level, status, requested_by_username, requested_at, notes
+        )
+        values ($1, $2, $3, 'Approved', $4, now(), $5)
+        returning id
+      `, [itemId, quantity, urgency, requestedBy, notes]);
+      requestId = insertResult.rows[0]?.id || "";
+    }
+
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
   cache.requests.expiresAt = 0;
   const requests = await pgListRequests(200);
-  return requests.find((entry) => entry.id === result.rows[0].id) || { id: result.rows[0].id, requestId: result.rows[0].request_number };
+  return requests.find((entry) => entry.id === requestId) || { id: requestId };
 }
 
 async function pgCreateRequestsBatch(payload, requestedByOverride = "") {

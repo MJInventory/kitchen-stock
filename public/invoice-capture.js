@@ -34,6 +34,19 @@ let items = [];
 let parsedLines = [];
 let ocrRules = [];
 
+function formatUserDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
 function message(target, text, isError = false) {
   target.textContent = text;
   target.classList.toggle("error", isError);
@@ -41,7 +54,7 @@ function message(target, text, isError = false) {
 
 function showApp() {
   loginScreen.hidden = true;
-  currentUser.textContent = sessionUser;
+  currentUser.textContent = formatUserDisplay(sessionUser);
 }
 
 function showLogin() {

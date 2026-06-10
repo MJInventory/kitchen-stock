@@ -38,6 +38,12 @@ function todayLocal() {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+function sortByLabel(records, getLabel) {
+  return [...(records || [])].sort((left, right) =>
+    String(getLabel(left) || "").localeCompare(String(getLabel(right) || ""), undefined, { numeric: true })
+  );
+}
+
 function itemById(itemId) {
   return items.find((item) => item.id === itemId);
 }
@@ -104,10 +110,10 @@ async function loadOptions() {
   ]);
   items = itemsData.items || [];
   suppliers = optionsData.suppliers || [];
-  itemSelect.innerHTML = items
+  itemSelect.innerHTML = sortByLabel(items, (item) => item.name)
     .map((item) => `<option value="${esc(item.id)}">${esc(item.name)} (${esc(item.unit || "item")})</option>`)
     .join("");
-  supplierSelect.innerHTML = '<option value="">Choose supplier</option>' + suppliers
+  supplierSelect.innerHTML = '<option value="">Choose supplier</option>' + sortByLabel(suppliers, (supplier) => supplier.name)
     .map((supplier) => `<option value="${esc(supplier.name)}">${esc(supplier.name)}</option>`)
     .join("");
   document.querySelector("#expectedDate").value = todayLocal();
@@ -118,7 +124,7 @@ async function loadOptions() {
 }
 
 function optionsForSuppliers(selectedName) {
-  return '<option value="">Choose supplier</option>' + suppliers
+  return '<option value="">Choose supplier</option>' + sortByLabel(suppliers, (supplier) => supplier.name)
     .map((supplier) => `<option value="${esc(supplier.name)}"${supplier.name === selectedName ? " selected" : ""}>${esc(supplier.name)}</option>`)
     .join("");
 }

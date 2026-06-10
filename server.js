@@ -1,9 +1,11 @@
 import http from "node:http";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getPool, postgresEnabled } from "./lib/postgres.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
@@ -22,7 +24,7 @@ const authSecret = process.env.AUTH_SECRET || "change-this-secret-in-render";
 const sessionMaxAgeMs = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
 const userConfig = process.env.APP_USERS || "";
 const allowedUnits = new Set(["box", "bag", "item", "bottle"]);
-const editableUserSources = new Set(["airtable"]);
+const editableUserSources = new Set(["airtable", "postgres"]);
 const accountingInbox = process.env.ACCOUNTING_INBOX || "bills.madameja.23d9599b@billfiles.com";
 const smtpHost = process.env.SMTP_HOST || "";
 const smtpPort = Number(process.env.SMTP_PORT || 587);
@@ -64,6 +66,26 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml"
 };
+
+function db() {
+  return getPool();
+}
+
+function hasPostgres() {
+  return postgresEnabled();
+}
+
+function isValidId(value) {
+  return /^[a-z0-9-]+$/i.test(String(value || "").trim());
+}
+
+function isoDate(value) {
+  return String(value || "").slice(0, 10);
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function parseUsers() {
   return new Map(
@@ -366,7 +388,350 @@ async function listAirtableRecords(tableId, params = {}) {
   return records;
 }
 
+function pgNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function pgItemFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name || "",
+    category: row.category || "",
+    categoryId: row.category_id || "",
+    storageLocation: row.storage_location || "",
+    storageLocationId: row.storage_location_id || "",
+    inventoryArea: row.inventory_area || "",
+    inventoryAreaId: row.inventory_area_id || "",
+    inventorySubgroup: row.category || "",
+    inventorySubgroupId: row.category_id || "",
+    shelfCode: row.shelf_code || "",
+    shelfCodeId: row.shelf_code_id || "",
+    supplierId: row.supplier_id || "",
+    supplierName: row.supplier_name || "Unassigned Supplier",
+    supplierContact: row.supplier_contact || "",
+    quantity: pgNumber(row.quantity),
+    unit: row.unit || "",
+    minimum: pgNumber(row.minimum)
+  };
+}
+
+function pgRequestFromRow(row) {
+  return {
+    id: row.id,
+    requestId: row.request_number ?? row.request_id ?? null,
+    itemId: row.item_id || row.inventory_item_id || "",
+    quantity: pgNumber(row.quantity),
+    urgency: row.urgency || row.urgency_level || "",
+    category: row.category || "",
+    storageLocation: row.storage_location || "",
+    inventoryArea: row.inventory_area || "",
+    inventorySubgroup: row.category || "",
+    shelfCode: row.shelf_code || "",
+    requestedBy: row.requested_by || row.requested_by_username || "",
+    status: row.status || "",
+    received: Boolean(row.received ?? row.delivered),
+    receivedAt: row.received_at || row.delivered_at || "",
+    receivedBy: row.received_by || row.delivered_by || row.delivered_by_username || "",
+    requestedAt: row.requested_at || "",
+    notes: row.notes || "",
+    itemName: row.item_name || "",
+    unit: row.unit || "",
+    supplierName: row.supplier_name || "Unassigned Supplier",
+    supplierContact: row.supplier_contact || "",
+    driverLineId: row.driver_line_id || "",
+    ordered: Boolean(row.ordered),
+    orderedAt: row.ordered_at || "",
+    orderedBy: row.ordered_by || row.ordered_by_username || "",
+    toDeliver: Boolean(row.to_deliver),
+    deliveryDay: row.delivery_day || "",
+    driverName: row.driver_name || row.driver_username || "",
+    delivered: Boolean(row.delivered),
+    deliveredAt: row.delivered_at || row.received_at || "",
+    deliveredBy: row.delivered_by || row.received_by || ""
+  };
+}
+
+function pgDriverLineFromRow(row) {
+  return {
+    id: row.id,
+    requestRecordId: row.order_request_id || "",
+    requestId: row.request_number ?? null,
+    itemRecordId: row.inventory_item_id || "",
+    itemName: row.item_name || "",
+    quantity: pgNumber(row.quantity),
+    unit: row.unit || "",
+    category: row.category || "",
+    inventoryArea: row.inventory_area || "",
+    storageLocation: row.storage_location || "",
+    shelfCode: row.shelf_code || "",
+    supplierName: row.supplier_name || "Unassigned Supplier",
+    supplierContact: row.supplier_contact || "",
+    ordered: Boolean(row.ordered),
+    orderedAt: row.ordered_at || "",
+    orderedBy: row.ordered_by_username || "",
+    received: Boolean(row.received),
+    receivedAt: row.received_at || "",
+    receivedBy: row.received_by_username || "",
+    toDeliver: Boolean(row.to_deliver),
+    deliveryDay: row.delivery_day || "",
+    driverName: row.driver_username || "",
+    notes: row.notes || "",
+    standingRunId: row.standing_order_run_id || "",
+    standingRunLineId: row.standing_order_run_line_id || ""
+  };
+}
+
+function pgStandingOrderFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name || "",
+    itemId: row.items?.[0]?.itemId || "",
+    itemName: row.items?.[0]?.itemName || "",
+    items: Array.isArray(row.items) ? row.items : [],
+    supplierName: row.supplier_name || "",
+    quantity: row.items?.[0]?.quantity ?? null,
+    expectedDate: row.expected_date || "",
+    schedule: row.schedule || "Weekly",
+    otherSchedule: row.other_schedule || "",
+    active: row.active !== false,
+    lastGeneratedDate: row.last_generated_date || "",
+    notes: row.notes || ""
+  };
+}
+
+async function pgListSuppliers() {
+  const result = await db().query(`
+    select id, name, contact_information
+    from suppliers
+    where active = true
+    order by name
+  `);
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name || "",
+    contact: row.contact_information || ""
+  }));
+}
+
+async function pgListLookup(tableName) {
+  const result = await db().query(`
+    select id, name
+    from ${tableName}
+    where active = true
+    order by sort_order, name
+  `);
+  const values = result.rows.map((row) => ({ id: row.id, name: row.name || "" })).filter((row) => row.name);
+  return {
+    records: values,
+    byId: new Map(values.map((record) => [record.id, record])),
+    byName: new Map(values.map((record) => [record.name.toLowerCase(), record]))
+  };
+}
+
+async function pgListLookups() {
+  const [categories, storageLocations, inventoryAreas, units] = await Promise.all([
+    pgListLookup("categories"),
+    pgListLookup("storage_locations"),
+    pgListLookup("inventory_areas"),
+    pgListLookup("units_of_measure")
+  ]);
+  const shelfResult = await db().query(`
+    select sc.id, sc.code as name, sl.name as storage_location
+    from shelf_codes sc
+    left join storage_locations sl on sl.id = sc.storage_location_id
+    where sc.active = true
+    order by sl.name nulls last, sc.sort_order, sc.code
+  `);
+  const shelfRecords = shelfResult.rows.map((row) => ({
+    id: row.id,
+    name: row.name || "",
+    storageLocation: row.storage_location || ""
+  }));
+  return {
+    categories,
+    storageLocations,
+    inventoryAreas,
+    inventorySubgroups: categories,
+    unitOfMeasurement: units,
+    shelfCodes: {
+      records: shelfRecords,
+      byId: new Map(shelfRecords.map((record) => [record.id, record])),
+      byName: new Map(shelfRecords.map((record) => [`${String(record.storageLocation || "").toLowerCase()}::${record.name.toLowerCase()}`, record]))
+    }
+  };
+}
+
+async function pgListItems() {
+  const result = await db().query(`
+    select
+      i.id,
+      i.name,
+      c.id as category_id,
+      c.name as category,
+      sl.id as storage_location_id,
+      sl.name as storage_location,
+      ia.id as inventory_area_id,
+      ia.name as inventory_area,
+      sc.id as shelf_code_id,
+      sc.code as shelf_code,
+      sp.id as supplier_id,
+      sp.name as supplier_name,
+      sp.contact_information as supplier_contact,
+      u.id as unit_id,
+      u.name as unit,
+      i.current_quantity as quantity,
+      i.minimum_threshold as minimum
+    from inventory_items i
+    left join categories c on c.id = i.category_id
+    left join storage_locations sl on sl.id = i.storage_location_id
+    left join inventory_areas ia on ia.id = i.inventory_area_id
+    left join shelf_codes sc on sc.id = i.shelf_code_id
+    left join suppliers sp on sp.id = i.primary_supplier_id
+    left join units_of_measure u on u.id = i.unit_of_measure_id
+    where i.active = true
+    order by i.name
+  `);
+  return result.rows.map(pgItemFromRow);
+}
+
+async function pgListRequests(limit = 20) {
+  const result = await db().query(`
+    select
+      r.id,
+      r.request_number,
+      r.inventory_item_id as item_id,
+      r.quantity_needed as quantity,
+      r.urgency_level as urgency,
+      r.status,
+      r.requested_by_username as requested_by,
+      r.requested_at,
+      r.delivered as received,
+      r.delivered_at as received_at,
+      r.delivered_by_username as received_by,
+      r.notes,
+      i.name as item_name,
+      c.name as category,
+      sl.name as storage_location,
+      ia.name as inventory_area,
+      sc.code as shelf_code,
+      u.name as unit,
+      sp.name as supplier_name,
+      sp.contact_information as supplier_contact
+    from order_requests r
+    join inventory_items i on i.id = r.inventory_item_id
+    left join categories c on c.id = i.category_id
+    left join storage_locations sl on sl.id = i.storage_location_id
+    left join inventory_areas ia on ia.id = i.inventory_area_id
+    left join shelf_codes sc on sc.id = i.shelf_code_id
+    left join units_of_measure u on u.id = i.unit_of_measure_id
+    left join suppliers sp on sp.id = i.primary_supplier_id
+    order by r.request_number desc
+    limit $1
+  `, [limit]);
+  return result.rows.map(pgRequestFromRow);
+}
+
+async function pgListOpenRequests() {
+  const result = await db().query(`
+    select
+      r.id,
+      r.request_number,
+      r.inventory_item_id as item_id,
+      r.quantity_needed as quantity,
+      r.urgency_level as urgency,
+      r.status,
+      r.requested_by_username as requested_by,
+      r.requested_at,
+      r.delivered,
+      r.delivered_at,
+      r.delivered_by_username,
+      r.ordered,
+      r.ordered_at,
+      r.ordered_by_username,
+      r.to_deliver,
+      r.delivery_day,
+      r.notes,
+      r.standing_order_run_id,
+      r.standing_order_run_line_id,
+      i.name as item_name,
+      c.name as category,
+      sl.name as storage_location,
+      ia.name as inventory_area,
+      sc.code as shelf_code,
+      u.name as unit,
+      sp.name as supplier_name,
+      sp.contact_information as supplier_contact
+    from order_requests r
+    join inventory_items i on i.id = r.inventory_item_id
+    left join categories c on c.id = i.category_id
+    left join storage_locations sl on sl.id = i.storage_location_id
+    left join inventory_areas ia on ia.id = i.inventory_area_id
+    left join shelf_codes sc on sc.id = i.shelf_code_id
+    left join units_of_measure u on u.id = i.unit_of_measure_id
+    left join suppliers sp on sp.id = i.primary_supplier_id
+    where r.delivered = false and r.status in ('Pending', 'Approved')
+    order by c.name nulls last, i.name, r.requested_at
+  `);
+  return result.rows.map(pgRequestFromRow);
+}
+
+async function pgListStandingOrders() {
+  const result = await db().query(`
+    select
+      so.id,
+      so.name,
+      so.expected_arrival_date::text as expected_date,
+      so.schedule,
+      so.other_schedule,
+      so.active,
+      so.last_generated_date::text as last_generated_date,
+      so.notes,
+      sp.name as supplier_name,
+      coalesce(
+        json_agg(
+          json_build_object(
+            'itemId', i.id,
+            'itemName', i.name,
+            'quantity', soi.quantity
+          )
+          order by i.name
+        ) filter (where soi.id is not null),
+        '[]'::json
+      ) as items
+    from standing_orders so
+    left join suppliers sp on sp.id = so.supplier_id
+    left join standing_order_items soi on soi.standing_order_id = so.id
+    left join inventory_items i on i.id = soi.inventory_item_id
+    group by so.id, sp.name
+    order by so.expected_arrival_date asc nulls last, sp.name asc nulls last, so.name asc
+  `);
+  return result.rows.map(pgStandingOrderFromRow);
+}
+
+async function pgListAppUsers() {
+  const result = await db().query(`
+    select id, username, display_name, role, theme, active, must_change_password, source
+    from app_users
+    order by username
+  `);
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.display_name || row.username,
+    username: row.username,
+    role: normalizeRole(row.role),
+    theme: row.theme === "light" ? "light" : "dark",
+    active: row.active !== false,
+    mustChangePassword: Boolean(row.must_change_password),
+    source: row.source || "postgres"
+  }));
+}
+
 async function listItems() {
+  if (hasPostgres()) {
+    return pgListItems();
+  }
   const suppliers = await getSuppliers();
   const lookups = await getLookups();
   const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
@@ -408,6 +773,9 @@ function normalizeItem(record, supplierById, lookups) {
 }
 
 async function listSuppliers() {
+  if (hasPostgres()) {
+    return pgListSuppliers();
+  }
   const records = await listAirtableRecords(suppliersTableId);
   return records
     .map((record) => ({
@@ -419,6 +787,9 @@ async function listSuppliers() {
 }
 
 async function listRequests() {
+  if (hasPostgres()) {
+    return pgListRequests();
+  }
   const data = await airtable(`${requestsTableId}?pageSize=20&sort%5B0%5D%5Bfield%5D=Request%20ID&sort%5B0%5D%5Bdirection%5D=desc`);
   return data.records.map((record) => ({
     id: record.id,
@@ -441,6 +812,9 @@ async function listRequests() {
 }
 
 async function listOpenRequests() {
+  if (hasPostgres()) {
+    return pgListOpenRequests();
+  }
   const records = await listAirtableRecords(requestsTableId, {
     filterByFormula: "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))",
     "sort[0][field]": "Requested By",
@@ -524,6 +898,9 @@ async function getAppUsersTableId() {
 }
 
 async function listAppUsers() {
+  if (hasPostgres()) {
+    return pgListAppUsers();
+  }
   const tableId = await getAppUsersTableId();
   if (!tableId) return envUsersList();
 
@@ -569,7 +946,10 @@ async function getAppUsers() {
 async function findAppUserByName(name) {
   const normalized = String(name || "").trim().toLowerCase();
   const appUsers = await getAppUsers();
-  return appUsers.find((user) => user.name.toLowerCase() === normalized && user.active !== false);
+  return appUsers.find((user) =>
+    (String(user.username || user.name || "").toLowerCase() === normalized || String(user.name || "").toLowerCase() === normalized)
+    && user.active !== false
+  );
 }
 
 async function refreshUserFromDirectory(user) {

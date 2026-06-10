@@ -23,7 +23,13 @@ function setMessage(text, isError = false) {
 }
 
 function fillSelect(select, records, selectedValue = "", placeholder = "Choose...") {
-  const normalized = (records || []).map((record) => typeof record === "string" ? { name: record } : record);
+  const normalized = (records || [])
+    .map((record) => typeof record === "string" ? { name: record } : record)
+    .sort((left, right) => {
+      const leftLabel = String(left.displayName || left.name || "").toLowerCase();
+      const rightLabel = String(right.displayName || right.name || "").toLowerCase();
+      return leftLabel.localeCompare(rightLabel, undefined, { numeric: true });
+    });
   select.innerHTML = [
     `<option value="">${placeholder}</option>`,
     ...normalized.map((record) => {
@@ -41,7 +47,11 @@ function escapeHtml(value) {
 function renderShelfOptions(selectedValue = "") {
   const selectedLocation = String(storageLocationInput.value || "").trim().toLowerCase();
   const matching = shelfCodes.filter((shelf) => !selectedLocation || String(shelf.storageLocation || "").trim().toLowerCase() === selectedLocation);
-  const options = matching.length ? matching : shelfCodes;
+  const options = (matching.length ? matching : shelfCodes).slice().sort((left, right) => {
+    const leftLabel = String(left.displayName || left.name || "").toLowerCase();
+    const rightLabel = String(right.displayName || right.name || "").toLowerCase();
+    return leftLabel.localeCompare(rightLabel, undefined, { numeric: true });
+  });
   shelfCodeSelect.innerHTML = [
     '<option value="">Choose shelf code</option>',
     ...options.map((shelf) => `<option value="${escapeHtml(shelf.name)}"${shelf.name === selectedValue ? " selected" : ""}>${escapeHtml(shelf.displayName || shelf.name)}</option>`)
@@ -75,6 +85,8 @@ async function loadOptions() {
   shelfCodes = data.shelfCodes || [];
   renderShelfOptions("TBD");
   supplierId.innerHTML = '<option value="">Unassigned</option>' + (data.suppliers || [])
+    .slice()
+    .sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), undefined, { numeric: true }))
     .map((supplier) => `<option value="${supplier.id}">${supplier.name}</option>`)
     .join("");
   applyPrefillFromQuery();

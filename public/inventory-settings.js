@@ -70,10 +70,18 @@ function normalize(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function sortOptionRecords(records) {
+  return [...(records || [])].sort((left, right) => {
+    const leftLabel = String(left.displayName || left.name || "").toLowerCase();
+    const rightLabel = String(right.displayName || right.name || "").toLowerCase();
+    return leftLabel.localeCompare(rightLabel, undefined, { numeric: true });
+  });
+}
+
 function optionList(records, selectedValue, placeholder = "") {
   return [
     placeholder ? `<option value="">${escapeHtml(placeholder)}</option>` : "",
-    ...records.map((record) => {
+    ...sortOptionRecords(records).map((record) => {
       const value = record.name ?? record.displayName ?? "";
       return `<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(record.displayName || record.name || value)}</option>`;
     })
@@ -82,6 +90,8 @@ function optionList(records, selectedValue, placeholder = "") {
 
 function fillFilter(select, records, selectedValue, allLabel) {
   select.innerHTML = `<option value="">${allLabel}</option>` + records
+    .slice()
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }))
     .map((record) => `<option value="${escapeHtml(record.name)}"${record.name === selectedValue ? " selected" : ""}>${escapeHtml(record.name)}</option>`)
     .join("");
 }
@@ -203,7 +213,7 @@ function renderItems() {
           Primary supplier
           <select class="supplier-select">
             <option value="">Unassigned</option>
-            ${(optionsData.suppliers || []).map((supplier) => `<option value="${escapeHtml(supplier.id)}"${supplier.id === item.supplierId ? " selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}
+            ${sortOptionRecords(optionsData.suppliers || []).map((supplier) => `<option value="${escapeHtml(supplier.id)}"${supplier.id === item.supplierId ? " selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}
           </select>
         </label>
         <label>

@@ -305,9 +305,6 @@ function renderStandingOrders() {
   standingOrderList.innerHTML = standingOrders
     .slice(0, 100)
     .map((order) => {
-      const itemNames = (Array.isArray(order.items) ? order.items : [])
-        .map((item) => item.itemName || "")
-        .filter(Boolean);
       return `
       <a class="daily-order-row daily-order-link" href="/standing-orders.html?orderId=${encodeURIComponent(order.id)}">
         <div>
@@ -317,7 +314,6 @@ function renderStandingOrders() {
             order.schedule || "",
             order.items?.length ? `${order.items.length} item(s)` : ""
           ].filter(Boolean).join(" / "))}</span>
-          ${itemNames.length ? `<small>${escapeHtml(itemNames.join(", "))}</small>` : ""}
         </div>
       </a>
     `;

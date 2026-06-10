@@ -135,10 +135,23 @@ function userPermissions(role) {
   };
 }
 
+function presentUserName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
 function publicUser(user) {
   const role = normalizeRole(user?.role);
   return {
-    name: user?.name || "",
+    name: presentUserName(user?.name || ""),
     role,
     theme: user?.theme === "light" ? "light" : "dark",
     active: user?.active !== false,
@@ -154,6 +167,7 @@ function publicUserForAdmin(user, actor = null) {
   return {
     ...publicUser(user),
     id: user.id || "",
+    lastLoginAt: user.lastLoginAt || "",
     editable,
     canEditRole,
     canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
@@ -1020,14 +1034,15 @@ async function pgGenerateStandingOrdersForDate(selectedDate, userName = "System"
 
 async function pgListAppUsers() {
   const result = await db().query(`
-    select id, username, display_name, role, theme, active, must_change_password, source
+    select id, username, display_name, role, theme, active, must_change_password, source, last_login_at
     from app_users
     order by username
   `);
   return result.rows.map((row) => ({
-    id: row.id,
-    name: row.display_name || row.username,
-    username: row.username,
+      id: row.id,
+      name: presentUserName(row.display_name || row.username),
+      username: row.username,
+      lastLoginAt: row.last_login_at || "",
     role: normalizeRole(row.role),
     theme: row.theme === "light" ? "light" : "dark",
     active: row.active !== false,
@@ -1040,7 +1055,7 @@ async function pgFindAppUserByName(name) {
   const normalized = String(name || "").trim().toLowerCase();
   if (!normalized) return null;
   const result = await db().query(`
-    select id, username, display_name, password_hash, role, theme, active, must_change_password, source
+    select id, username, display_name, password_hash, role, theme, active, must_change_password, source, last_login_at
     from app_users
     where lower(username) = $1 or lower(display_name) = $1
     limit 1
@@ -1048,9 +1063,10 @@ async function pgFindAppUserByName(name) {
   const row = result.rows[0];
   if (!row) return null;
   return {
-    id: row.id,
-    name: row.display_name || row.username,
-    username: row.username,
+      id: row.id,
+      name: presentUserName(row.display_name || row.username),
+      username: row.username,
+    lastLoginAt: row.last_login_at || "",
     passwordHash: row.password_hash,
     role: normalizeRole(row.role),
     theme: row.theme === "light" ? "light" : "dark",
@@ -1072,14 +1088,15 @@ async function pgCreateAppUser(payload) {
   const result = await db().query(`
     insert into app_users (username, display_name, password_hash, role, theme, active, must_change_password, source)
     values ($1, $2, $3, $4, $5, $6, $7, 'postgres')
-    returning id, username, display_name, role, theme, active, must_change_password, source
+    returning id, username, display_name, role, theme, active, must_change_password, source, last_login_at
   `, [username, displayName, passwordHash, role, theme, payload.active !== false, Boolean(payload.mustChangePassword)]);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
   return {
-    id: row.id,
-    name: row.display_name || row.username,
-    username: row.username,
+      id: row.id,
+      name: presentUserName(row.display_name || row.username),
+      username: row.username,
+    lastLoginAt: row.last_login_at || "",
     role: normalizeRole(row.role),
     theme: row.theme,
     active: row.active !== false,
@@ -1091,7 +1108,7 @@ async function pgCreateAppUser(payload) {
 async function pgUpdateAppUser(recordId, payload) {
   if (!isValidId(recordId)) throw new Error("Invalid app user record.");
   const current = await db().query(`
-    select id, username, display_name, role, theme, active, must_change_password, source
+    select id, username, display_name, role, theme, active, must_change_password, source, last_login_at
     from app_users
     where id = $1
   `, [recordId]);
@@ -1121,14 +1138,15 @@ async function pgUpdateAppUser(recordId, payload) {
         updated_at = now()
         ${passwordSql}
     where id = $1
-    returning id, username, display_name, role, theme, active, must_change_password, source
+    returning id, username, display_name, role, theme, active, must_change_password, source, last_login_at
   `, values);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
   return {
-    id: row.id,
-    name: row.display_name || row.username,
-    username: row.username,
+      id: row.id,
+      name: presentUserName(row.display_name || row.username),
+      username: row.username,
+    lastLoginAt: row.last_login_at || "",
     role: normalizeRole(row.role),
     theme: row.theme,
     active: row.active !== false,
@@ -1154,20 +1172,33 @@ async function pgChangeOwnPassword(userName, currentPassword, newPassword, optio
     update app_users
     set password_hash = $2, must_change_password = false, updated_at = now()
     where id = $1
-    returning id, username, display_name, role, theme, active, must_change_password, source
+    returning id, username, display_name, role, theme, active, must_change_password, source, last_login_at
   `, [user.id, passwordHash]);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
   return {
-    id: row.id,
-    name: row.display_name || row.username,
-    username: row.username,
+      id: row.id,
+      name: presentUserName(row.display_name || row.username),
+      username: row.username,
+    lastLoginAt: row.last_login_at || "",
     role: normalizeRole(row.role),
     theme: row.theme,
     active: row.active !== false,
     mustChangePassword: Boolean(row.must_change_password),
     source: row.source || "postgres"
   };
+}
+
+async function pgRecordSuccessfulLogin(userId) {
+  if (!isValidId(userId)) return "";
+  const result = await db().query(`
+    update app_users
+    set last_login_at = now(), updated_at = now()
+    where id = $1
+    returning last_login_at
+  `, [userId]);
+  cache.appUsers.expiresAt = 0;
+  return result.rows[0]?.last_login_at || "";
 }
 
 async function pgGetDailyGuestCount(date) {
@@ -4608,6 +4639,10 @@ const server = http.createServer(async (req, res) => {
       if (!user || !validPassword) {
         send(res, 401, { error: "Invalid username or password." });
         return;
+      }
+
+      if (hasPostgres() && user.id) {
+        user.lastLoginAt = await pgRecordSuccessfulLogin(user.id);
       }
 
       send(res, 200, storeSession(user));

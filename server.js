@@ -418,6 +418,9 @@ function pgItemFromRow(row) {
 }
 
 function pgRequestFromRow(row) {
+  const notes = row.notes || "";
+  const standingRunId = row.standing_order_run_id || standingRunIdFromNotes(notes);
+  const standingRunLineId = row.standing_order_run_line_id || standingRunLineIdFromNotes(notes);
   return {
     id: row.id,
     requestId: row.request_number ?? row.request_id ?? null,
@@ -435,7 +438,7 @@ function pgRequestFromRow(row) {
     receivedAt: row.received_at || row.delivered_at || "",
     receivedBy: row.received_by || row.delivered_by || row.delivered_by_username || "",
     requestedAt: row.requested_at || "",
-    notes: row.notes || "",
+    notes,
     itemName: row.item_name || "",
     unit: row.unit || "",
     supplierName: row.supplier_name || "Unassigned Supplier",
@@ -450,12 +453,15 @@ function pgRequestFromRow(row) {
     delivered: Boolean(row.delivered),
     deliveredAt: row.delivered_at || row.received_at || "",
     deliveredBy: row.delivered_by || row.received_by || "",
-    standingRunId: row.standing_order_run_id || "",
-    standingRunLineId: row.standing_order_run_line_id || ""
+    standingRunId: standingRunId || "",
+    standingRunLineId: standingRunLineId || ""
   };
 }
 
 function pgDriverLineFromRow(row) {
+  const notes = row.notes || "";
+  const standingRunId = row.standing_order_run_id || standingRunIdFromNotes(notes);
+  const standingRunLineId = row.standing_order_run_line_id || standingRunLineIdFromNotes(notes);
   return {
     id: row.id,
     requestRecordId: row.order_request_id || "",
@@ -479,9 +485,9 @@ function pgDriverLineFromRow(row) {
     toDeliver: Boolean(row.to_deliver),
     deliveryDay: row.delivery_day || "",
     driverName: row.driver_username || "",
-    notes: row.notes || "",
-    standingRunId: row.standing_order_run_id || "",
-    standingRunLineId: row.standing_order_run_line_id || ""
+    notes,
+    standingRunId: standingRunId || "",
+    standingRunLineId: standingRunLineId || ""
   };
 }
 

@@ -449,7 +449,9 @@ function pgRequestFromRow(row) {
     driverName: row.driver_name || row.driver_username || "",
     delivered: Boolean(row.delivered),
     deliveredAt: row.delivered_at || row.received_at || "",
-    deliveredBy: row.delivered_by || row.received_by || ""
+    deliveredBy: row.delivered_by || row.received_by || "",
+    standingRunId: row.standing_order_run_id || "",
+    standingRunLineId: row.standing_order_run_line_id || ""
   };
 }
 
@@ -1332,7 +1334,7 @@ async function pgListOrderReport(date) {
       d.to_deliver,
       d.delivery_day::text as delivery_day,
       r.standing_order_run_id,
-      d.standing_order_run_line_id,
+      r.standing_order_run_line_id,
       coalesce(ds.name, sp.name) as supplier_name,
       r.id as request_id,
       r.request_number,

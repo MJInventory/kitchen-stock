@@ -13,6 +13,32 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 
+function formatUserDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
+function formatLastLogin(value) {
+  if (!value) return "Never logged in";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return `Last login: ${value}`;
+  return `Last login: ${date.toLocaleString([], {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  })}`;
+}
+
 function setMessage(text, isError = false) {
   adminMessage.textContent = text;
   adminMessage.classList.toggle("error", isError);
@@ -43,7 +69,7 @@ function showApp() {
   loginScreen.hidden = true;
   const role = localStorage.getItem("kitchenStockRole") || "user";
   const roleLabel = role === "god" ? "God" : role === "admin" ? "Admin" : role === "power-user" ? "Power User" : "User";
-  currentUser.textContent = sessionUser ? `${sessionUser} / ${roleLabel}` : "";
+  currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
   document.querySelectorAll("[data-god-only]").forEach((option) => {
     option.hidden = !permissions.canManageAdminRoles;
     option.disabled = !permissions.canManageAdminRoles;
@@ -81,6 +107,7 @@ function renderUsers(users) {
       <div>
         <strong>${escapeHtml(user.name)}</strong>
         <span>${user.editable ? "Online user" : "Render user - move to App Users to edit"}</span>
+        <span>${escapeHtml(formatLastLogin(user.lastLoginAt))}</span>
       </div>
       <label>New password
         <input class="user-password" type="text" placeholder="Leave blank to keep current" ${user.editable && user.canSave ? "" : "disabled"}>

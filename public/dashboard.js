@@ -181,6 +181,7 @@ function renderDailyOrder() {
   const selectedDay = todayLocal();
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !request.standingRunId)
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
     .filter((request) => requestDay(request) === selectedDay)
     .sort(logicalRequestCompare);
@@ -227,6 +228,7 @@ function renderOpenOrders() {
   const selectedDay = todayLocal();
   const openRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !request.standingRunId)
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
     .filter((request) => {
       const day = requestDay(request);

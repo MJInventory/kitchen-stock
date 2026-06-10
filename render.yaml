@@ -7,7 +7,7 @@ services:
     startCommand: npm start
     envVars:
       - key: DATA_BACKEND
-        value: airtable
+        value: postgres
       - key: DATABASE_URL
         sync: false
       - key: AIRTABLE_TOKEN

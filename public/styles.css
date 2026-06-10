@@ -853,14 +853,17 @@ body.order-app {
 :root[data-theme="light"] .qty-input,
 :root[data-theme="light"] .stock-input,
 :root[data-theme="light"] .stock-count-entry input,
-:root[data-theme="light"] .location-picker-button {
+:root[data-theme="light"] .location-picker-button,
+:root[data-theme="light"] .stock-count-controls input,
+:root[data-theme="light"] .count-note {
   background: #fffdf8;
   color: var(--order-ink);
 }
 
 :root[data-theme="light"] .order-app .icon-button,
 :root[data-theme="light"] .feature-select select,
-:root[data-theme="light"] .order-filters select {
+:root[data-theme="light"] .order-filters select,
+:root[data-theme="light"] .stock-count-controls button {
   background: #fffdf8;
   color: var(--order-ink);
   border-color: var(--order-line);
@@ -1481,8 +1484,8 @@ body.order-app {
 }
 
 .stock-count-toolbar {
-  width: min(760px, calc(100% - 32px));
-  margin: 34px auto 18px;
+  width: min(860px, calc(100% - 32px));
+  margin: 28px auto 18px;
   display: grid;
   gap: 14px;
 }
@@ -1583,9 +1586,9 @@ body.order-app {
 }
 
 .stock-count-heading {
-  width: min(1080px, calc(100% - 32px));
+  width: min(860px, calc(100% - 32px));
   margin: 18px auto;
-  padding: 18px 0;
+  padding: 18px 8px;
   border-top: 1px solid var(--order-line);
   border-bottom: 1px solid var(--order-line);
   display: grid;
@@ -1610,18 +1613,22 @@ body.order-app {
 }
 
 .stock-count-list {
-  width: min(760px, calc(100% - 32px));
+  width: min(860px, calc(100% - 32px));
   margin: 0 auto 48px;
   display: grid;
   gap: 12px;
 }
 
 .stock-count-row {
-  grid-template-columns: 46px minmax(0, 1fr) auto;
-  gap: 14px;
+  display: grid;
+  grid-template-areas:
+    "marker main controls"
+    ". note note";
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 16px;
   align-items: center;
   min-height: 112px;
-  padding: 16px 18px;
+  padding: 18px 20px;
 }
 
 .stock-count-row:focus-within {
@@ -1630,6 +1637,7 @@ body.order-app {
 }
 
 .stock-count-marker {
+  grid-area: marker;
   width: 34px;
   min-height: 28px;
   border: 1px solid var(--order-gold);
@@ -1644,10 +1652,18 @@ body.order-app {
   text-align: center;
 }
 
+.stock-count-main {
+  grid-area: main;
+  align-self: center;
+  gap: 6px;
+}
+
 .stock-count-controls {
+  grid-area: controls;
   display: flex;
   align-items: center;
   gap: 8px;
+  justify-self: end;
   color: var(--order-ink);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
@@ -1662,6 +1678,7 @@ body.order-app {
   background: #101010;
   color: var(--order-gold);
   padding: 0;
+  box-shadow: none;
 }
 
 .stock-count-controls input {
@@ -1675,9 +1692,10 @@ body.order-app {
 }
 
 .stock-count-note-wrap {
-  grid-column: 2 / 4;
+  grid-area: note;
   display: grid;
   gap: 6px;
+  margin-top: 2px;
 }
 
 .stock-count-note-wrap span {
@@ -1696,6 +1714,7 @@ body.order-app {
   padding: 10px 12px;
   font-size: 12px;
   border-radius: 10px;
+  box-shadow: none;
 }
 
 .daily-order-panel {
@@ -2116,6 +2135,7 @@ body.order-app {
   .stock-count-heading {
     grid-template-columns: 1fr;
     gap: 12px;
+    padding-inline: 0;
   }
 
   .stock-count-heading .back-button {
@@ -2123,6 +2143,10 @@ body.order-app {
   }
 
   .stock-count-row {
+    grid-template-areas:
+      "marker main"
+      "controls controls"
+      "note note";
     grid-template-columns: 44px minmax(0, 1fr);
     align-items: start;
     padding: 14px;
@@ -2134,12 +2158,13 @@ body.order-app {
 
   .stock-count-controls,
   .stock-count-note-wrap {
-    grid-column: 2;
+    grid-column: auto;
   }
 
   .stock-count-controls {
     justify-content: flex-start;
     flex-wrap: wrap;
+    justify-self: start;
   }
 
   .daily-order-panel {

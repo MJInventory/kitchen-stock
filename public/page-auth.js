@@ -10,6 +10,19 @@
 
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+
+  function formatUserDisplay(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (raw !== raw.toLowerCase()) return raw;
+    return raw
+      .split(/\s+/)
+      .map((part) => part
+        .split("-")
+        .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+        .join("-"))
+      .join(" ");
+  }
   let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 
   function setLoginMessage(text, isError = false) {
@@ -38,7 +51,7 @@
 
   function showApp() {
     if (loginScreen) loginScreen.hidden = true;
-    if (currentUser) currentUser.textContent = sessionUser;
+    if (currentUser) currentUser.textContent = formatUserDisplay(sessionUser);
   }
 
   function showLogin() {

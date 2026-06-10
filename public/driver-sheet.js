@@ -19,6 +19,19 @@ let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 let currentSheet = { date: "", requests: [], suppliers: [] };
 
+function formatUserDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
 function todayLocal() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
@@ -37,13 +50,13 @@ function setLoginMessage(text, isError = false) {
 
 function showApp() {
   loginScreen.hidden = true;
-  currentUser.textContent = sessionUser;
+  currentUser.textContent = formatUserDisplay(sessionUser);
   const canAssignDriver = Boolean(sessionPermissions.canAdminUsers);
   driverName.disabled = !canAssignDriver;
   saveDriverButton.hidden = !canAssignDriver;
   saveDriverButton.disabled = !canAssignDriver;
   if (canAssignDriver && !driverName.value) {
-    driverName.value = sessionUser || "";
+    driverName.value = formatUserDisplay(sessionUser || "");
   }
 }
 
@@ -54,6 +67,8 @@ function showLogin() {
   sessionUser = "";
   localStorage.removeItem("kitchenStockToken");
   localStorage.removeItem("kitchenStockUser");
+  localStorage.removeItem("kitchenStockRole");
+  localStorage.removeItem("kitchenStockPermissions");
 }
 
 function escapeHtml(value) {
@@ -137,17 +152,20 @@ function supplierOptions(selectedSupplier) {
 }
 
 function renderSheet(data) {
-  currentSheet = data;
-  if (data.driverName && !driverName.value) driverName.value = data.driverName;
+  currentSheet = {
+    ...data,
+    requests: (data.requests || []).filter((request) => !request.standingRunId)
+  };
+  if (data.driverName && !driverName.value) driverName.value = formatUserDisplay(data.driverName);
   printDate.textContent = `Date: ${data.date}`;
-  printDriver.textContent = `Driver: ${driverName.value || "________________"}`;
+  printDriver.textContent = `Driver: ${formatUserDisplay(driverName.value) || "________________"}`;
 
-  if (!data.requests.length) {
+  if (!currentSheet.requests.length) {
     sheetList.innerHTML = '<p class="empty-sheet">No pending or approved requests for this date.</p>';
     return;
   }
 
-  const groups = groupRequests(data.requests);
+  const groups = groupRequests(currentSheet.requests);
   sheetList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, supplier]) => `
@@ -321,7 +339,7 @@ async function saveDriverAssignment() {
   });
   driverName.value = result.driverName || driverName.value;
   currentSheet.driverName = result.driverName;
-  printDriver.textContent = `Driver: ${result.driverName}`;
+  printDriver.textContent = `Driver: ${formatUserDisplay(result.driverName)}`;
   await loadSheet();
   setMessage(`Driver assigned to ${result.updated} line(s).`);
 }
@@ -353,7 +371,7 @@ sheetDate.value = todayLocal();
 loadSheetButton.addEventListener("click", () => loadSheet().catch((error) => setMessage(error.message, true)));
 saveDriverButton.addEventListener("click", () => saveDriverAssignment().catch((error) => setMessage(error.message, true)));
 driverName.addEventListener("input", () => {
-  printDriver.textContent = `Driver: ${driverName.value || "________________"}`;
+  printDriver.textContent = `Driver: ${formatUserDisplay(driverName.value) || "________________"}`;
 });
 printSheetButton.addEventListener("click", () => window.print());
 

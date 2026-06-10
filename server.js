@@ -537,6 +537,55 @@ async function pgListSuppliers() {
   }));
 }
 
+async function pgListSuppliersAdmin() {
+  const result = await db().query(`
+    select id, name, contact_information, active
+    from suppliers
+    order by name
+  `);
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name || "",
+    contact: row.contact_information || "",
+    active: row.active !== false
+  }));
+}
+
+async function pgSaveSupplier(payload, recordId = "") {
+  const name = String(payload.name || "").trim();
+  const contact = String(payload.contact || "").trim();
+  const active = payload.active !== false;
+  if (!name) throw new Error("Supplier name is required.");
+  let result;
+  if (recordId) {
+    if (!isValidId(recordId)) throw new Error("Invalid supplier record.");
+    result = await db().query(`
+      update suppliers
+      set name = $2,
+          contact_information = $3,
+          active = $4,
+          updated_at = now()
+      where id = $1
+      returning id, name, contact_information, active
+    `, [recordId, name, contact, active]);
+  } else {
+    result = await db().query(`
+      insert into suppliers (name, contact_information, active)
+      values ($1, $2, $3)
+      returning id, name, contact_information, active
+    `, [name, contact, active]);
+  }
+  cache.suppliers.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    name: row.name || "",
+    contact: row.contact_information || "",
+    active: row.active !== false
+  };
+}
+
 async function pgFindOrCreateSupplierByName(name) {
   const cleaned = String(name || "").trim();
   if (!cleaned) return null;
@@ -1338,15 +1387,18 @@ async function pgListDriverSheet(date) {
     pgDriverSheetRequests(selectedDate),
     pgListSuppliers()
   ]);
-  const driverName = requests.find((request) => request.driverName)?.driverName || "";
-  return { date: selectedDate, driverName, requests, suppliers };
+  const filteredRequests = requests.filter((request) => !isStandingOrderRequestRow(request));
+  const driverName = filteredRequests.find((request) => request.driverName)?.driverName || "";
+  return { date: selectedDate, driverName, requests: filteredRequests, suppliers };
 }
 
 async function pgListReceivingSheet(date) {
   const sheet = await pgListDriverSheet(date);
   return {
     ...sheet,
-    requests: sheet.requests.filter((request) => !request.delivered && request.status !== "Fulfilled")
+    requests: sheet.requests
+      .filter((request) => !isStandingOrderRequestRow(request))
+      .filter((request) => !request.delivered && request.status !== "Fulfilled")
   };
 }
 
@@ -1413,7 +1465,7 @@ async function pgListOrderReport(date) {
     delivered: Boolean(row.received || row.delivered),
     waiting: !(row.received || row.delivered)
   }));
-  const reportRows = rows.filter((row) => !row.standingRunId);
+  const reportRows = rows.filter((row) => !isStandingOrderRequestRow(row));
   return {
     date: selectedDate,
     summary: {
@@ -1499,7 +1551,9 @@ async function pgCreateRequest(payload, requestedByOverride = "") {
 }
 
 async function pgCreateRequestsBatch(payload, requestedByOverride = "") {
-  const requestedItems = Array.isArray(payload.requests) ? payload.requests : [];
+  const requestedItems = (Array.isArray(payload.requests) ? payload.requests : [])
+    .filter((request) => isValidId(String(request?.itemId || "").trim()))
+    .filter((request) => Number(request?.quantityNeeded || 0) > 0);
   if (!requestedItems.length) throw new Error("Select at least one item.");
   const created = [];
   for (const request of requestedItems) {
@@ -2021,6 +2075,47 @@ async function listSuppliers() {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+async function listSuppliersAdmin() {
+  if (hasPostgres()) {
+    return pgListSuppliersAdmin();
+  }
+  const records = await listAirtableRecords(suppliersTableId);
+  return records
+    .map((record) => ({
+      id: record.id,
+      name: record.fields["Supplier Name"] || "",
+      contact: record.fields["Contact Information"] || "",
+      active: record.fields.Active !== false
+    }))
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }));
+}
+
+async function saveSupplier(payload, recordId = "") {
+  if (hasPostgres()) {
+    return pgSaveSupplier(payload, recordId);
+  }
+  const name = String(payload.name || "").trim();
+  const contact = String(payload.contact || "").trim();
+  const active = payload.active !== false;
+  if (!name) throw new Error("Supplier name is required.");
+  const fields = {
+    "Supplier Name": name,
+    "Contact Information": contact,
+    Active: active
+  };
+  const record = recordId
+    ? await airtable(`${suppliersTableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
+    : await airtable(suppliersTableId, { method: "POST", body: JSON.stringify({ fields }) });
+  cache.suppliers.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return {
+    id: record.id,
+    name: record.fields["Supplier Name"] || "",
+    contact: record.fields["Contact Information"] || "",
+    active: record.fields.Active !== false
+  };
+}
+
 async function listRequests() {
   if (hasPostgres()) {
     return pgListRequests();
@@ -2091,7 +2186,7 @@ async function getItems() {
 }
 
 async function getSuppliers() {
-  return cached("suppliers", itemCacheMs, listSuppliers);
+  return cached("suppliers", Math.min(itemCacheMs, 60000), listSuppliers);
 }
 
 async function getRequests() {
@@ -2546,6 +2641,13 @@ function standingRunIdFromNotes(notes) {
 function standingRunLineIdFromNotes(notes) {
   const match = String(notes || "").match(/^Standing run line id:\s*(rec[a-zA-Z0-9]+)\.?$/im);
   return match ? match[1].trim() : "";
+}
+
+function isStandingOrderRequestRow(row) {
+  return Boolean(String(row?.standingRunId || "").trim())
+    || Boolean(String(row?.standingRunLineId || "").trim())
+    || String(row?.requestedBy || "").toLowerCase().includes("standing order")
+    || String(row?.notes || "").toLowerCase().includes("standing order");
 }
 
 function normalizeStandingOrderRun(record) {
@@ -4814,12 +4916,29 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && req.url.startsWith("/api/setup/suppliers")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      send(res, 200, { suppliers: await listSuppliersAdmin() });
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/api/setup/categories") {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const category = await saveCategory(await readJson(req));
       send(res, 201, { category });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/setup/suppliers") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const supplier = await saveSupplier(await readJson(req));
+      send(res, 201, { supplier });
       return;
     }
 
@@ -4830,6 +4949,16 @@ const server = http.createServer(async (req, res) => {
       const recordId = req.url.split("/")[4];
       const category = await saveCategory(await readJson(req), recordId);
       send(res, 200, { category });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/setup/suppliers/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const recordId = req.url.split("/")[4];
+      const supplier = await saveSupplier(await readJson(req), recordId);
+      send(res, 200, { supplier });
       return;
     }
 

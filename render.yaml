@@ -10,8 +10,6 @@ services:
         value: postgres
       - key: DATABASE_URL
         sync: false
-      - key: AIRTABLE_TOKEN
-        sync: false
       - key: APP_USERS
         sync: false
       - key: AUTH_SECRET

@@ -196,6 +196,9 @@ create table if not exists standing_order_runs (
   notes text not null default ''
 );
 
+create unique index if not exists idx_standing_order_runs_once_per_day
+  on standing_order_runs (standing_order_id, expected_delivery_date);
+
 create table if not exists standing_order_run_lines (
   id uuid primary key default gen_random_uuid(),
   external_id text unique,
@@ -228,6 +231,8 @@ create table if not exists invoice_captures (
   id uuid primary key default gen_random_uuid(),
   external_id text unique,
   supplier_id uuid references suppliers(id) on delete set null,
+  invoice_number text not null default '',
+  invoice_total numeric(12,2),
   captured_by_username text not null,
   captured_at timestamptz not null default now(),
   image_name text not null default '',
@@ -244,6 +249,8 @@ create table if not exists invoice_lines (
   invoice_capture_id uuid not null references invoice_captures(id) on delete cascade,
   inventory_item_id uuid references inventory_items(id) on delete set null,
   supplier_id uuid references suppliers(id) on delete set null,
+  invoice_number text not null default '',
+  item_name text not null default '',
   raw_description text not null default '',
   quantity numeric(12,2),
   unit text not null default '',
@@ -251,4 +258,21 @@ create table if not exists invoice_lines (
   total_price numeric(12,2),
   matched boolean not null default false,
   notes text not null default ''
+);
+
+create table if not exists invoice_ocr_rules (
+  id uuid primary key default gen_random_uuid(),
+  external_id text unique,
+  supplier_id uuid references suppliers(id) on delete cascade,
+  supplier_name text not null default '',
+  rule_type text not null default 'Line Item',
+  ocr_match_text text not null default '',
+  target_field text not null default '',
+  inventory_item_id uuid references inventory_items(id) on delete set null,
+  inventory_item_name text not null default '',
+  notes text not null default '',
+  active boolean not null default true,
+  created_by_username text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );

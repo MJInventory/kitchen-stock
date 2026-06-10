@@ -21,16 +21,38 @@ From the project root:
 npm install
 npm run db:check
 npm run db:setup
+npm run db:import:airtable
 ```
 
 ## Current migration plan
 
 1. Keep Airtable live as the current source of truth
 2. Apply the Postgres schema
-3. Add an import script from Airtable into Postgres
+3. Run the Airtable import into Postgres
 4. Add a backend repository layer that can switch by `DATA_BACKEND`
 5. Test the web app on Postgres
 6. Cut over Render from `airtable` to `postgres`
+
+## Import status
+
+The first import script covers:
+
+- suppliers
+- categories
+- storage locations
+- inventory areas
+- units of measure
+- shelf codes
+- app users
+- inventory items
+- order requests
+- driver sheet lines
+- stock counts
+- standing orders
+- standing order items
+- daily guest counts
+
+It is designed as an upsert-based import, so we can rerun it during migration work.
 
 ## First schema scope
 

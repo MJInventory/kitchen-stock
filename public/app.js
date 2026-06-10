@@ -255,6 +255,7 @@ function groupRequestsByCategory(requests) {
 function renderDailyOrder() {
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !request.standingRunId)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));

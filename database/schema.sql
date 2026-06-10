@@ -2,7 +2,6 @@ create extension if not exists "pgcrypto";
 
 create table if not exists app_users (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   username text not null unique,
   display_name text not null,
   password_hash text not null,
@@ -11,13 +10,13 @@ create table if not exists app_users (
   active boolean not null default true,
   must_change_password boolean not null default false,
   source text not null default 'postgres',
+  last_login_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create table if not exists suppliers (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null unique,
   contact_information text not null default '',
   active boolean not null default true,
@@ -27,7 +26,6 @@ create table if not exists suppliers (
 
 create table if not exists categories (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null unique,
   active boolean not null default true,
   sort_order integer not null default 0,
@@ -37,7 +35,6 @@ create table if not exists categories (
 
 create table if not exists storage_locations (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null unique,
   active boolean not null default true,
   sort_order integer not null default 0,
@@ -47,7 +44,6 @@ create table if not exists storage_locations (
 
 create table if not exists inventory_areas (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null unique,
   active boolean not null default true,
   sort_order integer not null default 0,
@@ -57,16 +53,15 @@ create table if not exists inventory_areas (
 
 create table if not exists units_of_measure (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null unique,
   active boolean not null default true,
+  sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create table if not exists shelf_codes (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   storage_location_id uuid not null references storage_locations(id) on delete cascade,
   code text not null,
   active boolean not null default true,
@@ -78,7 +73,6 @@ create table if not exists shelf_codes (
 
 create table if not exists inventory_items (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null,
   category_id uuid references categories(id) on delete set null,
   storage_location_id uuid references storage_locations(id) on delete set null,
@@ -99,7 +93,6 @@ create index if not exists idx_inventory_items_supplier on inventory_items (prim
 
 create table if not exists order_requests (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   request_number bigint generated always as identity,
   inventory_item_id uuid not null references inventory_items(id) on delete restrict,
   quantity_needed numeric(12,2) not null,
@@ -127,7 +120,6 @@ create index if not exists idx_order_requests_item on order_requests (inventory_
 
 create table if not exists driver_sheet_lines (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   sheet_date date not null,
   order_request_id uuid not null references order_requests(id) on delete cascade,
   supplier_id uuid references suppliers(id) on delete set null,
@@ -148,7 +140,6 @@ create table if not exists driver_sheet_lines (
 
 create table if not exists stock_counts (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   inventory_item_id uuid not null references inventory_items(id) on delete cascade,
   counted_quantity numeric(12,2) not null,
   previous_quantity numeric(12,2) not null default 0,
@@ -159,7 +150,6 @@ create table if not exists stock_counts (
 
 create table if not exists standing_orders (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   name text not null,
   supplier_id uuid references suppliers(id) on delete set null,
   expected_arrival_date date,
@@ -185,7 +175,6 @@ create table if not exists standing_order_items (
 
 create table if not exists standing_order_runs (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   standing_order_id uuid not null references standing_orders(id) on delete cascade,
   expected_delivery_date date not null,
   status text not null default 'Open',
@@ -201,7 +190,6 @@ create unique index if not exists idx_standing_order_runs_once_per_day
 
 create table if not exists standing_order_run_lines (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   standing_order_run_id uuid not null references standing_order_runs(id) on delete cascade,
   standing_order_id uuid not null references standing_orders(id) on delete cascade,
   inventory_item_id uuid not null references inventory_items(id) on delete restrict,
@@ -219,7 +207,6 @@ create table if not exists standing_order_run_lines (
 
 create table if not exists daily_guest_counts (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   report_date date not null unique,
   guests integer not null check (guests >= 0),
   notes text not null default '',
@@ -229,7 +216,6 @@ create table if not exists daily_guest_counts (
 
 create table if not exists invoice_captures (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   supplier_id uuid references suppliers(id) on delete set null,
   invoice_number text not null default '',
   invoice_total numeric(12,2),
@@ -245,7 +231,6 @@ create table if not exists invoice_captures (
 
 create table if not exists invoice_lines (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   invoice_capture_id uuid not null references invoice_captures(id) on delete cascade,
   inventory_item_id uuid references inventory_items(id) on delete set null,
   supplier_id uuid references suppliers(id) on delete set null,
@@ -262,7 +247,6 @@ create table if not exists invoice_lines (
 
 create table if not exists invoice_ocr_rules (
   id uuid primary key default gen_random_uuid(),
-  external_id text unique,
   supplier_id uuid references suppliers(id) on delete cascade,
   supplier_name text not null default '',
   rule_type text not null default 'Line Item',

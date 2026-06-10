@@ -7,6 +7,7 @@ const currentUser = document.querySelector("#currentUser");
 const logoutButton = document.querySelector("#logoutButton");
 const areaFilter = document.querySelector("#areaFilter");
 const locationFilter = document.querySelector("#locationFilter");
+const searchFilter = document.querySelector("#searchFilter");
 const setupMessage = document.querySelector("#setupMessage");
 const itemSettingsList = document.querySelector("#itemSettingsList");
 const saveAllButton = document.querySelector("#saveAllButton");
@@ -24,6 +25,19 @@ let optionsData = {
   suppliers: []
 };
 
+function formatUserDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
 function setLoginMessage(text, isError = false) {
   loginMessage.textContent = text;
   loginMessage.classList.toggle("error", isError);
@@ -36,7 +50,7 @@ function setSetupMessage(text, isError = false) {
 
 function showApp() {
   loginScreen.hidden = true;
-  currentUser.textContent = sessionUser;
+  currentUser.textContent = formatUserDisplay(sessionUser);
 }
 
 function showLogin() {
@@ -166,12 +180,23 @@ function syncDirtyState(article) {
 function renderItems() {
   const area = areaFilter.value;
   const location = locationFilter.value;
+  const search = normalize(searchFilter?.value);
   const filtered = items
     .map(effectiveItem)
     .filter((item) => {
       const areaMatches = !area || item.inventoryArea === area;
       const locationMatches = !location || item.storageLocation === location;
-      return areaMatches && locationMatches;
+      const haystack = [
+        item.name,
+        item.supplierName,
+        item.inventoryArea,
+        item.storageLocation,
+        item.category,
+        item.shelfCode,
+        item.unit
+      ].map(normalize).join(" ");
+      const searchMatches = !search || haystack.includes(search);
+      return areaMatches && locationMatches && searchMatches;
     })
     .sort(compareItems);
 
@@ -361,6 +386,7 @@ logoutButton.addEventListener("click", () => {
 });
 areaFilter.addEventListener("change", renderItems);
 locationFilter.addEventListener("change", renderItems);
+searchFilter?.addEventListener("input", renderItems);
 saveAllButton.addEventListener("click", () => {
   saveAllChanges().catch((error) => {
     saveAllButton.disabled = false;

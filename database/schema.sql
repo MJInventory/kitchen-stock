@@ -2,6 +2,7 @@ create extension if not exists "pgcrypto";
 
 create table if not exists app_users (
   id uuid primary key default gen_random_uuid(),
+  external_id text unique,
   username text not null unique,
   display_name text not null,
   password_hash text not null,

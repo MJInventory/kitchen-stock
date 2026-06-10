@@ -6,6 +6,10 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      - key: DATA_BACKEND
+        value: airtable
+      - key: DATABASE_URL
+        sync: false
       - key: AIRTABLE_TOKEN
         sync: false
       - key: APP_USERS

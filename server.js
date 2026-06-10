@@ -1331,6 +1331,8 @@ async function pgListOrderReport(date) {
       d.received_by_username,
       d.to_deliver,
       d.delivery_day::text as delivery_day,
+      coalesce(d.standing_order_run_id, r.standing_order_run_id) as standing_order_run_id,
+      d.standing_order_run_line_id,
       coalesce(ds.name, sp.name) as supplier_name,
       r.id as request_id,
       r.request_number,
@@ -1372,18 +1374,19 @@ async function pgListOrderReport(date) {
     delivered: Boolean(row.received || row.delivered),
     waiting: !(row.received || row.delivered)
   }));
+  const reportRows = rows.filter((row) => !row.standingRunId);
   return {
     date: selectedDate,
     summary: {
       guests: guestCount?.guests ?? null,
-      totalLines: rows.length,
-      orderedLines: rows.filter((row) => row.ordered).length,
-      deliveredLines: rows.filter((row) => row.delivered).length,
-      waitingLines: rows.filter((row) => row.waiting).length,
-      toDeliverLines: rows.filter((row) => row.toDeliver).length
+      totalLines: reportRows.length,
+      orderedLines: reportRows.filter((row) => row.ordered).length,
+      deliveredLines: reportRows.filter((row) => row.delivered).length,
+      waitingLines: reportRows.filter((row) => row.waiting).length,
+      toDeliverLines: reportRows.filter((row) => row.toDeliver).length
     },
     guestCount,
-    rows,
+    rows: reportRows,
     standingOrders
   };
 }
@@ -3472,19 +3475,20 @@ async function listOrderReport(date) {
       if (status) return status;
       return String(a.requestId || "").localeCompare(String(b.requestId || ""));
     });
+  const reportRows = rows.filter((row) => !row.standingRunId);
 
   return {
     date: selectedDate,
     summary: {
       guests: guestCount?.guests ?? null,
-      totalLines: rows.length,
-      orderedLines: rows.filter((row) => row.ordered).length,
-      deliveredLines: rows.filter((row) => row.delivered).length,
-      waitingLines: rows.filter((row) => row.waiting).length,
-      toDeliverLines: rows.filter((row) => row.toDeliver).length
+      totalLines: reportRows.length,
+      orderedLines: reportRows.filter((row) => row.ordered).length,
+      deliveredLines: reportRows.filter((row) => row.delivered).length,
+      waitingLines: reportRows.filter((row) => row.waiting).length,
+      toDeliverLines: reportRows.filter((row) => row.toDeliver).length
     },
     guestCount,
-    rows,
+    rows: reportRows,
     standingOrders
   };
 }

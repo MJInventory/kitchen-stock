@@ -16,6 +16,19 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let currentSheet = { date: "", requests: [], suppliers: [] };
 
+function formatUserDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw !== raw.toLowerCase()) return raw;
+  return raw
+    .split(/\s+/)
+    .map((part) => part
+      .split("-")
+      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
+      .join("-"))
+    .join(" ");
+}
+
 function todayLocal() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
@@ -43,8 +56,8 @@ function setLoginMessage(text, isError = false) {
 
 function showApp() {
   loginScreen.hidden = true;
-  currentUser.textContent = sessionUser;
-  printReceiver.textContent = `Receiver: ${sessionUser || "________________"}`;
+  currentUser.textContent = formatUserDisplay(sessionUser);
+  printReceiver.textContent = `Receiver: ${formatUserDisplay(sessionUser) || "________________"}`;
 }
 
 function showLogin() {

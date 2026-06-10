@@ -1,4 +1,4 @@
-﻿const loginScreen = document.querySelector("#loginScreen");
+const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");
@@ -172,6 +172,10 @@ function isStandingOrder(request) {
     || String(request.notes || "").toLowerCase().includes("standing order");
 }
 
+function hasValidRequestItemId(request) {
+  return Boolean(String(request?.itemId || "").trim());
+}
+
 function expectedDateFromRequest(request) {
   const match = String(request.notes || "").match(/Expected arrival:\s*(\d{4}-\d{2}-\d{2})/i);
   return match ? match[1] : "";
@@ -279,6 +283,8 @@ function renderDailyOrder() {
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !request.standingRunId)
+    .filter((request) => !isStandingOrder(request))
+    .filter(hasValidRequestItemId)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
@@ -471,6 +477,8 @@ function buildSelectedFromRecentRequests() {
   const userRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !request.standingRunId)
+    .filter((request) => !isStandingOrder(request))
+    .filter(hasValidRequestItemId)
     .filter((request) => sameUser(request.requestedBy, sessionUser))
     .filter((request) => {
       const requestDay = String(request.requestedAt || "").slice(0, 10);
@@ -538,8 +546,10 @@ async function submitSelected() {
   setMessage("Saving order...");
 
   try {
-    const requests = [...selected.values()].map((entry) => ({
-      itemId: entry.item.id,
+    const requests = [...selected.values()]
+      .filter((entry) => entry?.item?.id)
+      .map((entry) => ({
+      itemId: String(entry.item.id || "").trim(),
       quantityNeeded: entry.quantity,
       urgencyLevel: entry.urgency,
       storageLocation: entry.item.storageLocation || "",
@@ -547,7 +557,11 @@ async function submitSelected() {
       shelfCode: entry.item.shelfCode || "",
       requestedBy: sessionUser || "Kitchen",
       notes: ""
-    }));
+    }))
+      .filter((entry) => entry.itemId);
+    if (!requests.length) {
+      throw new Error("No valid items were selected to save.");
+    }
     const data = await api("/api/requests/batch", {
       method: "POST",
       body: JSON.stringify({ requests })

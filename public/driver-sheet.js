@@ -1,4 +1,4 @@
-﻿const sheetDate = document.querySelector("#sheetDate");
+const sheetDate = document.querySelector("#sheetDate");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -18,6 +18,12 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 let currentSheet = { date: "", requests: [], suppliers: [] };
+
+function isStandingOrderRequest(request) {
+  return Boolean(String(request?.standingRunId || "").trim())
+    || String(request?.requestedBy || "").toLowerCase().includes("standing order")
+    || String(request?.notes || "").toLowerCase().includes("standing order");
+}
 
 function formatUserDisplay(value) {
   const raw = String(value || "").trim();
@@ -154,7 +160,7 @@ function supplierOptions(selectedSupplier) {
 function renderSheet(data) {
   currentSheet = {
     ...data,
-    requests: (data.requests || []).filter((request) => !request.standingRunId)
+    requests: (data.requests || []).filter((request) => !isStandingOrderRequest(request))
   };
   if (data.driverName && !driverName.value) driverName.value = formatUserDisplay(data.driverName);
   printDate.textContent = `Date: ${data.date}`;

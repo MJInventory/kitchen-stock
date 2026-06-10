@@ -1610,22 +1610,18 @@ body.order-app {
 }
 
 .stock-count-list {
-  width: min(900px, calc(100% - 32px));
+  width: min(760px, calc(100% - 32px));
   margin: 0 auto 48px;
   display: grid;
   gap: 12px;
 }
 
 .stock-count-row {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
-  gap: 16px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
-  border: 1px solid var(--order-line);
-  border-radius: 18px;
-  background: var(--order-panel);
+  min-height: 112px;
   padding: 16px 18px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
 }
 
 .stock-count-row:focus-within {
@@ -1634,10 +1630,10 @@ body.order-app {
 }
 
 .stock-count-marker {
-  width: 42px;
-  min-height: 32px;
+  width: 34px;
+  min-height: 28px;
   border: 1px solid var(--order-gold);
-  border-radius: 10px;
+  border-radius: 9px;
   display: grid;
   place-items: center;
   color: var(--order-gold);
@@ -1648,34 +1644,7 @@ body.order-app {
   text-align: center;
 }
 
-.stock-count-main {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.stock-count-main strong {
-  color: var(--order-ink);
-  font-size: 16px;
-  overflow-wrap: anywhere;
-}
-
-.stock-count-main span,
-.stock-count-main small,
-.stock-count-main em {
-  color: var(--order-muted);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 10px;
-  line-height: 1.25;
-  text-transform: uppercase;
-}
-
-.stock-count-main em {
-  color: var(--order-gold);
-  font-style: normal;
-}
-
-.stock-count-entry {
+.stock-count-controls {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1684,7 +1653,7 @@ body.order-app {
   font-size: 12px;
 }
 
-.stock-count-entry button {
+.stock-count-controls button {
   width: 30px;
   height: 30px;
   min-width: 30px;
@@ -1695,7 +1664,7 @@ body.order-app {
   padding: 0;
 }
 
-.stock-count-entry input {
+.stock-count-controls input {
   width: 64px;
   height: 36px;
   border-color: var(--order-line);
@@ -1705,14 +1674,28 @@ body.order-app {
   text-align: center;
 }
 
-.count-note {
+.stock-count-note-wrap {
   grid-column: 2 / 4;
+  display: grid;
+  gap: 6px;
+}
+
+.stock-count-note-wrap span {
+  color: var(--order-muted);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.count-note {
   border-color: var(--order-line);
-  background: #080808;
+  background: rgba(8, 8, 8, 0.96);
   color: var(--order-ink);
-  min-height: 34px;
-  padding: 8px 10px;
+  min-height: 38px;
+  padding: 10px 12px;
   font-size: 12px;
+  border-radius: 10px;
 }
 
 .daily-order-panel {
@@ -2149,12 +2132,12 @@ body.order-app {
     width: 36px;
   }
 
-  .stock-count-entry,
-  .count-note {
+  .stock-count-controls,
+  .stock-count-note-wrap {
     grid-column: 2;
   }
 
-  .stock-count-entry {
+  .stock-count-controls {
     justify-content: flex-start;
     flex-wrap: wrap;
   }

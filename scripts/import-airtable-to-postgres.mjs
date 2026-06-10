@@ -144,8 +144,8 @@ async function importSuppliers(records) {
       `
         insert into suppliers (external_id, name, contact_information, active)
         values ($1, $2, $3, $4)
-        on conflict (external_id) do update
-          set name = excluded.name,
+        on conflict (name) do update
+          set external_id = coalesce(suppliers.external_id, excluded.external_id),
               contact_information = excluded.contact_information,
               active = excluded.active,
               updated_at = now()
@@ -237,9 +237,10 @@ async function importAppUsers(records) {
           external_id, username, display_name, password_hash, role, theme, active, must_change_password, source
         )
         values ($1, $2, $3, $4, $5, $6, $7, $8, 'airtable')
-        on conflict (external_id) do update
-          set username = excluded.username,
+        on conflict (username) do update
+          set external_id = coalesce(app_users.external_id, excluded.external_id),
               display_name = excluded.display_name,
+              password_hash = excluded.password_hash,
               role = excluded.role,
               theme = excluded.theme,
               active = excluded.active,

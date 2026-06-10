@@ -1331,7 +1331,7 @@ async function pgListOrderReport(date) {
       d.received_by_username,
       d.to_deliver,
       d.delivery_day::text as delivery_day,
-      coalesce(d.standing_order_run_id, r.standing_order_run_id) as standing_order_run_id,
+      r.standing_order_run_id,
       d.standing_order_run_line_id,
       coalesce(ds.name, sp.name) as supplier_name,
       r.id as request_id,

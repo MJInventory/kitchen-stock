@@ -2094,6 +2094,10 @@ async function getAppUsers() {
 
 async function findAppUserByName(name) {
   const normalized = String(name || "").trim().toLowerCase();
+  if (hasPostgres()) {
+    const user = await pgFindAppUserByName(normalized);
+    return user && user.active !== false ? user : null;
+  }
   const appUsers = await getAppUsers();
   return appUsers.find((user) =>
     (String(user.username || user.name || "").toLowerCase() === normalized || String(user.name || "").toLowerCase() === normalized)

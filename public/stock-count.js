@@ -174,21 +174,24 @@ function renderList() {
       const notesValue = draftNotes.get(item.id) || "";
       const low = item.minimum !== null && Number(item.quantity || 0) < Number(item.minimum || 0);
       return `
-        <article class="stock-count-row" data-item-id="${escapeHtml(item.id)}">
+        <article class="product-row stock-count-row" data-item-id="${escapeHtml(item.id)}">
           <div class="stock-count-marker">${escapeHtml(item.shelfCode || "TBD")}</div>
-          <div class="stock-count-main">
+          <div class="product-main stock-count-main">
             <strong>${escapeHtml(item.name)}</strong>
             <span>${escapeHtml([item.inventoryArea, item.storageLocation, itemCategory(item)].filter(Boolean).join(" / "))}</span>
             <small>Current ${escapeHtml(item.quantity ?? 0)} ${escapeHtml(itemUnit(item))}${item.minimum !== null ? ` / min ${escapeHtml(item.minimum)}` : ""}</small>
             ${low ? '<em>Below minimum</em>' : ""}
           </div>
-          <div class="stock-count-entry">
+          <div class="product-controls stock-count-controls">
             <button class="step-count" type="button" data-step="-1">-</button>
             <input class="count-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="${escapeHtml(item.quantity ?? 0)}" value="${escapeHtml(countValue)}" aria-label="Count ${escapeHtml(item.name)}">
             <button class="step-count" type="button" data-step="1">+</button>
             <span>${escapeHtml(itemUnit(item))}</span>
           </div>
-          <input class="count-note" type="text" placeholder="Note" value="${escapeHtml(notesValue)}" aria-label="Note for ${escapeHtml(item.name)}">
+          <label class="stock-count-note-wrap">
+            <span>Note</span>
+            <input class="count-note" type="text" placeholder="Add note for this count" value="${escapeHtml(notesValue)}" aria-label="Note for ${escapeHtml(item.name)}">
+          </label>
         </article>
       `;
     })

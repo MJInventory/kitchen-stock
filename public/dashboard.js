@@ -359,7 +359,10 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", showLogin);
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
-dailyAreaFilter.addEventListener("change", renderDailyOrder);
+dailyAreaFilter.addEventListener("change", () => {
+  renderDailyOrder();
+  renderOpenOrders();
+});
 featureMenu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 });

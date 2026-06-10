@@ -563,11 +563,12 @@ function pgInvoiceRuleFromRow(row) {
 }
 
 async function pgListLookup(tableName) {
+  const orderBy = tableName === "units_of_measure" ? "name" : "sort_order, name";
   const result = await db().query(`
     select id, name
     from ${tableName}
     where active = true
-    order by sort_order, name
+    order by ${orderBy}
   `);
   const values = result.rows.map((row) => ({ id: row.id, name: row.name || "" })).filter((row) => row.name);
   return {

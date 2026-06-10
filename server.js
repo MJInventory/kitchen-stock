@@ -1502,7 +1502,7 @@ async function pgCreateRequest(payload, requestedByOverride = "") {
         and lower(requested_by_username) = lower($2)
         and delivered = false
         and status in ('Pending', 'Approved')
-        and coalesce(standing_order_run_id, '') = ''
+        and standing_order_run_id is null
       order by requested_at desc, request_number desc
       for update
     `, [itemId, requestedBy]);

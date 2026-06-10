@@ -150,6 +150,12 @@ function requestDay(request) {
   return stamp ? stamp.slice(0, 10) : "";
 }
 
+function isStandingOrderRequest(request) {
+  return Boolean(String(request?.standingRunId || "").trim())
+    || String(request?.requestedBy || "").toLowerCase().includes("standing order")
+    || String(request?.notes || "").toLowerCase().includes("standing order");
+}
+
 function requestSortValue(request) {
   const item = itemForRequest(request);
   return {
@@ -198,7 +204,7 @@ function renderDailyOrder() {
   const selectedDay = todayLocal();
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
-    .filter((request) => !request.standingRunId)
+    .filter((request) => !isStandingOrderRequest(request))
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
     .filter((request) => requestDay(request) === selectedDay)
     .sort(logicalRequestCompare);
@@ -245,7 +251,7 @@ function renderOpenOrders() {
   const selectedDay = todayLocal();
   const openRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
-    .filter((request) => !request.standingRunId)
+    .filter((request) => !isStandingOrderRequest(request))
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
     .filter((request) => {
       const day = requestDay(request);

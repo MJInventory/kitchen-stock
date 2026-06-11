@@ -586,6 +586,23 @@ async function pgSaveSupplier(payload, recordId = "") {
   };
 }
 
+async function pgDeleteSupplier(recordId) {
+  if (!isValidId(recordId)) throw new Error("Invalid supplier record.");
+  const inUse = await db().query(`
+    select exists(select 1 from inventory_items where primary_supplier_id = $1) as inventory_used,
+           exists(select 1 from standing_orders where supplier_id = $1) as standing_used,
+           exists(select 1 from driver_sheet_lines where supplier_id = $1) as driver_used
+  `, [recordId]);
+  const usage = inUse.rows[0] || {};
+  if (usage.inventory_used || usage.standing_used || usage.driver_used) {
+    throw new Error("This supplier is still used by inventory items, standing orders, or driver lines. Set it inactive instead of deleting it.");
+  }
+  await db().query(`delete from suppliers where id = $1`, [recordId]);
+  cache.suppliers.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return { ok: true, recordId };
+}
+
 async function pgFindOrCreateSupplierByName(name) {
   const cleaned = String(name || "").trim();
   if (!cleaned) return null;
@@ -1701,12 +1718,18 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
   }
   if (Object.prototype.hasOwnProperty.call(payload, "toDeliver")) {
     const toDeliver = Boolean(payload.toDeliver);
-    const day = toDeliver ? String(payload.deliveryDay || "").trim() : null;
-    if (toDeliver && !/^\d{4}-\d{2}-\d{2}$/.test(day || "")) throw new Error("Choose the delivery day for 2Deliver items.");
+    const rawDay = String(payload.deliveryDay || "").trim();
+    const day = toDeliver && /^\d{4}-\d{2}-\d{2}$/.test(rawDay) ? rawDay : null;
     values.push(toDeliver, day);
     fields.push(`to_deliver = $${values.length - 1}`, `delivery_day = $${values.length}`);
     requestValues.push(toDeliver, day);
     requestFields.push(`to_deliver = $${requestValues.length - 1}`, `delivery_day = $${requestValues.length}::date`);
+    if (toDeliver && !Object.prototype.hasOwnProperty.call(payload, "ordered")) {
+      values.push(true, new Date().toISOString(), userName);
+      fields.push(`ordered = $${values.length - 2}`, `ordered_at = $${values.length - 1}`, `ordered_by_username = $${values.length}`);
+      requestValues.push(true, new Date().toISOString(), userName);
+      requestFields.push(`ordered = $${requestValues.length - 2}`, `ordered_at = $${requestValues.length - 1}`, `ordered_by_username = $${requestValues.length}`);
+    }
   }
   if (Object.prototype.hasOwnProperty.call(payload, "supplierName")) {
     const supplierName = String(payload.supplierName || "").trim();
@@ -2114,6 +2137,19 @@ async function saveSupplier(payload, recordId = "") {
     contact: record.fields["Contact Information"] || "",
     active: record.fields.Active !== false
   };
+}
+
+async function deleteSupplier(recordId) {
+  if (hasPostgres()) {
+    return pgDeleteSupplier(recordId);
+  }
+  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
+    throw new Error("Invalid supplier record.");
+  }
+  await airtable(`${suppliersTableId}/${recordId}`, { method: "DELETE" });
+  cache.suppliers.expiresAt = 0;
+  cache.items.expiresAt = 0;
+  return { ok: true, recordId };
 }
 
 async function listRequests() {
@@ -4959,6 +4995,16 @@ const server = http.createServer(async (req, res) => {
       const recordId = req.url.split("/")[4];
       const supplier = await saveSupplier(await readJson(req), recordId);
       send(res, 200, { supplier });
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url.startsWith("/api/setup/suppliers/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
+      const recordId = req.url.split("/")[4];
+      const result = await deleteSupplier(recordId);
+      send(res, 200, { result });
       return;
     }
 

@@ -57,6 +57,7 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   currentUser.textContent = formatUserDisplay(sessionUser);
+  window.refreshKitchenMenus?.();
   printReceiver.textContent = `Receiver: ${formatUserDisplay(sessionUser) || "________________"}`;
 }
 

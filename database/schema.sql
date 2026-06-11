@@ -9,6 +9,8 @@ create table if not exists app_users (
   theme text not null default 'dark' check (theme in ('dark', 'light')),
   active boolean not null default true,
   must_change_password boolean not null default false,
+  notify_on_new_orders boolean not null default false,
+  notify_on_delivery boolean not null default true,
   source text not null default 'postgres',
   last_login_at timestamptz,
   created_at timestamptz not null default now(),
@@ -96,6 +98,7 @@ create table if not exists order_requests (
   request_number bigint generated always as identity,
   inventory_item_id uuid not null references inventory_items(id) on delete restrict,
   quantity_needed numeric(12,2) not null,
+  order_unit text not null default '',
   urgency_level text not null default 'Medium',
   status text not null default 'Approved',
   requested_by_username text not null,
@@ -260,3 +263,20 @@ create table if not exists invoice_ocr_rules (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists app_notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  notification_type text not null default 'info',
+  title text not null default '',
+  body text not null default '',
+  related_request_id uuid references order_requests(id) on delete set null,
+  related_standing_order_id uuid references standing_orders(id) on delete set null,
+  related_standing_order_run_id uuid references standing_order_runs(id) on delete set null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+
+create index if not exists idx_app_notifications_user_read_created
+  on app_notifications (user_id, is_read, created_at desc);

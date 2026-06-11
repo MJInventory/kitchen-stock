@@ -55,6 +55,7 @@ function message(target, text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   currentUser.textContent = formatUserDisplay(sessionUser);
+  window.refreshKitchenMenus?.();
 }
 
 function showLogin() {

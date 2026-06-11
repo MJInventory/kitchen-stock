@@ -7,7 +7,9 @@ const currentUser = document.querySelector("#currentUser");
 const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
 const featureMenu = document.querySelector("#featureMenu");
+const backofficeMenu = document.querySelector("#backofficeMenu");
 const dailyAreaFilter = document.querySelector("#dailyAreaFilter");
+const dailyUserFilter = document.querySelector("#dailyUserFilter");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
 const openOrderCount = document.querySelector("#openOrderCount");
@@ -87,6 +89,7 @@ function showApp() {
   loginScreen.hidden = true;
   const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
   currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
+  window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];
   });
@@ -150,6 +153,10 @@ function requestDay(request) {
   return stamp ? stamp.slice(0, 10) : "";
 }
 
+function requestUser(request) {
+  return String(request.requestedBy || "").trim();
+}
+
 function isStandingOrderRequest(request) {
   return Boolean(String(request?.standingRunId || "").trim())
     || String(request?.requestedBy || "").toLowerCase().includes("standing order")
@@ -200,12 +207,35 @@ function populateDailyAreaFilter() {
   dailyAreaFilter.value = areas.includes(selected) ? selected : "";
 }
 
+function populateDailyUserFilter() {
+  const users = [...new Set(
+    recentRequests
+      .map((request) => requestUser(request))
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+  const selected = dailyUserFilter.value;
+  dailyUserFilter.innerHTML = [
+    '<option value="">All Users</option>',
+    `<option value="__mine__"${selected === "__mine__" ? " selected" : ""}>My Orders</option>`,
+    ...users.map((user) => `<option value="${escapeHtml(user)}"${user === selected ? " selected" : ""}>${escapeHtml(formatUserDisplay(user))}</option>`)
+  ].join("");
+  dailyUserFilter.value = selected === "__mine__" || users.includes(selected) ? selected : "";
+}
+
+function requesterMatches(request) {
+  if (!dailyUserFilter.value) return true;
+  if (dailyUserFilter.value === "__mine__") return sameUser(requestUser(request), sessionUser);
+  return sameUser(requestUser(request), dailyUserFilter.value);
+}
+
 function renderDailyOrder() {
   const selectedDay = todayLocal();
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !isStandingOrderRequest(request))
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
+    .filter(requesterMatches)
     .filter((request) => requestDay(request) === selectedDay)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
@@ -253,6 +283,7 @@ function renderOpenOrders() {
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !isStandingOrderRequest(request))
     .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
+    .filter(requesterMatches)
     .filter((request) => {
       const day = requestDay(request);
       return !day || day < selectedDay;
@@ -331,6 +362,7 @@ async function refresh() {
   recentRequests = data.requests || [];
   standingOrders = data.standingOrders || [];
   populateDailyAreaFilter();
+  populateDailyUserFilter();
   renderDailyOrder();
   renderOpenOrders();
   renderStandingOrders();
@@ -384,9 +416,13 @@ dailyAreaFilter.addEventListener("change", () => {
   renderDailyOrder();
   renderOpenOrders();
 });
-featureMenu?.addEventListener("change", (event) => {
-  if (event.target.value) window.location.href = event.target.value;
+dailyUserFilter?.addEventListener("change", () => {
+  renderDailyOrder();
+  renderOpenOrders();
 });
+[featureMenu, backofficeMenu].forEach((menu) => menu?.addEventListener("change", (event) => {
+  if (event.target.value) window.location.href = event.target.value;
+}));
 dailyOrderList.addEventListener("click", (event) => {
   const deleteButton = event.target.closest(".delete-order-button");
   if (deleteButton) {

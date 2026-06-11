@@ -2074,6 +2074,16 @@ body.order-app {
     gap: 8px;
   }
 
+  .menu-duo .feature-select {
+    grid-area: auto;
+    justify-self: stretch;
+    min-width: 0;
+  }
+
+  .menu-duo .feature-select span {
+    text-align: left;
+  }
+
   .feature-select select {
     width: 100%;
   }

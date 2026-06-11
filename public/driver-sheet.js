@@ -159,6 +159,13 @@ function supplierOptions(selectedSupplier) {
     .join("");
 }
 
+function unitOptions(selectedUnit) {
+  const current = String(selectedUnit || "item").trim().toLowerCase() || "item";
+  return ["box", "bag", "item", "bottle"]
+    .map((unit) => `<option value="${escapeHtml(unit)}"${unit === current ? " selected" : ""}>${escapeHtml(unit)}</option>`)
+    .join("");
+}
+
 function formatQuantity(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return String(value ?? "").trim();
@@ -274,7 +281,11 @@ function renderSheet(data) {
                           </select>
                         </td>
                         <td>${escapeHtml(request.quantity ?? "")}</td>
-                        <td>${escapeHtml(request.unit || "")}</td>
+                        <td>
+                          <select class="driver-unit-select" ${request.driverLineId ? "" : "disabled"} aria-label="Unit for ${escapeHtml(request.itemName)}">
+                            ${unitOptions(request.unit)}
+                          </select>
+                        </td>
                         <td>${escapeHtml(request.urgency || "")}</td>
                         <td>
                           <button class="driver-check-button${request.toDeliver ? " checked" : ""}" type="button" data-action="toDeliver" ${request.driverLineId ? "" : "disabled"} aria-label="Mark 2Deliver">
@@ -315,7 +326,8 @@ function updateRequestFromLine(line) {
       driverName: line.driverName || request.driverName,
       delivered: line.received || request.delivered,
       supplierName: line.supplierName || request.supplierName,
-      supplierContact: line.supplierContact || request.supplierContact
+      supplierContact: line.supplierContact || request.supplierContact,
+      unit: line.unit || request.unit
     };
   });
 }
@@ -431,6 +443,25 @@ async function changeSupplier(row, select) {
   }
 }
 
+async function changeUnit(row, select) {
+  const lineId = row.dataset.lineId;
+  select.disabled = true;
+  setMessage("Saving order unit...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ unit: select.value })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage("Order unit updated for this line.");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    select.disabled = false;
+  }
+}
+
 sheetDate.value = todayLocal();
 loadSheetButton.addEventListener("click", () => loadSheet().catch((error) => setMessage(error.message, true)));
 saveDriverButton.addEventListener("click", () => saveDriverAssignment().catch((error) => setMessage(error.message, true)));
@@ -457,11 +488,20 @@ sheetList.addEventListener("click", (event) => {
 });
 
 sheetList.addEventListener("change", (event) => {
-  const select = event.target.closest(".driver-supplier-select");
-  if (!select) return;
-  const row = select.closest("tr");
-  if (!row?.dataset.lineId) return;
-  changeSupplier(row, select);
+  const supplierSelect = event.target.closest(".driver-supplier-select");
+  if (supplierSelect) {
+    const row = supplierSelect.closest("tr");
+    if (!row?.dataset.lineId) return;
+    changeSupplier(row, supplierSelect);
+    return;
+  }
+
+  const unitSelect = event.target.closest(".driver-unit-select");
+  if (unitSelect) {
+    const row = unitSelect.closest("tr");
+    if (!row?.dataset.lineId) return;
+    changeUnit(row, unitSelect);
+  }
 });
 
 loginForm.addEventListener("submit", async (event) => {

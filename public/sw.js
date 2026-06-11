@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v112";
+const CACHE_NAME = "kitchen-stock-v113";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -59,11 +59,50 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
+  if (event.request.method !== "GET") {
+    return;
+  }
+
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  const isAppShellRequest = event.request.mode === "navigate"
+    || url.pathname === "/"
+    || url.pathname.endsWith(".html")
+    || url.pathname.endsWith(".js")
+    || url.pathname.endsWith(".css")
+    || url.pathname.endsWith(".webmanifest");
+
+  if (isAppShellRequest) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const fresh = await fetch(event.request, { cache: "no-store" });
+        if (fresh && fresh.ok) {
+          cache.put(event.request, fresh.clone());
+        }
+        return fresh;
+      } catch {
+        const cached = await cache.match(event.request);
+        if (cached) return cached;
+        throw new Error("Network unavailable");
+      }
+    })());
     return;
   }
 

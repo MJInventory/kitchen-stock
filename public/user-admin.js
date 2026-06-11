@@ -70,6 +70,7 @@ function showApp() {
   const role = localStorage.getItem("kitchenStockRole") || "user";
   const roleLabel = role === "god" ? "God" : role === "admin" ? "Admin" : role === "power-user" ? "Power User" : "User";
   currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
+  window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-god-only]").forEach((option) => {
     option.hidden = !permissions.canManageAdminRoles;
     option.disabled = !permissions.canManageAdminRoles;

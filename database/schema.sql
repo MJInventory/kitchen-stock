@@ -280,3 +280,17 @@ create table if not exists app_notifications (
 
 create index if not exists idx_app_notifications_user_read_created
   on app_notifications (user_id, is_read, created_at desc);
+
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_push_subscriptions_user
+  on push_subscriptions (user_id, updated_at desc);

@@ -2,6 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
+import webpush from "web-push";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +36,14 @@ const mailFrom = process.env.MAIL_FROM || smtpUser;
 const brevoApiKey = process.env.BREVO_API_KEY || "";
 const ocrSpaceApiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
 const isRender = Boolean(process.env.RENDER);
+const vapidSubject = process.env.WEB_PUSH_SUBJECT || "mailto:admin@madamejanette.com";
+const vapidPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || "";
+const vapidPrivateKey = process.env.WEB_PUSH_PRIVATE_KEY || "";
+
+const pushEnabled = Boolean(vapidPublicKey && vapidPrivateKey);
+if (pushEnabled) {
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+}
 
 const cache = {
   items: { expiresAt: 0, value: null, pending: null },
@@ -108,6 +117,22 @@ async function ensurePostgresSchemaUpgrades() {
     await db().query(`
       create index if not exists idx_app_notifications_user_read_created
         on app_notifications (user_id, is_read, created_at desc)
+    `);
+    await db().query(`
+      create table if not exists push_subscriptions (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid not null references app_users(id) on delete cascade,
+        endpoint text not null unique,
+        p256dh text not null,
+        auth text not null,
+        user_agent text not null default '',
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `);
+    await db().query(`
+      create index if not exists idx_push_subscriptions_user
+        on push_subscriptions (user_id, updated_at desc)
     `);
   })().catch((error) => {
     postgresSchemaReady = null;
@@ -1072,7 +1097,8 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
         type: "standing-order",
         title: `${createdNew ? "New" : "Updated"} standing order`,
         body: `${savedOrder.supplierName || data.supplierName} - ${savedOrder.expectedDate || data.expectedDate} - ${(savedOrder.items || data.items || []).length} item(s).`,
-        relatedStandingOrderId: orderId
+        relatedStandingOrderId: orderId,
+        url: `/standing-orders.html?orderId=${encodeURIComponent(orderId)}`
       });
     }
     return savedOrder;
@@ -1371,16 +1397,111 @@ async function pgCreateNotificationsForUsers(userNames, payload = {}) {
   const relatedRequestId = isValidId(payload.relatedRequestId) ? String(payload.relatedRequestId) : null;
   const relatedStandingOrderId = isValidId(payload.relatedStandingOrderId) ? String(payload.relatedStandingOrderId) : null;
   const relatedStandingOrderRunId = isValidId(payload.relatedStandingOrderRunId) ? String(payload.relatedStandingOrderRunId) : null;
+  const inserted = [];
   for (const row of usersResult.rows) {
-    await db().query(`
+    const result = await db().query(`
       insert into app_notifications (
         user_id, notification_type, title, body, related_request_id,
         related_standing_order_id, related_standing_order_run_id
       )
       values ($1, $2, $3, $4, $5, $6, $7)
+      returning id, user_id, notification_type, title, body, created_at
     `, [row.id, type, title, body, relatedRequestId, relatedStandingOrderId, relatedStandingOrderRunId]);
+    inserted.push(result.rows[0]);
+  }
+  if (pushEnabled && inserted.length) {
+    await Promise.all(inserted.map((notification) => pushNotificationToUser(notification.user_id, {
+      id: notification.id,
+      type: notification.notification_type,
+      title: notification.title,
+      body: notification.body,
+      createdAt: notification.created_at,
+      url: String(payload.url || "/")
+    })));
   }
   return usersResult.rows.length;
+}
+
+async function pgListPushSubscriptionsForUserId(userId) {
+  await ensurePostgresSchemaUpgrades();
+  if (!isValidId(userId)) return [];
+  const result = await db().query(`
+    select id, endpoint, p256dh, auth
+    from push_subscriptions
+    where user_id = $1
+    order by updated_at desc
+  `, [userId]);
+  return result.rows;
+}
+
+async function pgSavePushSubscription(userName, subscription = {}, userAgent = "") {
+  await ensurePostgresSchemaUpgrades();
+  if (!pushEnabled) throw new Error("Push notifications are not configured yet.");
+  const user = await pgFindAppUserByName(userName);
+  if (!user?.id) throw new Error("User not found.");
+  const endpoint = String(subscription.endpoint || "").trim();
+  const p256dh = String(subscription.keys?.p256dh || "").trim();
+  const auth = String(subscription.keys?.auth || "").trim();
+  if (!endpoint || !p256dh || !auth) throw new Error("Push subscription is incomplete.");
+  await db().query(`
+    insert into push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+    values ($1, $2, $3, $4, $5)
+    on conflict (endpoint) do update
+      set user_id = excluded.user_id,
+          p256dh = excluded.p256dh,
+          auth = excluded.auth,
+          user_agent = excluded.user_agent,
+          updated_at = now()
+  `, [user.id, endpoint, p256dh, auth, String(userAgent || "").slice(0, 400)]);
+  return { ok: true };
+}
+
+async function pgRemovePushSubscription(userName, endpoint = "") {
+  await ensurePostgresSchemaUpgrades();
+  const user = await pgFindAppUserByName(userName);
+  if (!user?.id) throw new Error("User not found.");
+  const cleaned = String(endpoint || "").trim();
+  if (!cleaned) return { ok: true, removed: 0 };
+  const result = await db().query(`
+    delete from push_subscriptions
+    where user_id = $1 and endpoint = $2
+  `, [user.id, cleaned]);
+  return { ok: true, removed: result.rowCount || 0 };
+}
+
+async function pushNotificationToUser(userId, payload = {}) {
+  if (!pushEnabled || !isValidId(userId)) return;
+  const subscriptions = await pgListPushSubscriptionsForUserId(userId);
+  if (!subscriptions.length) return;
+  const body = JSON.stringify({
+    title: String(payload.title || "MJ Stock Magic"),
+    body: String(payload.body || ""),
+    url: String(payload.url || "/"),
+    tag: String(payload.type || "info"),
+    data: {
+      id: String(payload.id || ""),
+      url: String(payload.url || "/"),
+      createdAt: String(payload.createdAt || "")
+    }
+  });
+  await Promise.all(subscriptions.map(async (subscription) => {
+    try {
+      await webpush.sendNotification({
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.p256dh,
+          auth: subscription.auth
+        }
+      }, body);
+    } catch (error) {
+      const statusCode = Number(error?.statusCode || 0);
+      if (statusCode === 404 || statusCode === 410) {
+        await db().query(`delete from push_subscriptions where id = $1`, [subscription.id]);
+        return;
+      }
+      console.error("Push notification failed:", error?.message || error);
+    }
+  }));
 }
 
 async function pgNotificationUsers(kind, excludeUserName = "") {
@@ -1730,7 +1851,8 @@ async function pgCreateRequestsBatch(payload, requestedByOverride = "") {
     await pgCreateNotificationsForUsers(notifyUsers, {
       type: "new-order",
       title: `New order by ${presentUserName(requester || "User")}`,
-      body: `${created.length} item(s) entered: ${itemNames.join(", ")}${remainder}.`
+      body: `${created.length} item(s) entered: ${itemNames.join(", ")}${remainder}.`,
+      url: "/"
     });
   }
   return created;
@@ -1854,7 +1976,8 @@ async function pgDeliverRequest(recordId, userName) {
           type: "delivery",
           title: `${request.item_name || "Item"} delivered`,
           body: `${qty} ${request.unit || ""} received and added to stock by ${presentUserName(userName)}.`,
-          relatedRequestId: recordId
+          relatedRequestId: recordId,
+          url: "/"
         });
       }
     }
@@ -5063,6 +5186,35 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       send(res, 200, storeSession(freshUser));
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/api/push/public-key") {
+      const user = requireUser(req, res, { allowPasswordChange: true });
+      if (!user) return;
+      send(res, 200, { enabled: pushEnabled, publicKey: pushEnabled ? vapidPublicKey : "" });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/push/subscribe") {
+      const user = requireUser(req, res, { allowPasswordChange: true });
+      if (!user) return;
+      const payload = await readJson(req);
+      const result = hasPostgres()
+        ? await pgSavePushSubscription(user.name, payload.subscription || {}, req.headers["user-agent"] || "")
+        : { ok: false };
+      send(res, 200, result);
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url === "/api/push/subscribe") {
+      const user = requireUser(req, res, { allowPasswordChange: true });
+      if (!user) return;
+      const payload = await readJson(req);
+      const result = hasPostgres()
+        ? await pgRemovePushSubscription(user.name, payload.endpoint || "")
+        : { ok: false, removed: 0 };
+      send(res, 200, result);
       return;
     }
 

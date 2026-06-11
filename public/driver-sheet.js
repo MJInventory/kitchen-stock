@@ -1,4 +1,4 @@
-const sheetDate = document.querySelector("#sheetDate");
+﻿const sheetDate = document.querySelector("#sheetDate");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -57,6 +57,7 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   currentUser.textContent = formatUserDisplay(sessionUser);
+  window.refreshKitchenMenus?.();
   const canAssignDriver = Boolean(sessionPermissions.canAdminUsers);
   driverName.disabled = !canAssignDriver;
   saveDriverButton.hidden = !canAssignDriver;
@@ -321,6 +322,13 @@ async function toggleToDeliver(row, button) {
       body: JSON.stringify({ toDeliver, deliveryDay })
     });
     updateRequestFromLine(line);
+    if (toDeliver) {
+      const orderedButton = row.querySelector('[data-action="ordered"]');
+      if (orderedButton && !orderedButton.classList.contains("checked")) {
+        orderedButton.classList.add("checked");
+        orderedButton.innerHTML = "&#10003;";
+      }
+    }
     renderSheet(currentSheet);
     setMessage("");
   } catch (error) {

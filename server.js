@@ -1150,33 +1150,35 @@ async function pgUpdateStandingOrderRecord(recordId, payload, user) {
 }
 
 async function pgRebuildStandingOrderRunTx(client, runId, orderId, effectiveDate, data, userName) {
-  const receivedCheck = await client.query(`
-    select count(*)::int as received_count
-    from standing_order_run_lines
-    where standing_order_run_id = $1
-      and coalesce(received, false) = true
+  const currentLinesResult = await client.query(`
+    select sorl.id,
+           sorl.inventory_item_id,
+           sorl.order_request_id,
+           sorl.quantity,
+           sorl.unit,
+           sorl.supplier_name,
+           sorl.received,
+           sorl.status,
+           coalesce(r.ordered, false) as ordered
+    from standing_order_run_lines sorl
+    left join order_requests r on r.id = sorl.order_request_id
+    where sorl.standing_order_run_id = $1
   `, [runId]);
-  if (Number(receivedCheck.rows[0]?.received_count || 0) > 0) return false;
+  const currentLines = currentLinesResult.rows;
+  const orderItemMap = new Map((data.items || []).map((item) => [item.itemId, item]));
 
-  const linkedRequests = await client.query(`
-    select order_request_id
-    from standing_order_run_lines
-    where standing_order_run_id = $1
-      and order_request_id is not null
-  `, [runId]);
-  const requestIds = linkedRequests.rows.map((row) => row.order_request_id).filter(Boolean);
-  if (requestIds.length) {
-    await client.query(`
-      delete from order_requests
-      where id = any($1::uuid[])
-    `, [requestIds]);
+  for (const line of currentLines) {
+    const keepLine = orderItemMap.has(line.inventory_item_id) || Boolean(line.received);
+    if (keepLine) continue;
+    if (line.order_request_id) {
+      await client.query(`delete from order_requests where id = $1`, [line.order_request_id]);
+    }
+    await client.query(`delete from standing_order_run_lines where id = $1`, [line.id]);
   }
-  await client.query(`
-    delete from standing_order_run_lines
-    where standing_order_run_id = $1
-  `, [runId]);
 
   for (const item of data.items) {
+    const existingLines = currentLines.filter((line) => line.inventory_item_id === item.itemId);
+    const editableLine = existingLines.find((line) => !line.received);
     const itemNote = [
       `Standing order: ${data.schedule}.`,
       data.name ? `Standing order name: ${data.name}.` : "",
@@ -1186,6 +1188,29 @@ async function pgRebuildStandingOrderRunTx(client, runId, orderId, effectiveDate
       `Expected arrival: ${effectiveDate}.`,
       data.notes
     ].filter(Boolean).join("\n");
+
+    if (editableLine?.order_request_id) {
+      await client.query(`
+        update order_requests
+        set quantity_needed = $2,
+            notes = $3,
+            updated_at = now()
+        where id = $1
+      `, [editableLine.order_request_id, item.quantity, itemNote]);
+      await client.query(`
+        update standing_order_run_lines
+        set quantity = $2,
+            supplier_name = $3,
+            notes = $4,
+            status = 'Scheduled'
+        where id = $1
+      `, [editableLine.id, item.quantity, data.supplierName || "", itemNote]);
+      continue;
+    }
+
+    if (existingLines.length) {
+      continue;
+    }
 
     const requestInsert = await client.query(`
       insert into order_requests (
@@ -1864,8 +1889,8 @@ async function pgDriverSheetRequests(selectedDate) {
       d.received_by_username as received_by,
       d.to_deliver,
       d.delivery_day::text as delivery_day,
-      coalesce(ds.name, sp.name) as supplier_name,
-      coalesce(ds.contact_information, sp.contact_information, '') as supplier_contact,
+      coalesce(ds.name, sorl.supplier_name, sp.name) as supplier_name,
+      coalesce(ds.contact_information, ss.contact_information, sp.contact_information, '') as supplier_contact,
       r.id,
       r.request_number,
       r.inventory_item_id as item_id,
@@ -1894,12 +1919,14 @@ async function pgDriverSheetRequests(selectedDate) {
     left join shelf_codes sc on sc.id = i.shelf_code_id
     left join units_of_measure u on u.id = i.unit_of_measure_id
     left join suppliers sp on sp.id = i.primary_supplier_id
+    left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join suppliers ss on lower(ss.name) = lower(sorl.supplier_name)
     left join driver_sheet_lines d on d.order_request_id = r.id and d.sheet_date = $1::date
     left join suppliers ds on ds.id = d.supplier_id
     where r.delivered = false
       and r.status in ('Pending', 'Approved')
       and r.requested_at::date <= $1::date
-    order by coalesce(ds.name, sp.name) nulls last, c.name nulls last, sc.code nulls last, i.name
+    order by coalesce(ds.name, sorl.supplier_name, sp.name) nulls last, c.name nulls last, sc.code nulls last, i.name
   `, [selectedDate]);
   return result.rows.map((row) => pgRequestFromRow({
     ...row,
@@ -1976,7 +2003,7 @@ async function pgListOrderReport(date) {
       d.delivery_day::text as delivery_day,
       r.standing_order_run_id,
       r.standing_order_run_line_id,
-      coalesce(ds.name, sp.name) as supplier_name,
+      coalesce(ds.name, sorl.supplier_name, sp.name) as supplier_name,
       r.id as request_id,
       r.request_number,
       r.quantity_needed as quantity,
@@ -2003,9 +2030,10 @@ async function pgListOrderReport(date) {
     left join shelf_codes sc on sc.id = i.shelf_code_id
     left join units_of_measure u on u.id = i.unit_of_measure_id
     left join suppliers sp on sp.id = i.primary_supplier_id
+    left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
     left join suppliers ds on ds.id = d.supplier_id
     where d.sheet_date = $1::date
-    order by coalesce(ds.name, sp.name) nulls last, c.name nulls last, i.name
+    order by coalesce(ds.name, sorl.supplier_name, sp.name) nulls last, c.name nulls last, i.name
   `, [selectedDate]);
   const rows = result.rows.map((row) => ({
     ...pgDriverLineFromRow(row),
@@ -2389,12 +2417,14 @@ async function pgDeliverDriverLine(recordId, requestRecordId, userName) {
   const lineResult = await db().query(`
     select d.id, d.driver_username, d.ordered, d.to_deliver, d.delivery_day::text as delivery_day,
            d.received, d.received_at, d.received_by_username,
-           coalesce(ds.name, sp.name) as supplier_name,
-           coalesce(ds.contact_information, sp.contact_information, '') as supplier_contact
+           coalesce(ds.name, sorl.supplier_name, sp.name) as supplier_name,
+           coalesce(ds.contact_information, ss.contact_information, sp.contact_information, '') as supplier_contact
     from driver_sheet_lines d
     join order_requests r on r.id = d.order_request_id
     join inventory_items i on i.id = r.inventory_item_id
     left join suppliers sp on sp.id = i.primary_supplier_id
+    left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join suppliers ss on lower(ss.name) = lower(sorl.supplier_name)
     left join suppliers ds on ds.id = d.supplier_id
     where d.id = $1
   `, [recordId]);

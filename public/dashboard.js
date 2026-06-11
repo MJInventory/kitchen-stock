@@ -157,6 +157,14 @@ function requestUser(request) {
   return String(request.requestedBy || "").trim();
 }
 
+function selectedDailyArea() {
+  return String(dailyAreaFilter?.value || "").trim();
+}
+
+function selectedDailyUser() {
+  return String(dailyUserFilter?.value || "").trim();
+}
+
 function isStandingOrderRequest(request) {
   return Boolean(String(request?.standingRunId || "").trim())
     || String(request?.requestedBy || "").toLowerCase().includes("standing order")
@@ -193,13 +201,14 @@ function groupRequestsByCategory(requests) {
 }
 
 function populateDailyAreaFilter() {
+  if (!dailyAreaFilter) return;
   const areas = [...new Set(
     recentRequests
       .map((request) => requestArea(request))
       .filter(Boolean)
   )].sort((a, b) => a.localeCompare(b));
 
-  const selected = dailyAreaFilter.value;
+  const selected = selectedDailyArea();
   dailyAreaFilter.innerHTML = [
     '<option value="">All Areas</option>',
     ...areas.map((area) => `<option value="${escapeHtml(area)}"${area === selected ? " selected" : ""}>${escapeHtml(area)}</option>`)
@@ -208,13 +217,14 @@ function populateDailyAreaFilter() {
 }
 
 function populateDailyUserFilter() {
+  if (!dailyUserFilter) return;
   const users = [...new Set(
     recentRequests
       .map((request) => requestUser(request))
       .filter(Boolean)
   )].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
-  const selected = dailyUserFilter.value;
+  const selected = selectedDailyUser();
   dailyUserFilter.innerHTML = [
     '<option value="">All Users</option>',
     `<option value="__mine__"${selected === "__mine__" ? " selected" : ""}>My Orders</option>`,
@@ -224,17 +234,19 @@ function populateDailyUserFilter() {
 }
 
 function requesterMatches(request) {
-  if (!dailyUserFilter.value) return true;
-  if (dailyUserFilter.value === "__mine__") return sameUser(requestUser(request), sessionUser);
-  return sameUser(requestUser(request), dailyUserFilter.value);
+  const selectedUser = selectedDailyUser();
+  if (!selectedUser) return true;
+  if (selectedUser === "__mine__") return sameUser(requestUser(request), sessionUser);
+  return sameUser(requestUser(request), selectedUser);
 }
 
 function renderDailyOrder() {
   const selectedDay = todayLocal();
+  const selectedArea = selectedDailyArea();
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !isStandingOrderRequest(request))
-    .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
+    .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
     .filter((request) => requestDay(request) === selectedDay)
     .sort(logicalRequestCompare);
@@ -279,10 +291,11 @@ function renderDailyOrder() {
 
 function renderOpenOrders() {
   const selectedDay = todayLocal();
+  const selectedArea = selectedDailyArea();
   const openRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !isStandingOrderRequest(request))
-    .filter((request) => !dailyAreaFilter.value || requestArea(request) === dailyAreaFilter.value)
+    .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
     .filter((request) => {
       const day = requestDay(request);
@@ -412,7 +425,7 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", showLogin);
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
-dailyAreaFilter.addEventListener("change", () => {
+dailyAreaFilter?.addEventListener("change", () => {
   renderDailyOrder();
   renderOpenOrders();
 });

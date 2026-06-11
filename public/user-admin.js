@@ -127,6 +127,8 @@ function renderUsers(users) {
           <option value="light"${user.theme === "light" ? " selected" : ""}>Light</option>
         </select>
       </label>
+      <label class="check-label"><input class="user-notify-orders" type="checkbox" ${user.notifyOnNewOrders ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on new orders</label>
+      <label class="check-label"><input class="user-notify-delivery" type="checkbox" ${user.notifyOnDelivery ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on delivered items</label>
       <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
       <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
       <label class="check-label delete-check"><input class="user-delete" type="checkbox" ${user.editable && user.canDelete ? "" : "disabled"}> Delete user</label>
@@ -163,6 +165,8 @@ async function saveUser(row) {
       password: row.querySelector(".user-password").value,
       role: row.querySelector(".user-role").value,
       theme: row.querySelector(".user-theme").value,
+      notifyOnNewOrders: row.querySelector(".user-notify-orders").checked,
+      notifyOnDelivery: row.querySelector(".user-notify-delivery").checked,
       active: row.querySelector(".user-active").checked,
       mustChangePassword: row.querySelector(".user-must-change").checked
     })
@@ -206,6 +210,8 @@ newUserForm.addEventListener("submit", async (event) => {
         password: document.querySelector("#newPassword").value,
         role: document.querySelector("#newRole").value,
         theme: document.querySelector("#newTheme").value,
+        notifyOnNewOrders: document.querySelector("#newNotifyOrders").checked,
+        notifyOnDelivery: document.querySelector("#newNotifyDelivery").checked,
         active: true,
         mustChangePassword: document.querySelector("#newMustChange").checked
       })

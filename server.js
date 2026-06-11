@@ -1118,6 +1118,10 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
     await client.query("commit");
     cache.requests.expiresAt = 0;
     const savedOrder = (await pgListStandingOrders()).find((entry) => entry.id === orderId) || { id: orderId, ...data };
+    if (data.active !== false && /^\d{4}-\d{2}-\d{2}$/.test(data.expectedDate || "") && data.expectedDate <= todayIso()) {
+      await pgGenerateStandingOrdersForDate(data.expectedDate, user.name || "System");
+    }
+    await pgSyncStandingOrderRunsForOrder(orderId, user.name || "System");
     const notifyUsers = await pgNotificationUsers("new-order", user.name);
     if (notifyUsers.length) {
       await pgCreateNotificationsForUsers(notifyUsers, {
@@ -1137,8 +1141,12 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
   }
 }
 
-async function pgUpdateStandingOrderRecord(recordId, payload) {
-  return pgSaveStandingOrderDefinition(payload, { permissions: { canAddInventoryItems: true } }, recordId);
+async function pgUpdateStandingOrderRecord(recordId, payload, user) {
+  return pgSaveStandingOrderDefinition(
+    payload,
+    user || { permissions: { canAddInventoryItems: true }, name: "System" },
+    recordId
+  );
 }
 
 async function pgRebuildStandingOrderRunTx(client, runId, orderId, effectiveDate, data, userName) {
@@ -1282,6 +1290,23 @@ async function pgSyncStandingOrderRunsForDate(selectedDate, userName = "System")
   } finally {
     client.release();
   }
+}
+
+async function pgSyncStandingOrderRunsForOrder(orderId, userName = "System") {
+  if (!isValidId(orderId)) return 0;
+  const result = await db().query(`
+    select distinct expected_delivery_date::text as expected_date
+    from standing_order_runs
+    where standing_order_id = $1
+      and status = 'Open'
+    order by expected_delivery_date
+  `, [orderId]);
+  let synced = 0;
+  for (const row of result.rows) {
+    if (!row.expected_date) continue;
+    synced += await pgSyncStandingOrderRunsForDate(row.expected_date, userName);
+  }
+  return synced;
 }
 
 async function pgDeleteStandingOrder(recordId, user) {
@@ -5844,7 +5869,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can update standing orders.")) return;
       const recordId = req.url.split("/")[3];
-      const standingOrder = await updateStandingOrderRecord(recordId, await readJson(req));
+      const standingOrder = await updateStandingOrderRecord(recordId, await readJson(req), user);
       send(res, 200, { standingOrder });
       return;
     }

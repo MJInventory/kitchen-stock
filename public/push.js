@@ -2,6 +2,7 @@
   const PROMPT_KEY = "kitchenStockPushPromptedV1";
   let started = false;
   let subscribeAttempted = false;
+  let pushStatus = { supported: false, permission: "default", subscribed: false, enabled: false };
 
   function token() {
     return localStorage.getItem("kitchenStockToken") || "";
@@ -20,6 +21,16 @@
     return data;
   }
 
+  function emitStatus() {
+    pushStatus = {
+      ...pushStatus,
+      supported: "serviceWorker" in navigator && "PushManager" in window && "Notification" in window,
+      permission: ("Notification" in window ? Notification.permission : "unsupported")
+    };
+    window.kitchenPushStatus = pushStatus;
+    window.dispatchEvent(new CustomEvent("kitchen-push-status", { detail: pushStatus }));
+  }
+
   function urlBase64ToUint8Array(base64String) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -29,6 +40,8 @@
 
   async function unsubscribeIfNeeded(registration) {
     const existing = await registration.pushManager.getSubscription();
+    pushStatus.subscribed = false;
+    emitStatus();
     if (!existing) return;
     await api("/api/push/subscribe", {
       method: "DELETE",
@@ -37,14 +50,17 @@
     await existing.unsubscribe().catch(() => {});
   }
 
-  async function ensureSubscribed() {
+  async function ensureSubscribed(forcePrompt = false) {
     if (subscribeAttempted || !token() || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      emitStatus();
       return;
     }
     subscribeAttempted = true;
 
     const registration = await navigator.serviceWorker.ready;
     const config = await api("/api/push/public-key");
+    pushStatus.enabled = Boolean(config.enabled && config.publicKey);
+    emitStatus();
     if (!config.enabled || !config.publicKey) return;
 
     if (Notification.permission === "denied") {
@@ -52,9 +68,10 @@
       return;
     }
 
-    if (Notification.permission === "default" && !localStorage.getItem(PROMPT_KEY)) {
+    if (Notification.permission === "default" && (forcePrompt || !localStorage.getItem(PROMPT_KEY))) {
       localStorage.setItem(PROMPT_KEY, "1");
       const permission = await Notification.requestPermission();
+      emitStatus();
       if (permission !== "granted") return;
     }
 
@@ -66,6 +83,8 @@
         method: "POST",
         body: JSON.stringify({ subscription: existing.toJSON() })
       });
+      pushStatus.subscribed = true;
+      emitStatus();
       return;
     }
 
@@ -78,6 +97,8 @@
       method: "POST",
       body: JSON.stringify({ subscription: subscription.toJSON() })
     });
+    pushStatus.subscribed = true;
+    emitStatus();
   }
 
   function start() {
@@ -92,6 +113,11 @@
     });
     window.addEventListener("storage", trySetup);
     window.setupKitchenPush = trySetup;
+    window.enableKitchenPush = async () => {
+      subscribeAttempted = false;
+      await ensureSubscribed(true);
+    };
+    emitStatus();
     trySetup();
     window.setInterval(trySetup, 20000);
   }

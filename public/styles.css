@@ -828,10 +828,10 @@ td small {
   gap: 4px;
   justify-self: center;
   color: var(--order-muted);
-  font: 10px Arial, Helvetica, sans-serif;
+  font: 11px Arial, Helvetica, sans-serif;
   font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  text-transform: none;
 }
 
 .menu-duo {
@@ -1929,11 +1929,13 @@ body.order-app {
 .delete-order-button,
 .deliver-order-button {
   width: auto;
-  min-width: 74px;
+  min-width: 92px;
+  min-height: 40px;
   border-radius: 999px;
-  padding: 8px 10px;
+  padding: 9px 14px;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .deliver-order-button {
@@ -2074,8 +2076,8 @@ body.order-app {
     grid-template-columns: 1fr;
     grid-template-areas:
       "brand"
-      "actions"
-      "nav";
+      "nav"
+      "actions";
     gap: 12px;
   }
 
@@ -2111,15 +2113,17 @@ body.order-app {
     font-size: 8px;
   }
 
-  .feature-select {
+  .order-topbar > .menu-duo {
     grid-area: nav;
+  }
+
+  .feature-select {
     justify-self: stretch;
     width: 100%;
     margin-top: 0;
   }
 
   .menu-duo {
-    grid-area: nav;
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
@@ -2134,6 +2138,7 @@ body.order-app {
 
   .menu-duo .feature-select span {
     text-align: left;
+    font-size: 11px;
   }
 
   .feature-select select {

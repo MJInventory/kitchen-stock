@@ -52,6 +52,7 @@
   function showApp() {
     if (loginScreen) loginScreen.hidden = true;
     if (currentUser) currentUser.textContent = formatUserDisplay(sessionUser);
+    window.refreshKitchenMenus?.();
   }
 
   function showLogin() {

@@ -349,7 +349,7 @@ button:hover,
 
 .standing-item-adder {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px auto;
+  grid-template-columns: minmax(0, 1fr) 96px;
   gap: 10px;
   align-items: center;
 }
@@ -382,6 +382,51 @@ button:hover,
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.search-pick-list {
+  display: grid;
+  gap: 8px;
+}
+
+.search-pick-option {
+  align-items: start;
+  background: color-mix(in srgb, var(--surface) 92%, var(--ink) 8%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.search-pick-option strong {
+  font-size: 14px;
+}
+
+.search-pick-option span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.standing-edit-adder {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 120px;
+}
+
+.standing-edit-adder .search-pick-list,
+.standing-edit-adder .wide-field {
+  grid-column: 1 / -1;
+}
+
+.standing-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .settings-item {
@@ -1963,6 +2008,7 @@ body.order-app {
 
   .admin-form-grid,
   .standing-item-adder,
+  .standing-edit-adder,
   .standing-item-line {
     grid-template-columns: 1fr;
   }

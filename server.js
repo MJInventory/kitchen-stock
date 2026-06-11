@@ -1674,11 +1674,17 @@ async function pgListDriverSheet(date) {
 }
 
 async function pgListReceivingSheet(date) {
-  const sheet = await pgListDriverSheet(date);
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  const [requests, suppliers] = await Promise.all([
+    pgDriverSheetRequests(selectedDate),
+    pgListSuppliers()
+  ]);
+  const receiverName = "";
   return {
-    ...sheet,
-    requests: sheet.requests
-      .filter((request) => !isStandingOrderRequestRow(request))
+    date: selectedDate,
+    driverName: receiverName,
+    suppliers,
+    requests: requests
       .filter((request) => !request.delivered && request.status !== "Fulfilled")
   };
 }

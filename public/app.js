@@ -349,7 +349,7 @@ function renderDailyOrder() {
                   ].filter(Boolean).join(" / "))}</span>
                 </div>
                 <div class="daily-order-actions">
-                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
+                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button>
                   ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
                 </div>
               </article>

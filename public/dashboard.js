@@ -16,19 +16,19 @@ const openOrderCount = document.querySelector("#openOrderCount");
 const openOrderList = document.querySelector("#openOrderList");
 const standingOrderCount = document.querySelector("#standingOrderCount");
 const standingOrderList = document.querySelector("#standingOrderList");
+const notificationCount = document.querySelector("#notificationCount");
+const notificationList = document.querySelector("#notificationList");
+const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
 const message = document.querySelector("#message");
 
 let allItems = [];
 let recentRequests = [];
 let standingOrders = [];
+let notifications = [];
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
-}
 
 function todayLocal() {
   const now = new Date();
@@ -240,6 +240,36 @@ function requesterMatches(request) {
   return sameUser(requestUser(request), selectedUser);
 }
 
+function formatNotificationDate(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function renderNotifications() {
+  if (!notificationList || !notificationCount) return;
+  const unread = notifications.filter((note) => !note.isRead);
+  notificationCount.textContent = `${unread.length} unread`;
+  if (readAllNotificationsButton) readAllNotificationsButton.disabled = unread.length === 0;
+  if (!notifications.length) {
+    notificationList.innerHTML = '<p class="empty-sheet">No notifications right now.</p>';
+    return;
+  }
+  notificationList.innerHTML = notifications
+    .slice(0, 20)
+    .map((note) => `
+      <article class="notification-row${note.isRead ? " read" : ""}" data-notification-id="${escapeHtml(note.id)}">
+        <div>
+          <strong>${escapeHtml(note.title || "Notification")}</strong>
+          <span>${escapeHtml(note.body || "")}</span>
+          <small>${escapeHtml(formatNotificationDate(note.createdAt))}</small>
+        </div>
+        ${note.isRead ? "" : '<button class="icon-button mark-notification-read" type="button">Mark read</button>'}
+      </article>
+    `)
+    .join("");
+}
+
 function renderDailyOrder() {
   const selectedDay = todayLocal();
   const selectedArea = selectedDailyArea();
@@ -374,12 +404,23 @@ async function refresh() {
   allItems = data.items || [];
   recentRequests = data.requests || [];
   standingOrders = data.standingOrders || [];
+  notifications = data.notifications || [];
   populateDailyAreaFilter();
   populateDailyUserFilter();
   renderDailyOrder();
   renderOpenOrders();
   renderStandingOrders();
+  renderNotifications();
   setMessage("");
+}
+
+async function markNotificationsRead(ids = []) {
+  const data = await api("/api/notifications/read", {
+    method: "POST",
+    body: JSON.stringify({ ids })
+  });
+  notifications = data.notifications || [];
+  renderNotifications();
 }
 
 async function deleteDailyOrder(requestId) {
@@ -446,6 +487,27 @@ dailyOrderList.addEventListener("click", (event) => {
   if (deliverButton) {
     deliverDailyOrder(deliverButton.dataset.deliverId).catch((error) => setMessage(error.message, true));
   }
+});
+
+notificationList?.addEventListener("click", (event) => {
+  const button = event.target.closest(".mark-notification-read");
+  if (!button) return;
+  const row = button.closest("[data-notification-id]");
+  if (!row?.dataset.notificationId) return;
+  button.disabled = true;
+  markNotificationsRead([row.dataset.notificationId]).catch((error) => {
+    setMessage(error.message, true);
+    button.disabled = false;
+  });
+});
+
+readAllNotificationsButton?.addEventListener("click", () => {
+  readAllNotificationsButton.disabled = true;
+  markNotificationsRead().catch((error) => {
+    setMessage(error.message, true);
+  }).finally(() => {
+    readAllNotificationsButton.disabled = false;
+  });
 });
 
 if (sessionToken && sessionUser) {

@@ -96,6 +96,10 @@ async function ensurePostgresSchemaUpgrades() {
         add column if not exists notify_on_delivery boolean not null default true
     `);
     await db().query(`
+      alter table standing_orders
+        add column if not exists deleted boolean not null default false
+    `);
+    await db().query(`
       alter table order_requests
         add column if not exists order_unit text not null default ''
     `);
@@ -924,6 +928,7 @@ async function pgListStandingOrders() {
     left join suppliers sp on sp.id = so.supplier_id
     left join standing_order_items soi on soi.standing_order_id = so.id
     left join inventory_items i on i.id = soi.inventory_item_id
+    where coalesce(so.deleted, false) = false
     group by so.id, sp.name
     order by so.expected_arrival_date asc nulls last, sp.name asc nulls last, so.name asc
   `);
@@ -1065,6 +1070,7 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
             recurring = $7,
             active = $8,
             notes = $9,
+            deleted = false,
             updated_at = now()
         where id = $1
       `, [recordId, data.name, data.supplierId, data.expectedDate, data.schedule, data.otherSchedule, data.recurring, data.active, data.notes]);
@@ -1114,6 +1120,19 @@ async function pgUpdateStandingOrderRecord(recordId, payload) {
   return pgSaveStandingOrderDefinition(payload, { permissions: { canAddInventoryItems: true } }, recordId);
 }
 
+async function pgDeleteStandingOrder(recordId, user) {
+  if (!user.permissions?.canAdminUsers) throw new Error("Only admins can delete standing orders.");
+  if (!isValidId(recordId)) throw new Error("Invalid standing order.");
+  await db().query(`
+    update standing_orders
+    set deleted = true,
+        active = false,
+        updated_at = now()
+    where id = $1
+  `, [recordId]);
+  return { id: recordId, deleted: true };
+}
+
 async function pgGenerateStandingOrdersForDate(selectedDate, userName = "System") {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate || "")) throw new Error("Choose a valid date.");
   const orders = (await pgListStandingOrders()).filter((order) => isStandingOrderDue(order, selectedDate));
@@ -1138,6 +1157,26 @@ async function pgGenerateStandingOrdersForDate(selectedDate, userName = "System"
         limit 1
       `, [order.id, selectedDate]);
       runId = existingRun.rows[0]?.id || "";
+    }
+
+    const existingLines = runId
+      ? await db().query(`
+        select count(*)::int as total
+        from standing_order_run_lines
+        where standing_order_run_id = $1
+      `, [runId])
+      : { rows: [{ total: 0 }] };
+    if (Number(existingLines.rows[0]?.total || 0) > 0) {
+      const nextDate = nextStandingOrderDate(order, selectedDate);
+      await db().query(`
+        update standing_orders
+        set last_generated_date = $2::date,
+            expected_arrival_date = $3::date,
+            active = $4,
+            updated_at = now()
+        where id = $1
+      `, [order.id, selectedDate, nextDate || selectedDate, order.schedule === "One Time" ? false : order.active]);
+      continue;
     }
 
     for (const line of order.items || []) {
@@ -1193,6 +1232,37 @@ async function pgGenerateStandingOrdersForDate(selectedDate, userName = "System"
 
   cache.requests.expiresAt = 0;
   return generated;
+}
+
+async function pgCloseStandingOrderRunIfCompleteTx(client, runId, userName) {
+  if (!isValidId(runId)) return;
+  const pending = await client.query(`
+    select count(*)::int as open_count
+    from standing_order_run_lines
+    where standing_order_run_id = $1
+      and coalesce(received, false) = false
+  `, [runId]);
+  if (Number(pending.rows[0]?.open_count || 0) > 0) return;
+
+  await client.query(`
+    update standing_order_runs
+    set status = 'Closed',
+        closed_at = now(),
+        closed_by_username = $2
+    where id = $1
+  `, [runId, userName]);
+
+  await client.query(`
+    update standing_orders so
+    set active = case when so.recurring then so.active else false end,
+        updated_at = now()
+    where so.id = (
+      select standing_order_id
+      from standing_order_runs
+      where id = $1
+      limit 1
+    )
+  `, [runId]);
 }
 
 async function pgListAppUsers() {
@@ -1970,6 +2040,19 @@ async function pgDeliverRequest(recordId, userName) {
           updated_at = now()
       where id = $1
     `, [recordId, userName]);
+
+    const standingLineUpdate = await client.query(`
+      update standing_order_run_lines
+      set received = true,
+          received_at = now(),
+          received_by_username = $2,
+          status = 'Received'
+      where order_request_id = $1
+      returning standing_order_run_id
+    `, [recordId, userName]);
+    for (const row of standingLineUpdate.rows) {
+      await pgCloseStandingOrderRunIfCompleteTx(client, row.standing_order_run_id, userName);
+    }
     await client.query("commit");
     cache.items.expiresAt = 0;
     cache.requests.expiresAt = 0;
@@ -5593,6 +5676,16 @@ const server = http.createServer(async (req, res) => {
       const recordId = req.url.split("/")[3];
       const standingOrder = await updateStandingOrderRecord(recordId, await readJson(req));
       send(res, 200, { standingOrder });
+      return;
+    }
+
+    if (req.method === "DELETE" && req.url.startsWith("/api/standing-orders/")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can delete standing orders.")) return;
+      const recordId = req.url.split("/")[3];
+      const result = await pgDeleteStandingOrder(recordId, user);
+      send(res, 200, { result });
       return;
     }
 

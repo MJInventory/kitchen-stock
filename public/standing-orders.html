@@ -51,10 +51,10 @@
           <fieldset class="wide-field inline-fieldset">
             <legend>Items</legend>
             <div class="standing-item-adder">
-              <select id="standingItem"></select>
+              <input id="standingItemSearch" type="search" placeholder="Search inventory items">
               <input id="standingQuantity" type="number" min="1" step="1" value="1" aria-label="Quantity">
-              <button id="addStandingItem" class="secondary" type="button">Add Item</button>
             </div>
+            <div id="standingItemResults" class="search-pick-list"></div>
             <div id="standingItems" class="standing-items"></div>
           </fieldset>
           <label class="wide-field">Notes <textarea id="standingNotes" rows="3"></textarea></label>
@@ -71,7 +71,7 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v116</footer>
+    <footer class="app-version">MJ Stock Magic v117</footer>
     <script src="/menus.js"></script>
     <script src="/push.js"></script>
     <script src="/theme.js"></script>

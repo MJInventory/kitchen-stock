@@ -1094,6 +1094,93 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
       `, [orderId, item.itemId, item.quantity]);
     }
 
+    if (!createdNew) {
+      const openRuns = await client.query(`
+        select sor.id, sor.expected_delivery_date::text as expected_date
+        from standing_order_runs sor
+        where sor.standing_order_id = $1
+          and sor.status = 'Open'
+        order by sor.expected_delivery_date
+      `, [orderId]);
+
+      for (const run of openRuns.rows) {
+        const receivedCheck = await client.query(`
+          select count(*)::int as received_count
+          from standing_order_run_lines
+          where standing_order_run_id = $1
+            and coalesce(received, false) = true
+        `, [run.id]);
+        if (Number(receivedCheck.rows[0]?.received_count || 0) > 0) continue;
+
+        const linkedRequests = await client.query(`
+          select order_request_id
+          from standing_order_run_lines
+          where standing_order_run_id = $1
+            and order_request_id is not null
+        `, [run.id]);
+        const requestIds = linkedRequests.rows.map((row) => row.order_request_id).filter(Boolean);
+        if (requestIds.length) {
+          await client.query(`
+            delete from order_requests
+            where id = any($1::uuid[])
+          `, [requestIds]);
+        }
+        await client.query(`
+          delete from standing_order_run_lines
+          where standing_order_run_id = $1
+        `, [run.id]);
+
+        const effectiveDate = String(run.expected_date || data.expectedDate || "").trim();
+        for (const item of data.items) {
+          const itemNote = [
+            `Standing order: ${data.schedule}.`,
+            data.name ? `Standing order name: ${data.name}.` : "",
+            data.supplierName ? `Standing supplier: ${data.supplierName}.` : "",
+            run.id ? `Standing run id: ${run.id}.` : "",
+            data.otherSchedule ? `Schedule detail: ${data.otherSchedule}.` : "",
+            `Expected arrival: ${effectiveDate}.`,
+            data.notes
+          ].filter(Boolean).join("\n");
+
+          const requestInsert = await client.query(`
+            insert into order_requests (
+              inventory_item_id, quantity_needed, urgency_level, status, requested_by_username, requested_at,
+              delivered, ordered, to_deliver, delivery_day, notes, standing_order_run_id, order_unit, updated_at
+            )
+            select
+              $1, $2, 'Low', 'Approved', $3, now(),
+              false, false, false, null, $4, $5, coalesce(u.name, ''), now()
+            from inventory_items i
+            left join units_of_measure u on u.id = i.unit_of_measure_id
+            where i.id = $1
+            returning id
+          `, [item.itemId, item.quantity, `Standing Order - ${user.name || "System"}`, itemNote, run.id]);
+          const requestId = requestInsert.rows[0]?.id || "";
+
+          const lineInsert = await client.query(`
+            insert into standing_order_run_lines (
+              standing_order_run_id, standing_order_id, inventory_item_id, order_request_id,
+              quantity, unit, supplier_name, received, status, notes
+            )
+            select $1, $2, $3, $4, $5, coalesce(u.name, ''), $6, false, 'Scheduled', $7
+            from inventory_items i
+            left join units_of_measure u on u.id = i.unit_of_measure_id
+            where i.id = $3
+            returning id
+          `, [run.id, orderId, item.itemId, requestId, item.quantity, data.supplierName || "", itemNote]);
+
+          if (requestId && lineInsert.rows[0]?.id) {
+            await client.query(`
+              update order_requests
+              set standing_order_run_line_id = $2,
+                  updated_at = now()
+              where id = $1
+            `, [requestId, lineInsert.rows[0].id]);
+          }
+        }
+      }
+    }
+
     await client.query("commit");
     cache.requests.expiresAt = 0;
     const savedOrder = (await pgListStandingOrders()).find((entry) => entry.id === orderId) || { id: orderId, ...data };
@@ -1734,6 +1821,7 @@ async function pgDriverSheetRequests(selectedDate) {
 
 async function pgListDriverSheet(date) {
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  await pgGenerateStandingOrdersForDate(selectedDate);
   const [requests, suppliers] = await Promise.all([
     pgDriverSheetRequests(selectedDate),
     pgListSuppliers()
@@ -1745,6 +1833,7 @@ async function pgListDriverSheet(date) {
 
 async function pgListReceivingSheet(date) {
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  await pgGenerateStandingOrdersForDate(selectedDate);
   const [requests, suppliers] = await Promise.all([
     pgDriverSheetRequests(selectedDate),
     pgListSuppliers()
@@ -1761,6 +1850,7 @@ async function pgListReceivingSheet(date) {
 
 async function pgListOrderReport(date) {
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  await pgGenerateStandingOrdersForDate(selectedDate);
   await pgEnsureDriverSheetLines(selectedDate);
   const [guestCount, standingOrders] = await Promise.all([
     pgGetDailyGuestCount(selectedDate),

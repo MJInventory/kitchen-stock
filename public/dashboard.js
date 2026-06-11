@@ -324,7 +324,7 @@ function renderDailyOrder() {
                 ].filter(Boolean).join(" / "))}</span>
               </div>
               <div class="daily-order-actions">
-                <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
+                <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button>
                 ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
               </div>
             </article>
@@ -378,7 +378,7 @@ function renderOpenOrders() {
                   ].filter(Boolean).join(" / "))}</span>
                 </div>
                 <div class="daily-order-actions">
-                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Delivered</button>
+                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button>
                   ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Delete</button>` : ""}
                 </div>
               </article>
@@ -497,17 +497,22 @@ dailyUserFilter?.addEventListener("change", () => {
 [featureMenu, backofficeMenu].forEach((menu) => menu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 }));
-dailyOrderList.addEventListener("click", (event) => {
+function handleOrderListClick(event) {
   const deleteButton = event.target.closest(".delete-order-button");
   if (deleteButton) {
     deleteDailyOrder(deleteButton.dataset.requestId).catch((error) => setMessage(error.message, true));
-    return;
+    return true;
   }
   const deliverButton = event.target.closest(".deliver-order-button");
   if (deliverButton) {
     deliverDailyOrder(deliverButton.dataset.deliverId).catch((error) => setMessage(error.message, true));
+    return true;
   }
-});
+  return false;
+}
+
+dailyOrderList.addEventListener("click", handleOrderListClick);
+openOrderList.addEventListener("click", handleOrderListClick);
 
 notificationList?.addEventListener("click", (event) => {
   const button = event.target.closest(".mark-notification-read");

@@ -1,4 +1,4 @@
-const loginScreen = document.querySelector("#loginScreen");
+﻿const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");
@@ -10,6 +10,7 @@ const locationFilter = document.querySelector("#locationFilter");
 const refreshButton = document.querySelector("#refreshButton");
 const submitButton = document.querySelector("#submitButton");
 const featureMenu = document.querySelector("#featureMenu");
+const backofficeMenu = document.querySelector("#backofficeMenu");
 const searchInput = document.querySelector("#searchInput");
 const selectedChips = document.querySelector("#selectedChips");
 const categoryView = document.querySelector("#categoryView");
@@ -76,6 +77,7 @@ function showApp() {
   loginScreen.hidden = true;
   const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
   currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
+  window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];
   });
@@ -84,6 +86,7 @@ function showApp() {
     option.disabled = !sessionPermissions[option.dataset.permission];
   });
   if (featureMenu) featureMenu.value = "/ordering.html";
+  if (backofficeMenu) backofficeMenu.value = "";
 }
 
 function saveSession(data) {
@@ -652,9 +655,9 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
-featureMenu?.addEventListener("change", (event) => {
+[featureMenu, backofficeMenu].forEach((menu) => menu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
-});
+}));
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
 submitButton.addEventListener("click", () => submitSelected());
 

@@ -702,7 +702,8 @@ th {
   opacity: 0.55;
 }
 
-.driver-supplier-select {
+.driver-supplier-select,
+.driver-unit-select {
   width: 150px;
   min-width: 130px;
   border: 1px solid #98a2b3;
@@ -711,6 +712,11 @@ th {
   color: #101828;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+.driver-unit-select {
+  width: 86px;
+  min-width: 76px;
 }
 
 td small {

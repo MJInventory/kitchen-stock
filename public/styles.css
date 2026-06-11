@@ -783,6 +783,18 @@ td small {
   text-transform: uppercase;
 }
 
+.menu-duo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  justify-content: center;
+}
+
+.menu-duo .feature-select {
+  min-width: 190px;
+}
+
 .feature-select select {
   width: 100%;
   min-height: 40px;
@@ -893,6 +905,18 @@ body.order-app {
 :root[data-theme="light"] .stock-location-picker select option {
   background: #fffdf8;
   color: var(--order-ink);
+}
+
+:root[data-theme="light"] select,
+:root[data-theme="light"] input,
+:root[data-theme="light"] textarea {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea {
+  color-scheme: dark;
 }
 
 :root[data-theme="light"] .selected-chip,
@@ -2040,6 +2064,14 @@ body.order-app {
     justify-self: stretch;
     width: 100%;
     margin-top: 0;
+  }
+
+  .menu-duo {
+    grid-area: nav;
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    gap: 8px;
   }
 
   .feature-select select {

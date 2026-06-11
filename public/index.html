@@ -50,7 +50,7 @@
             <option value="/order-report.html">Reports</option>
             <option value="/standing-orders.html" data-permission="canAddInventoryItems">Standing Orders</option>
             <option value="/stock-count.html">Stock Count</option>
-            <option value="/inventory-settings.html" data-permission="canAddInventoryItems">Inventory Admin</option>
+            <option value="/inventory-settings.html" data-permission="canAddInventoryItems">Inventory Items</option>
             <option value="/suppliers.html" data-permission="canAddInventoryItems">Suppliers</option>
             <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Storage Locations</option>
             <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Shelf Codes</option>
@@ -74,6 +74,9 @@
           <select id="dailyAreaFilter" aria-label="Filter today's orders by area">
             <option value="">All Areas</option>
           </select>
+          <select id="dailyUserFilter" aria-label="Filter today's orders by user">
+            <option value="">All Users</option>
+          </select>
         </div>
         <p id="message" class="order-message" role="status"></p>
         <div id="dailyOrderList" class="daily-order-list"></div>
@@ -96,7 +99,8 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v107</footer>
+    <footer class="app-version">MJ Stock Magic v108</footer>
+    <script src="/menus.js"></script>
     <script src="/theme.js"></script>
     <script src="/dashboard.js" type="module"></script>
   </body>

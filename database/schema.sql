@@ -160,6 +160,7 @@ create table if not exists standing_orders (
   other_schedule text not null default '',
   recurring boolean not null default true,
   active boolean not null default true,
+  deleted boolean not null default false,
   last_generated_date date,
   notes text not null default '',
   created_at timestamptz not null default now(),

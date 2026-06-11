@@ -1589,9 +1589,15 @@ async function pgCreateStockCount(payload, userName) {
   try {
     await client.query("begin");
     const itemResult = await client.query(`
-      select i.id, i.name, i.current_quantity, u.name as unit
+      select i.id,
+             i.name,
+             i.current_quantity,
+             (
+               select u.name
+               from units_of_measure u
+               where u.id = i.unit_of_measure_id
+             ) as unit
       from inventory_items i
-      left join units_of_measure u on u.id = i.unit_of_measure_id
       where i.id = $1
       for update
     `, [itemId]);
@@ -1632,13 +1638,24 @@ async function pgDeliverRequest(recordId, userName) {
   try {
     await client.query("begin");
     const requestResult = await client.query(`
-      select r.id, r.request_number, r.inventory_item_id, r.quantity_needed, r.delivered, r.status, r.notes,
-             i.name as item_name, i.current_quantity, u.name as unit
+      select r.id,
+             r.request_number,
+             r.inventory_item_id,
+             r.quantity_needed,
+             r.delivered,
+             r.status,
+             r.notes,
+             i.name as item_name,
+             i.current_quantity,
+             (
+               select u.name
+               from units_of_measure u
+               where u.id = i.unit_of_measure_id
+             ) as unit
       from order_requests r
       join inventory_items i on i.id = r.inventory_item_id
-      left join units_of_measure u on u.id = i.unit_of_measure_id
       where r.id = $1
-      for update
+      for update of r, i
     `, [recordId]);
     const request = requestResult.rows[0];
     if (!request) throw new Error("Request not found.");

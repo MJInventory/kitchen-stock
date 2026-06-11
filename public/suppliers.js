@@ -30,6 +30,7 @@ function renderSuppliers(suppliers) {
           <textarea class="supplier-contact" rows="3">${esc(supplier.contact || "")}</textarea>
         </label>
         <label class="check-label"><input class="supplier-active" type="checkbox" ${supplier.active ? "checked" : ""}> Active</label>
+        <label class="check-label delete-check"><input class="supplier-delete" type="checkbox"> Delete supplier</label>
         <button class="save-supplier" type="button">Save</button>
       </article>
     `)
@@ -73,16 +74,30 @@ supplierList.addEventListener("click", (event) => {
   if (!saveButton) return;
   const row = saveButton.closest(".supplier-row");
   saveButton.disabled = true;
-  page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      name: row.querySelector(".supplier-name").value,
-      contact: row.querySelector(".supplier-contact").value,
-      active: row.querySelector(".supplier-active").checked
-    })
-  })
+  const deleteBox = row.querySelector(".supplier-delete");
+  const request = deleteBox?.checked
+    ? (window.confirm(`Delete supplier ${row.querySelector(".supplier-name").value.trim() || "this supplier"}?`)
+      && window.confirm("Really delete this supplier? This cannot be undone.")
+        ? page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, { method: "DELETE" })
+        : Promise.resolve({ cancelled: true }))
+    : page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: row.querySelector(".supplier-name").value,
+          contact: row.querySelector(".supplier-contact").value,
+          active: row.querySelector(".supplier-active").checked
+        })
+      });
+  request
     .then(loadSuppliers)
-    .then(() => setSupplierMessage("Supplier saved."))
+    .then((result) => {
+      if (result?.cancelled) {
+        deleteBox.checked = false;
+        setSupplierMessage("Delete cancelled.");
+        return;
+      }
+      setSupplierMessage(deleteBox?.checked ? "Supplier deleted." : "Supplier saved.");
+    })
     .catch((error) => setSupplierMessage(error.message, true))
     .finally(() => { saveButton.disabled = false; });
 });

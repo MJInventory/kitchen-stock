@@ -100,6 +100,7 @@ function saveSession(data) {
   localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
   localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
   window.applyKitchenTheme?.(data.user.theme || "dark");
+  window.setupKitchenPush?.();
 }
 
 function showLogin() {

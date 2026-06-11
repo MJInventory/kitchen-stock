@@ -24,21 +24,21 @@ const dailyOrderCount = document.querySelector("#dailyOrderCount");
 const dailyOrderList = document.querySelector("#dailyOrderList");
 const standingOrderCount = document.querySelector("#standingOrderCount");
 const standingOrderList = document.querySelector("#standingOrderList");
+const notificationCount = document.querySelector("#notificationCount");
+const notificationList = document.querySelector("#notificationList");
+const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
 const message = document.querySelector("#message");
 
 let allItems = [];
 let recentRequests = [];
 let standingOrders = [];
+let notifications = [];
 let activeCategory = "";
 let selected = new Map();
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
-}
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -188,6 +188,10 @@ function itemUnit(item) {
   return item.unit || "item";
 }
 
+function entryUnit(entry) {
+  return entry?.unit || itemUnit(entry?.item || {});
+}
+
 function addItemHrefFromSearch() {
   const params = new URLSearchParams();
   const term = searchInput.value.trim();
@@ -243,8 +247,38 @@ function renderSelectedChips() {
     .map((entry) => `
       <button class="selected-chip" type="button" data-remove-id="${entry.item.id}">
         <span>${escapeHtml(entry.item.name)}</span>
-        <small>${entry.quantity} ${escapeHtml(itemUnit(entry.item))}</small>
+        <small>${entry.quantity} ${escapeHtml(entryUnit(entry))}</small>
       </button>
+    `)
+    .join("");
+}
+
+function formatNotificationDate(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function renderNotifications() {
+  if (!notificationList || !notificationCount) return;
+  const unread = notifications.filter((note) => !note.isRead);
+  notificationCount.textContent = `${unread.length} unread`;
+  if (readAllNotificationsButton) readAllNotificationsButton.disabled = unread.length === 0;
+  if (!notifications.length) {
+    notificationList.innerHTML = '<p class="empty-sheet">No notifications right now.</p>';
+    return;
+  }
+  notificationList.innerHTML = notifications
+    .slice(0, 20)
+    .map((note) => `
+      <article class="notification-row${note.isRead ? " read" : ""}" data-notification-id="${escapeHtml(note.id)}">
+        <div>
+          <strong>${escapeHtml(note.title || "Notification")}</strong>
+          <span>${escapeHtml(note.body || "")}</span>
+          <small>${escapeHtml(formatNotificationDate(note.createdAt))}</small>
+        </div>
+        ${note.isRead ? "" : '<button class="icon-button mark-notification-read" type="button">Mark read</button>'}
+      </article>
     `)
     .join("");
 }
@@ -423,7 +457,9 @@ function renderProductList() {
             <button class="qty-minus" type="button" aria-label="Decrease">-</button>
             <input class="qty-input" type="number" min="0" step="1" value="${quantity}">
             <button class="qty-plus" type="button" aria-label="Increase">+</button>
-            <span>${escapeHtml(itemUnit(item))}</span>
+            <select class="unit-input" aria-label="Order unit">
+              ${["box", "bag", "item", "bottle"].map((unit) => `<option value="${unit}"${unit === (entry?.unit || itemUnit(item)) ? " selected" : ""}>${unit}</option>`).join("")}
+            </select>
             <select class="urgency-input" aria-label="Urgency">
               ${["Low", "Medium", "High", "Critical"].map((level) => `<option${level === urgency ? " selected" : ""}>${level}</option>`).join("")}
             </select>
@@ -463,6 +499,7 @@ function render() {
   renderSelectedChips();
   renderDailyOrder();
   renderStandingOrders();
+  renderNotifications();
   updateSaveButton();
 }
 
@@ -470,7 +507,8 @@ function selectItem(item, quantity = defaultQuantity(item), urgency = "Medium") 
   selected.set(item.id, {
     item,
     quantity: Math.max(1, Number(quantity || 1)),
-    urgency
+    urgency,
+    unit: itemUnit(item)
   });
 }
 
@@ -501,7 +539,8 @@ function buildSelectedFromRecentRequests() {
     map.set(request.itemId, {
       item,
       quantity: Math.max(1, Number(request.quantity || 1)),
-      urgency: request.urgency || "Medium"
+      urgency: request.urgency || "Medium",
+      unit: request.unit || itemUnit(item)
     });
   }
 
@@ -514,7 +553,8 @@ function syncProductRow(row) {
   selected.set(item.id, {
     item,
     quantity: Math.max(1, Number(row.querySelector(".qty-input").value || 1)),
-    urgency: row.querySelector(".urgency-input").value
+    urgency: row.querySelector(".urgency-input").value,
+    unit: row.querySelector(".unit-input")?.value || itemUnit(item)
   });
 }
 
@@ -526,6 +566,8 @@ function toggleProduct(row) {
     selected.delete(item.id);
   } else {
     selectItem(item, row.querySelector(".qty-input").value, row.querySelector(".urgency-input").value);
+    const entry = selected.get(item.id);
+    if (entry) entry.unit = row.querySelector(".unit-input")?.value || itemUnit(item);
   }
 
   render();
@@ -537,6 +579,7 @@ async function refresh() {
   allItems = data.items;
   recentRequests = data.requests;
   standingOrders = data.standingOrders || [];
+  notifications = data.notifications || [];
   selected = buildSelectedFromRecentRequests();
   render();
   setMessage("");
@@ -554,6 +597,7 @@ async function submitSelected() {
       .map((entry) => ({
       itemId: String(entry.item.id || "").trim(),
       quantityNeeded: entry.quantity,
+      unitOverride: entry.unit || itemUnit(entry.item),
       urgencyLevel: entry.urgency,
       storageLocation: entry.item.storageLocation || "",
       inventoryArea: entry.item.inventoryArea || "",
@@ -622,6 +666,15 @@ async function updateCurrentStock(itemId, countedQuantity) {
       id === data.item.id ? { ...entry, item: { ...entry.item, quantity: data.item.quantity } } : entry
     ])
   );
+}
+
+async function markNotificationsRead(ids = []) {
+  const data = await api("/api/notifications/read", {
+    method: "POST",
+    body: JSON.stringify({ ids })
+  });
+  notifications = data.notifications || [];
+  renderNotifications();
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -709,7 +762,11 @@ productList.addEventListener("click", (event) => {
     input.value = Math.max(0, Number(input.value || 0) + delta);
     if (Number(input.value) > 0) {
       const item = allItems.find((candidate) => candidate.id === row.dataset.itemId);
-      if (item && !selected.has(item.id)) selectItem(item, input.value, row.querySelector(".urgency-input").value);
+      if (item && !selected.has(item.id)) {
+        selectItem(item, input.value, row.querySelector(".urgency-input").value);
+        const entry = selected.get(item.id);
+        if (entry) entry.unit = row.querySelector(".unit-input")?.value || itemUnit(item);
+      }
     }
     syncProductRow(row);
     render();
@@ -722,7 +779,11 @@ productList.addEventListener("change", (event) => {
 
   if (event.target.matches(".qty-input") && Number(event.target.value || 0) > 0) {
     const item = allItems.find((candidate) => candidate.id === row.dataset.itemId);
-    if (item && !selected.has(item.id)) selectItem(item, event.target.value, row.querySelector(".urgency-input").value);
+    if (item && !selected.has(item.id)) {
+      selectItem(item, event.target.value, row.querySelector(".urgency-input").value);
+      const entry = selected.get(item.id);
+      if (entry) entry.unit = row.querySelector(".unit-input")?.value || itemUnit(item);
+    }
   }
 
   syncProductRow(row);
@@ -754,6 +815,27 @@ dailyOrderList.addEventListener("click", (event) => {
   deleteDailyOrder(button.dataset.requestId).catch((error) => {
     setMessage(error.message, true);
     button.disabled = false;
+  });
+});
+
+notificationList?.addEventListener("click", (event) => {
+  const button = event.target.closest(".mark-notification-read");
+  if (!button) return;
+  const row = button.closest("[data-notification-id]");
+  if (!row?.dataset.notificationId) return;
+  button.disabled = true;
+  markNotificationsRead([row.dataset.notificationId]).catch((error) => {
+    setMessage(error.message, true);
+    button.disabled = false;
+  });
+});
+
+readAllNotificationsButton?.addEventListener("click", () => {
+  readAllNotificationsButton.disabled = true;
+  markNotificationsRead().catch((error) => {
+    setMessage(error.message, true);
+  }).finally(() => {
+    readAllNotificationsButton.disabled = false;
   });
 });
 

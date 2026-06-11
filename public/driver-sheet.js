@@ -10,6 +10,7 @@ const driverName = document.querySelector("#driverName");
 const loadSheetButton = document.querySelector("#loadSheetButton");
 const saveDriverButton = document.querySelector("#saveDriverButton");
 const printSheetButton = document.querySelector("#printSheetButton");
+const textSheetButton = document.querySelector("#textSheetButton");
 const sheetMessage = document.querySelector("#sheetMessage");
 const printDate = document.querySelector("#printDate");
 const printDriver = document.querySelector("#printDriver");
@@ -156,6 +157,55 @@ function supplierOptions(selectedSupplier) {
       return `<option value="${escapeHtml(name)}"${name === selected ? " selected" : ""}>${escapeHtml(name)}</option>`;
     })
     .join("");
+}
+
+function formatQuantity(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value ?? "").trim();
+  return Number.isInteger(number) ? String(number) : String(number);
+}
+
+function buildPlainTextSheet() {
+  const grouped = new Map();
+  const requests = [...(currentSheet.requests || [])]
+    .sort((left, right) => {
+      const supplier = String(left.supplierName || "").localeCompare(String(right.supplierName || ""), undefined, { sensitivity: "base" });
+      if (supplier) return supplier;
+      return String(left.itemName || "").localeCompare(String(right.itemName || ""), undefined, { numeric: true, sensitivity: "base" });
+    });
+
+  for (const request of requests) {
+    const supplier = String(request.supplierName || "Unassigned Supplier").trim() || "Unassigned Supplier";
+    if (!grouped.has(supplier)) grouped.set(supplier, []);
+    grouped.get(supplier).push(request);
+  }
+
+  return [...grouped.entries()]
+    .map(([supplier, supplierRequests]) => {
+      const lines = supplierRequests.map((request) => `${formatQuantity(request.quantity)} x ${String(request.unit || "item").trim() || "item"} ${String(request.itemName || "").trim()}`.trim());
+      return [supplier, ...lines].join("\n");
+    })
+    .join("\n\n");
+}
+
+function openTextSheet() {
+  if (!currentSheet.requests?.length) {
+    setMessage("Load a driver sheet first.", true);
+    return;
+  }
+  const text = buildPlainTextSheet();
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `driver-sheet-${sheetDate.value || todayLocal()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function renderSheet(data) {
@@ -388,6 +438,7 @@ driverName.addEventListener("input", () => {
   printDriver.textContent = `Driver: ${formatUserDisplay(driverName.value) || "________________"}`;
 });
 printSheetButton.addEventListener("click", () => window.print());
+textSheetButton.addEventListener("click", openTextSheet);
 
 sheetList.addEventListener("click", (event) => {
   const button = event.target.closest(".driver-check-button");

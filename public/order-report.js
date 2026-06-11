@@ -77,6 +77,7 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   currentUser.textContent = formatUserDisplay(sessionUser);
+  window.refreshKitchenMenus?.();
   const canAdmin = Boolean(sessionPermissions.canAdminUsers);
   guestCountField.hidden = !canAdmin;
   guestNotesField.hidden = !canAdmin;

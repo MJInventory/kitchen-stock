@@ -265,20 +265,20 @@ function renderNotifications() {
   const unread = notifications.filter((note) => !note.isRead);
   notificationCount.textContent = `${unread.length} unread`;
   if (readAllNotificationsButton) readAllNotificationsButton.disabled = unread.length === 0;
-  if (!notifications.length) {
+  if (!unread.length) {
     notificationList.innerHTML = '<p class="empty-sheet">No notifications right now.</p>';
     return;
   }
-  notificationList.innerHTML = notifications
+  notificationList.innerHTML = unread
     .slice(0, 20)
     .map((note) => `
-      <article class="notification-row${note.isRead ? " read" : ""}" data-notification-id="${escapeHtml(note.id)}">
+      <article class="notification-row" data-notification-id="${escapeHtml(note.id)}">
         <div>
           <strong>${escapeHtml(note.title || "Notification")}</strong>
           <span>${escapeHtml(note.body || "")}</span>
           <small>${escapeHtml(formatNotificationDate(note.createdAt))}</small>
         </div>
-        ${note.isRead ? "" : '<button class="icon-button mark-notification-read" type="button">Mark read</button>'}
+        <button class="icon-button mark-notification-read" type="button">Mark read</button>
       </article>
     `)
     .join("");

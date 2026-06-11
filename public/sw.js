@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v113";
+const CACHE_NAME = "kitchen-stock-v114";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -21,6 +21,7 @@ const APP_SHELL = [
   "/app.js",
   "/dashboard.js",
   "/menus.js",
+  "/push.js",
   "/theme.js",
   "/driver-sheet.js",
   "/receiving-sheet.js",
@@ -107,6 +108,44 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
+});
+
+self.addEventListener("push", (event) => {
+  const payload = (() => {
+    try {
+      return event.data ? event.data.json() : {};
+    } catch {
+      return { title: "MJ Stock Magic", body: event.data?.text?.() || "" };
+    }
+  })();
+
+  const title = payload.title || "MJ Stock Magic";
+  const options = {
+    body: payload.body || "",
+    icon: "/mjordering-icon-192.png",
+    badge: "/mjordering-icon-192.png",
+    tag: payload.tag || "mj-stock-magic",
+    data: payload.data || { url: payload.url || "/" }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+  event.waitUntil((async () => {
+    const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = allClients.find((client) => "focus" in client);
+    if (existing) {
+      await existing.focus();
+      if ("navigate" in existing) {
+        await existing.navigate(targetUrl);
+      }
+      return;
+    }
+    await clients.openWindow(targetUrl);
+  })());
 });
 
 

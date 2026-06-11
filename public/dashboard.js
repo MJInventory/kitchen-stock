@@ -19,6 +19,7 @@ const standingOrderList = document.querySelector("#standingOrderList");
 const notificationCount = document.querySelector("#notificationCount");
 const notificationList = document.querySelector("#notificationList");
 const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
+const enablePushButton = document.querySelector("#enablePushButton");
 const message = document.querySelector("#message");
 
 let allItems = [];
@@ -271,6 +272,24 @@ function renderNotifications() {
     .join("");
 }
 
+function renderPushStatus(detail = {}) {
+  if (!enablePushButton) return;
+  const supported = Boolean(detail.supported);
+  const enabled = Boolean(detail.enabled);
+  const subscribed = Boolean(detail.subscribed);
+  const permission = detail.permission || "default";
+  const shouldShow = supported && enabled && (!subscribed || permission !== "granted");
+  enablePushButton.hidden = !shouldShow;
+  enablePushButton.disabled = permission === "denied";
+  if (permission === "denied") {
+    enablePushButton.textContent = "Notifications blocked in browser";
+  } else if (subscribed) {
+    enablePushButton.textContent = "Phone notifications enabled";
+  } else {
+    enablePushButton.textContent = "Enable phone notifications";
+  }
+}
+
 function renderDailyOrder() {
   const selectedDay = todayLocal();
   const selectedArea = selectedDailyArea();
@@ -511,8 +530,24 @@ readAllNotificationsButton?.addEventListener("click", () => {
   });
 });
 
+enablePushButton?.addEventListener("click", () => {
+  enablePushButton.disabled = true;
+  Promise.resolve(window.enableKitchenPush?.())
+    .catch((error) => setMessage(error.message || "Could not enable phone notifications.", true))
+    .finally(() => {
+      window.setTimeout(() => {
+        enablePushButton.disabled = false;
+      }, 600);
+    });
+});
+
+window.addEventListener("kitchen-push-status", (event) => {
+  renderPushStatus(event.detail || {});
+});
+
 if (sessionToken && sessionUser) {
   showApp();
+  renderPushStatus(window.kitchenPushStatus || {});
   refresh().catch((error) => setMessage(error.message, true));
 } else {
   showLogin();

@@ -447,6 +447,7 @@ async function deleteDailyOrder(requestId) {
   await api(`/api/requests/${requestId}`, { method: "DELETE" });
   recentRequests = recentRequests.filter((request) => request.id !== requestId);
   renderDailyOrder();
+  renderOpenOrders();
   setMessage("Item removed from today's order.");
 }
 
@@ -500,11 +501,13 @@ dailyUserFilter?.addEventListener("change", () => {
 function handleOrderListClick(event) {
   const deleteButton = event.target.closest(".delete-order-button");
   if (deleteButton) {
+    if (!window.confirm("Remove this item from the order list?")) return true;
     deleteDailyOrder(deleteButton.dataset.requestId).catch((error) => setMessage(error.message, true));
     return true;
   }
   const deliverButton = event.target.closest(".deliver-order-button");
   if (deliverButton) {
+    if (!window.confirm("Mark this item as received and add it to inventory?")) return true;
     deliverDailyOrder(deliverButton.dataset.deliverId).catch((error) => setMessage(error.message, true));
     return true;
   }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v127";
+const CACHE_NAME = "kitchen-stock-v128";
 const APP_SHELL = [
   "/",
   "/index.html",

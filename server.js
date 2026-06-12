@@ -36,6 +36,7 @@ const mailFrom = process.env.MAIL_FROM || smtpUser;
 const brevoApiKey = process.env.BREVO_API_KEY || "";
 const ocrSpaceApiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
 const isRender = Boolean(process.env.RENDER);
+const appTimeZone = process.env.APP_TIMEZONE || "America/La_Paz";
 const vapidSubject = process.env.WEB_PUSH_SUBJECT || "mailto:admin@madamejanette.com";
 const vapidPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || "";
 const vapidPrivateKey = process.env.WEB_PUSH_PRIVATE_KEY || "";
@@ -168,7 +169,12 @@ function isoDate(value) {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: appTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
 }
 
 function parseUsers() {
@@ -1975,13 +1981,13 @@ async function pgEnsureDriverSheetLines(selectedDate) {
     join inventory_items i on i.id = r.inventory_item_id
     where r.delivered = false
       and r.status in ('Pending', 'Approved')
-      and r.requested_at::date <= $1::date
+      and (r.requested_at at time zone $2)::date <= $1::date
       and not exists (
         select 1
         from driver_sheet_lines d
         where d.sheet_date = $1::date and d.order_request_id = r.id
       )
-  `, [selectedDate]);
+  `, [selectedDate, appTimeZone]);
 }
 
 async function pgDriverSheetRequests(selectedDate) {
@@ -2035,9 +2041,9 @@ async function pgDriverSheetRequests(selectedDate) {
     left join suppliers ds on ds.id = d.supplier_id
     where r.delivered = false
       and r.status in ('Pending', 'Approved')
-      and r.requested_at::date <= $1::date
+      and (r.requested_at at time zone $2)::date <= $1::date
     order by coalesce(ds.name, sorl.supplier_name, sp.name) nulls last, c.name nulls last, sc.code nulls last, i.name
-  `, [selectedDate]);
+  `, [selectedDate, appTimeZone]);
   return result.rows.map((row) => pgRequestFromRow({
     ...row,
     supplier_name: row.supplier_name,
@@ -2253,7 +2259,8 @@ async function pgCreateRequestsBatch(payload, requestedByOverride = "") {
     created.push(await pgCreateRequest(request, requestedByOverride));
   }
   const requester = String(requestedByOverride || requestedItems[0]?.requestedBy || "").trim();
-  const notifyUsers = await pgNotificationUsers("new-order", requester);
+  const notifyAreas = await pgAreasForInventoryItemIds(requestedItems.map((request) => request.itemId));
+  const notifyUsers = await pgNotificationUsers("new-order", requester, notifyAreas);
   if (notifyUsers.length && created.length) {
     const itemNames = created.slice(0, 4).map((entry) => entry.itemName || "Item").filter(Boolean);
     const remainder = created.length > itemNames.length ? ` and ${created.length - itemNames.length} more` : "";

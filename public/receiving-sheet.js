@@ -222,12 +222,57 @@ function updateRequestFromLine(line) {
   });
 }
 
+function chooseSupplierChangeMode(itemName, supplierName) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "choice-dialog";
+    dialog.innerHTML = `
+      <form method="dialog" class="choice-dialog-card">
+        <h2>Change Supplier</h2>
+        <p>How should we save <strong>${escapeHtml(supplierName || "this supplier")}</strong> for <strong>${escapeHtml(itemName || "this item")}</strong>?</p>
+        <div class="choice-dialog-actions">
+          <button type="button" class="icon-button" data-choice="permanent">Permanent</button>
+          <button type="button" class="icon-button" data-choice="one-time">One-Time</button>
+          <button type="button" class="icon-button" data-choice="cancel">Cancel</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(dialog);
+
+    const finish = (value) => {
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      resolve(value);
+    };
+
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) finish(null);
+    });
+    dialog.querySelectorAll("[data-choice]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const choice = button.dataset.choice;
+        if (choice === "cancel") finish(null);
+        else finish(choice);
+      });
+    });
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      finish(null);
+    });
+    dialog.showModal();
+  });
+}
+
 async function changeSupplier(row, select) {
   const lineId = row.dataset.lineId;
   const itemName = row.querySelector("td:nth-child(2)")?.textContent?.trim() || "this item";
-  const updatePrimarySupplier = window.confirm(
-    `Make ${select.value || "this supplier"} the primary supplier for ${itemName}?\n\nOK = change the inventory item's primary supplier.\nCancel = temporary change for this order only.`
-  );
+  const choice = await chooseSupplierChangeMode(itemName, select.value || "this supplier");
+  if (!choice) {
+    renderSheet(currentSheet);
+    setMessage("Supplier change cancelled.");
+    return;
+  }
+  const updatePrimarySupplier = choice === "permanent";
   select.disabled = true;
   setMessage(updatePrimarySupplier ? "Saving supplier and updating primary supplier..." : "Saving temporary supplier...");
   try {

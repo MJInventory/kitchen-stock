@@ -37,6 +37,15 @@ function todayLocal() {
   return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
+function localDateKey(value) {
+  const stamp = String(value || "").trim();
+  if (!stamp) return "";
+  const parsed = new Date(stamp);
+  if (Number.isNaN(parsed.getTime())) return stamp.slice(0, 10);
+  const offset = parsed.getTimezoneOffset();
+  return new Date(parsed.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
 function setMessage(text, isError = false) {
   message.textContent = text;
   message.classList.toggle("error", isError);
@@ -152,7 +161,7 @@ function requestLocation(request) {
 
 function requestDay(request) {
   const stamp = String(request.requestedAt || "").trim();
-  return stamp ? stamp.slice(0, 10) : "";
+  return stamp ? localDateKey(stamp) : "";
 }
 
 function requestUser(request) {

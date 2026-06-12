@@ -73,6 +73,15 @@ function todayLocal() {
   return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
+function localDateKey(value) {
+  const stamp = String(value || "").trim();
+  if (!stamp) return "";
+  const parsed = new Date(stamp);
+  if (Number.isNaN(parsed.getTime())) return stamp.slice(0, 10);
+  const offset = parsed.getTimezoneOffset();
+  return new Date(parsed.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
 function showApp() {
   loginScreen.hidden = true;
   const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
@@ -557,7 +566,7 @@ function buildSelectedFromRecentRequests() {
     .filter(hasValidRequestItemId)
     .filter((request) => sameUser(request.requestedBy, sessionUser))
     .filter((request) => {
-      const requestDay = String(request.requestedAt || "").slice(0, 10);
+      const requestDay = localDateKey(request.requestedAt);
       return !requestDay || requestDay === currentDay;
     })
     .sort((left, right) => {

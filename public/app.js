@@ -649,8 +649,24 @@ async function submitSelected() {
       body: JSON.stringify({ requests })
     });
     const saved = selected.size;
-    await refresh();
+    const byId = new Map(recentRequests.map((request) => [request.id, request]));
+    for (const request of data.requests || []) {
+      if (request?.id) byId.set(request.id, request);
+    }
+    recentRequests = [...byId.values()]
+      .sort((left, right) => {
+        const leftTime = new Date(left.requestedAt || 0).getTime() || 0;
+        const rightTime = new Date(right.requestedAt || 0).getTime() || 0;
+        if (leftTime !== rightTime) return rightTime - leftTime;
+        return Number(right.requestId || 0) - Number(left.requestId || 0);
+      })
+      .slice(0, 200);
+    selected = buildSelectedFromRecentRequests();
+    render();
     setMessage(`${saved} item(s) saved to today's order.`);
+    window.setTimeout(() => {
+      refresh().catch((error) => setMessage(error.message, true));
+    }, 250);
   } catch (error) {
     setMessage(error.message, true);
   } finally {

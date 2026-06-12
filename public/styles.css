@@ -182,6 +182,7 @@ button:hover,
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .user-chip {
@@ -345,6 +346,16 @@ button:hover,
   font-size: 14px;
   font-weight: 700;
   padding: 0 6px;
+}
+
+.notify-area-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.notify-area-grid.compact {
+  margin-top: 10px;
 }
 
 .standing-item-adder {
@@ -1907,6 +1918,47 @@ body.order-app {
   align-items: center;
 }
 
+.choice-dialog {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  max-width: min(92vw, 460px);
+}
+
+.choice-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.choice-dialog-card {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: min(92vw, 420px);
+  box-shadow: 0 24px 60px rgba(16, 24, 40, 0.22);
+}
+
+.choice-dialog-card h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.choice-dialog-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.choice-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .daily-order-row strong,
 .daily-order-row span {
   display: block;
@@ -1996,11 +2048,13 @@ body.order-app {
   }
 
   .topbar {
+    flex-direction: column;
     align-items: flex-start;
   }
 
   .top-actions {
-    flex-direction: column;
+    width: 100%;
+    flex-direction: row;
     align-items: stretch;
   }
 
@@ -2277,6 +2331,19 @@ body.order-app {
   .daily-order-actions {
     justify-self: start;
     flex-wrap: wrap;
+  }
+
+  .choice-dialog-card {
+    min-width: min(92vw, 360px);
+    padding: 16px;
+  }
+
+  .choice-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .notify-area-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

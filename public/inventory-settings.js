@@ -138,6 +138,7 @@ function markDirty(itemId, isDirty = true) {
 
 function currentValuesFromArticle(article) {
   return {
+    name: article.querySelector(".item-name-input")?.value.trim() || "",
     inventoryArea: article.querySelector(".area-select")?.value || "",
     storageLocation: article.querySelector(".location-select")?.value || "",
     category: article.querySelector(".category-select")?.value || "",
@@ -151,6 +152,7 @@ function currentValuesFromArticle(article) {
 
 function itemSnapshot(item) {
   return {
+    name: item.name || "",
     inventoryArea: item.inventoryArea || "",
     storageLocation: item.storageLocation || "",
     category: item.category || "",
@@ -211,6 +213,10 @@ function renderItems() {
           <span>${escapeHtml([item.category, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
           <span>Current: ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
         </div>
+        <label>
+          Item name
+          <input class="item-name-input" type="text" value="${escapeHtml(item.name)}">
+        </label>
         <label>
           Area
           <select class="area-select">
@@ -285,6 +291,7 @@ async function saveItem(article) {
   const data = await api(`/api/items/${id}`, {
     method: "PATCH",
     body: JSON.stringify({
+      name: payload.name,
       minimumThreshold: payload.minimumThreshold,
       unit: payload.unit,
       inventoryArea: payload.inventoryArea,
@@ -327,6 +334,7 @@ async function saveAllChanges() {
     const data = await api(`/api/items/${itemId}`, {
       method: "PATCH",
       body: JSON.stringify({
+        name: payload.name,
         minimumThreshold: payload.minimumThreshold,
         unit: payload.unit,
         inventoryArea: payload.inventoryArea,

@@ -80,6 +80,16 @@ function db() {
   return getPool();
 }
 
+function normalizeNotificationAreaName(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw === "bar") return "bar";
+  if (raw === "foh" || raw === "front of house" || raw === "front-house") return "foh";
+  if (raw === "kitchen") return "kitchen";
+  if (raw === "general") return "general";
+  return "";
+}
+
 function hasPostgres() {
   return postgresEnabled();
 }
@@ -93,7 +103,11 @@ async function ensurePostgresSchemaUpgrades() {
     await db().query(`
       alter table app_users
         add column if not exists notify_on_new_orders boolean not null default false,
-        add column if not exists notify_on_delivery boolean not null default true
+        add column if not exists notify_on_delivery boolean not null default true,
+        add column if not exists notify_area_bar boolean not null default true,
+        add column if not exists notify_area_foh boolean not null default true,
+        add column if not exists notify_area_kitchen boolean not null default true,
+        add column if not exists notify_area_general boolean not null default true
     `);
     await db().query(`
       alter table standing_orders
@@ -243,6 +257,12 @@ function mapPgAppUserRow(row) {
     mustChangePassword: Boolean(row.must_change_password),
     notifyOnNewOrders: Boolean(row.notify_on_new_orders),
     notifyOnDelivery: row.notify_on_delivery !== false,
+    notifyAreas: {
+      bar: row.notify_area_bar !== false,
+      foh: row.notify_area_foh !== false,
+      kitchen: row.notify_area_kitchen !== false,
+      general: row.notify_area_general !== false
+    },
     source: row.source || "postgres"
   };
 }
@@ -256,6 +276,12 @@ function publicUserForAdmin(user, actor = null) {
     lastLoginAt: user.lastLoginAt || "",
     notifyOnNewOrders: Boolean(user.notifyOnNewOrders),
     notifyOnDelivery: user.notifyOnDelivery !== false,
+    notifyAreas: {
+      bar: user.notifyAreas?.bar !== false,
+      foh: user.notifyAreas?.foh !== false,
+      kitchen: user.notifyAreas?.kitchen !== false,
+      general: user.notifyAreas?.general !== false
+    },
     editable,
     canEditRole,
     canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
@@ -1320,10 +1346,11 @@ async function pgSyncStandingOrderRunsForDate(selectedDate, userName = "System")
 async function pgSyncStandingOrderRunsForOrder(orderId, userName = "System") {
   if (!isValidId(orderId)) return 0;
   const result = await db().query(`
-    select distinct expected_delivery_date::text as expected_date
+    select expected_delivery_date::text as expected_date
     from standing_order_runs
     where standing_order_id = $1
       and status = 'Open'
+    group by expected_delivery_date
     order by expected_delivery_date
   `, [orderId]);
   let synced = 0;
@@ -1466,24 +1493,60 @@ async function pgCloseStandingOrderRunIfCompleteTx(client, runId, userName) {
     where id = $1
   `, [runId, userName]);
 
-  await client.query(`
-    update standing_orders so
-    set active = case when so.recurring then so.active else false end,
-        updated_at = now()
-    where so.id = (
-      select standing_order_id
-      from standing_order_runs
-      where id = $1
-      limit 1
-    )
+  const runResult = await client.query(`
+    select
+      sor.expected_delivery_date::text as expected_date,
+      so.id as standing_order_id,
+      so.expected_arrival_date::text as current_expected_date,
+      so.schedule,
+      so.other_schedule,
+      so.recurring,
+      so.active
+    from standing_order_runs sor
+    join standing_orders so on so.id = sor.standing_order_id
+    where sor.id = $1
+    limit 1
   `, [runId]);
+  const run = runResult.rows[0];
+  if (!run?.standing_order_id) return;
+
+  const currentOrder = {
+    id: run.standing_order_id,
+    expectedDate: run.current_expected_date || run.expected_date || "",
+    schedule: run.schedule || "Weekly",
+    otherSchedule: run.other_schedule || "",
+    recurring: run.recurring !== false,
+    active: run.active !== false
+  };
+  const nextDate = currentOrder.recurring
+    ? nextStandingOrderDate(currentOrder, run.expected_date || currentOrder.expectedDate || todayIso())
+    : "";
+
+  await client.query(`
+    update standing_orders
+    set active = $2,
+        last_generated_date = coalesce($3::date, last_generated_date),
+        expected_arrival_date = case
+          when $4::date is not null then $4::date
+          else expected_arrival_date
+        end,
+        updated_at = now()
+    where id = $1
+  `, [
+    run.standing_order_id,
+    currentOrder.recurring ? currentOrder.active : false,
+    run.expected_date || null,
+    nextDate || null
+  ]);
 }
 
 async function pgListAppUsers() {
   await ensurePostgresSchemaUpgrades();
   const result = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           notify_on_new_orders, notify_on_delivery, source, last_login_at
+           notify_on_new_orders, notify_on_delivery,
+           notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           source, last_login_at
     from app_users
     order by username
   `);
@@ -1496,7 +1559,9 @@ async function pgFindAppUserByName(name) {
   if (!normalized) return null;
   const result = await db().query(`
     select id, username, display_name, password_hash, role, theme, active, must_change_password,
-           notify_on_new_orders, notify_on_delivery, source, last_login_at
+           notify_on_new_orders, notify_on_delivery,
+           notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           source, last_login_at
     from app_users
     where lower(username) = $1 or lower(display_name) = $1
     limit 1
@@ -1519,14 +1584,19 @@ async function pgCreateAppUser(payload) {
   const role = normalizeRole(payload.role);
   const theme = String(payload.theme || "dark").trim().toLowerCase() === "light" ? "light" : "dark";
   const passwordHash = await bcrypt.hash(password, 10);
+  const notifyAreas = payload.notifyAreas || {};
   const result = await db().query(`
     insert into app_users (
       username, display_name, password_hash, role, theme, active, must_change_password,
-      notify_on_new_orders, notify_on_delivery, source
+      notify_on_new_orders, notify_on_delivery,
+      notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+      source
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'postgres')
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'postgres')
     returning id, username, display_name, role, theme, active, must_change_password,
-              notify_on_new_orders, notify_on_delivery, source, last_login_at
+              notify_on_new_orders, notify_on_delivery,
+              notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+              source, last_login_at
   `, [
     username,
     displayName,
@@ -1536,7 +1606,11 @@ async function pgCreateAppUser(payload) {
     payload.active !== false,
     Boolean(payload.mustChangePassword),
     Boolean(payload.notifyOnNewOrders),
-    payload.notifyOnDelivery !== false
+    payload.notifyOnDelivery !== false,
+    notifyAreas.bar !== false,
+    notifyAreas.foh !== false,
+    notifyAreas.kitchen !== false,
+    notifyAreas.general !== false
   ]);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
@@ -1548,7 +1622,9 @@ async function pgUpdateAppUser(recordId, payload) {
   if (!isValidId(recordId)) throw new Error("Invalid app user record.");
   const current = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           notify_on_new_orders, notify_on_delivery, source, last_login_at
+           notify_on_new_orders, notify_on_delivery,
+           notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           source, last_login_at
     from app_users
     where id = $1
   `, [recordId]);
@@ -1562,8 +1638,13 @@ async function pgUpdateAppUser(recordId, payload) {
   const nextMustChange = Boolean(payload.mustChangePassword);
   const nextNotifyOnNewOrders = Boolean(payload.notifyOnNewOrders);
   const nextNotifyOnDelivery = payload.notifyOnDelivery !== false;
+  const notifyAreas = payload.notifyAreas || {};
+  const nextNotifyAreaBar = notifyAreas.bar !== false;
+  const nextNotifyAreaFoh = notifyAreas.foh !== false;
+  const nextNotifyAreaKitchen = notifyAreas.kitchen !== false;
+  const nextNotifyAreaGeneral = notifyAreas.general !== false;
   let passwordSql = "";
-  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextNotifyOnNewOrders, nextNotifyOnDelivery];
+  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral];
   if (String(payload.password || "").trim()) {
     const passwordHash = await bcrypt.hash(String(payload.password).trim(), 10);
     values.push(passwordHash);
@@ -1579,11 +1660,17 @@ async function pgUpdateAppUser(recordId, payload) {
         must_change_password = $7,
         notify_on_new_orders = $8,
         notify_on_delivery = $9,
+        notify_area_bar = $10,
+        notify_area_foh = $11,
+        notify_area_kitchen = $12,
+        notify_area_general = $13,
         updated_at = now()
         ${passwordSql}
     where id = $1
     returning id, username, display_name, role, theme, active, must_change_password,
-              notify_on_new_orders, notify_on_delivery, source, last_login_at
+              notify_on_new_orders, notify_on_delivery,
+              notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+              source, last_login_at
   `, values);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
@@ -1788,19 +1875,42 @@ async function pushNotificationToUser(userId, payload = {}) {
   }));
 }
 
-async function pgNotificationUsers(kind, excludeUserName = "") {
+async function pgNotificationUsers(kind, excludeUserName = "", areas = []) {
   await ensurePostgresSchemaUpgrades();
   const exclude = String(excludeUserName || "").trim().toLowerCase();
   const column = kind === "delivery" ? "notify_on_delivery" : "notify_on_new_orders";
+  const normalizedAreas = [...new Set((Array.isArray(areas) ? areas : []).map(normalizeNotificationAreaName).filter(Boolean))];
   const result = await db().query(`
-    select username
+    select username, notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general
     from app_users
     where active = true and ${column} = true
     order by username
   `);
   return result.rows
+    .filter((row) => {
+      if (!normalizedAreas.length) return true;
+      return normalizedAreas.some((area) => {
+        if (area === "bar") return row.notify_area_bar !== false;
+        if (area === "foh") return row.notify_area_foh !== false;
+        if (area === "kitchen") return row.notify_area_kitchen !== false;
+        if (area === "general") return row.notify_area_general !== false;
+        return false;
+      });
+    })
     .map((row) => String(row.username || "").trim())
     .filter((name) => name && name.toLowerCase() !== exclude);
+}
+
+async function pgAreasForInventoryItemIds(itemIds = []) {
+  const cleanIds = [...new Set((Array.isArray(itemIds) ? itemIds : []).filter((itemId) => isValidId(String(itemId || ""))))];
+  if (!cleanIds.length) return [];
+  const result = await db().query(`
+    select distinct ia.name as inventory_area
+    from inventory_items i
+    left join inventory_areas ia on ia.id = i.inventory_area_id
+    where i.id = any($1::uuid[])
+  `, [cleanIds]);
+  return [...new Set(result.rows.map((row) => normalizeNotificationAreaName(row.inventory_area)).filter(Boolean))];
 }
 
 async function pgRecordSuccessfulLogin(userId) {
@@ -2608,6 +2718,7 @@ async function pgSaveShelfCode(payload, recordId = "") {
 }
 
 async function pgUpdateItemSettings(recordId, payload) {
+  const itemName = String(payload.name || payload.itemName || "").trim();
   const minimum = Number(payload.minimumThreshold);
   const unit = String(payload.unit || "").trim().toLowerCase();
   const inventoryArea = String(payload.inventoryArea || "").trim();
@@ -2615,6 +2726,7 @@ async function pgUpdateItemSettings(recordId, payload) {
   const category = String(payload.category || "").trim();
   const shelfCode = String(payload.shelfCode || "").trim();
   const supplierId = String(payload.supplierId || "").trim();
+  if (!itemName) throw new Error("Item name is required.");
   if (!Number.isFinite(minimum) || minimum < 0) throw new Error("Minimum stock must be zero or greater.");
   if (!allowedUnits.has(unit)) throw new Error("Unit must be box, bag, item, or bottle.");
   const unitId = await pgFindOrCreateLookupRecord("unitOfMeasurement", unit);
@@ -2624,16 +2736,17 @@ async function pgUpdateItemSettings(recordId, payload) {
   const shelfCodeId = await pgResolveShelfCodeRecord(shelfCode, storageLocation);
   await db().query(`
     update inventory_items
-    set minimum_threshold = $2,
-        unit_of_measure_id = $3,
-        category_id = $4,
-        inventory_area_id = $5,
-        storage_location_id = $6,
-        shelf_code_id = $7,
-        primary_supplier_id = $8,
+    set name = $2,
+        minimum_threshold = $3,
+        unit_of_measure_id = $4,
+        category_id = $5,
+        inventory_area_id = $6,
+        storage_location_id = $7,
+        shelf_code_id = $8,
+        primary_supplier_id = $9,
         updated_at = now()
     where id = $1
-  `, [recordId, minimum, unitId || null, categoryId || null, areaId || null, storageLocationId || null, shelfCodeId || null, isValidId(supplierId) ? supplierId : null]);
+  `, [recordId, itemName, minimum, unitId || null, categoryId || null, areaId || null, storageLocationId || null, shelfCodeId || null, isValidId(supplierId) ? supplierId : null]);
   cache.items.expiresAt = 0;
   const items = await pgListItems();
   return items.find((item) => item.id === recordId);
@@ -3169,6 +3282,16 @@ async function listStandingOrders() {
 function nextStandingOrderDate(order, generatedDate) {
   if (order.schedule === "Daily") return addDays(generatedDate, 1);
   if (order.schedule === "Weekly") return addDays(generatedDate, 7);
+  if (order.schedule === "Other") {
+    const detail = String(order.otherSchedule || "").trim().toLowerCase();
+    const numericDays = Number(detail.replace(/[^0-9]/g, ""));
+    if (Number.isFinite(numericDays) && numericDays > 0) return addDays(generatedDate, numericDays);
+    if (detail.includes("biweek")) return addDays(generatedDate, 14);
+    if (detail.includes("fortnight")) return addDays(generatedDate, 14);
+    if (detail.includes("month")) return addDays(generatedDate, 30);
+    if (detail.includes("day")) return addDays(generatedDate, 1);
+    if (detail.includes("week")) return addDays(generatedDate, 7);
+  }
   return "";
 }
 

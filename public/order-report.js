@@ -1,4 +1,4 @@
-﻿const reportDate = document.querySelector("#reportDate");
+const reportDate = document.querySelector("#reportDate");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -18,6 +18,8 @@ const printDate = document.querySelector("#printDate");
 const reportSummary = document.querySelector("#reportSummary");
 const reportList = document.querySelector("#reportList");
 const standingReportList = document.querySelector("#standingReportList");
+const activitySummary = document.querySelector("#activitySummary");
+const activityReportList = document.querySelector("#activityReportList");
 
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
@@ -206,12 +208,115 @@ function renderStandingOrders(orders) {
     .join("");
 }
 
+function labelForActionType(value) {
+  if (value === "add") return "Adds";
+  if (value === "delete") return "Deletes";
+  return "Changes";
+}
+
+function labelForEntityType(value) {
+  return String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function labelForReasonCode(value) {
+  const code = String(value || "").trim();
+  const labels = {
+    "category-create": "Category added",
+    "category-delete": "Category removed",
+    "category-update": "Category changed",
+    "daily-guests": "Guest count changed",
+    "delivery-complete": "Order fully received",
+    "delivery-partial": "Order partly received",
+    "driver-assign": "Driver assigned",
+    "driver-line-change": "Driver sheet changed",
+    "delivery-plan-change": "Delivery plan changed",
+    "guest-count-create": "Guest count added",
+    "guest-count-update": "Guest count changed",
+    "inventory-create": "Item added",
+    "inventory-delete": "Item removed",
+    "inventory-update": "Item changed",
+    "order-create": "Order added",
+    "order-delete": "Order removed",
+    "order-update": "Order changed",
+    "password-change": "Own password changed",
+    "password-reset": "Password reset",
+    "picked-change": "Marked picked or unpicked",
+    "shelf-code-create": "Shelf code added",
+    "shelf-code-update": "Shelf code changed",
+    "standing-order-create": "Standing order added",
+    "standing-order-delete": "Standing order removed",
+    "standing-order-update": "Standing order changed",
+    "stock-count": "Stock count saved",
+    "storage-location-create": "Storage location added",
+    "storage-location-update": "Storage location changed",
+    "supplier-create": "Supplier added",
+    "supplier-delete": "Supplier removed",
+    "supplier-note-create": "Delivery memo added",
+    "supplier-note-delete": "Delivery memo removed",
+    "supplier-note-update": "Delivery memo changed",
+    "supplier-primary-change": "Supplier changed permanently",
+    "supplier-temp-change": "Supplier changed one time",
+    "supplier-update": "Supplier changed",
+    "unit-change": "Order unit changed",
+    "user-create": "User added",
+    "user-delete": "User removed",
+    "user-update": "User changed"
+  };
+  return labels[code] || labelForEntityType(code);
+}
+
+function renderActivity(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  const adds = list.filter((entry) => entry.actionType === "add").length;
+  const changes = list.filter((entry) => entry.actionType === "change").length;
+  const deletes = list.filter((entry) => entry.actionType === "delete").length;
+  const actors = new Set(list.map((entry) => String(entry.actorUsername || "").trim()).filter(Boolean)).size;
+
+  activitySummary.innerHTML = [
+    ["Adds", adds],
+    ["Changes", changes],
+    ["Deletes", deletes],
+    ["Users", actors]
+  ].map(([label, value]) => `
+    <article>
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </article>
+  `).join("");
+
+  if (!list.length) {
+    activityReportList.innerHTML = '<p class="empty-sheet">No recorded adds, changes, or deletes for this day.</p>';
+    return;
+  }
+
+  activityReportList.innerHTML = list
+    .map((entry) => `
+      <article class="activity-row action-${escapeHtml(entry.actionType)}">
+        <div class="activity-row-top">
+          <strong>${escapeHtml(entry.entityName || labelForEntityType(entry.entityType) || "Change")}</strong>
+          <span>${escapeHtml(formatDateTime(entry.createdAt))}</span>
+        </div>
+        <div class="activity-row-meta">
+          <span>${escapeHtml(labelForActionType(entry.actionType))}</span>
+          <span>${escapeHtml(labelForEntityType(entry.entityType))}</span>
+          <span>${escapeHtml(formatUserDisplay(entry.actorUsername || "System"))}</span>
+          ${entry.reasonCode ? `<span>${escapeHtml(labelForReasonCode(entry.reasonCode))}</span>` : ""}
+        </div>
+        ${entry.note ? `<p class="activity-note">${escapeHtml(entry.note)}</p>` : ""}
+      </article>
+    `)
+    .join("");
+}
+
 function renderReport(data) {
   printDate.textContent = `Date: ${data.date}`;
   guestCountInput.value = data.guestCount?.guests ?? "";
   guestNotesInput.value = data.guestCount?.notes ?? "";
   renderSummary(data.summary || {});
   renderStandingOrders(data.standingOrders || []);
+  renderActivity(data.activity || []);
 
   if (!data.rows.length) {
     reportList.innerHTML = '<p class="empty-sheet">No order lines found for this date.</p>';
@@ -341,7 +446,7 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-if (sessionToken && sessionUser) {
+  if (sessionToken && sessionUser) {
   showApp();
   loadReport().catch((error) => setMessage(error.message, true));
 } else {

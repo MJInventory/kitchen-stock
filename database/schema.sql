@@ -299,3 +299,21 @@ create table if not exists push_subscriptions (
 
 create index if not exists idx_push_subscriptions_user
   on push_subscriptions (user_id, updated_at desc);
+
+create table if not exists audit_log_entries (
+  id uuid primary key default gen_random_uuid(),
+  action_date date not null default current_date,
+  action_type text not null check (action_type in ('add', 'change', 'delete')),
+  entity_type text not null,
+  entity_id text not null default '',
+  entity_name text not null default '',
+  actor_username text not null default '',
+  reason_code text not null default '',
+  note text not null default '',
+  before_json jsonb,
+  after_json jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_audit_log_entries_date_created
+  on audit_log_entries (action_date desc, created_at desc);

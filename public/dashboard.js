@@ -20,6 +20,8 @@ const notificationCount = document.querySelector("#notificationCount");
 const notificationList = document.querySelector("#notificationList");
 const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
 const enablePushButton = document.querySelector("#enablePushButton");
+const dashboardMode = document.querySelector("#dashboardMode");
+const dashboardCards = document.querySelector("#dashboardCards");
 const message = document.querySelector("#message");
 
 let allItems = [];
@@ -168,6 +170,17 @@ function requestUser(request) {
   return String(request.requestedBy || "").trim();
 }
 
+function isOperationalRole() {
+  return Boolean(sessionPermissions.canAddInventoryItems || sessionPermissions.canAdminUsers);
+}
+
+function displayRoleMode() {
+  if (sessionRole === "god") return "God view";
+  if (sessionRole === "admin") return "Admin view";
+  if (sessionRole === "power-user") return "Power user view";
+  return "Team view";
+}
+
 function selectedDailyArea() {
   return String(dailyAreaFilter?.value || "").trim();
 }
@@ -236,12 +249,13 @@ function populateDailyUserFilter() {
   )].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
   const selected = selectedDailyUser();
+  const defaultSelection = !selected && !isOperationalRole() ? "__mine__" : selected;
   dailyUserFilter.innerHTML = [
     '<option value="">All Users</option>',
-    `<option value="__mine__"${selected === "__mine__" ? " selected" : ""}>My Orders</option>`,
-    ...users.map((user) => `<option value="${escapeHtml(user)}"${user === selected ? " selected" : ""}>${escapeHtml(formatUserDisplay(user))}</option>`)
+    `<option value="__mine__"${defaultSelection === "__mine__" ? " selected" : ""}>My Orders</option>`,
+    ...users.map((user) => `<option value="${escapeHtml(user)}"${user === defaultSelection ? " selected" : ""}>${escapeHtml(formatUserDisplay(user))}</option>`)
   ].join("");
-  dailyUserFilter.value = selected === "__mine__" || users.includes(selected) ? selected : "";
+  dailyUserFilter.value = defaultSelection === "__mine__" || users.includes(defaultSelection) ? defaultSelection : "";
 }
 
 function requesterMatches(request) {
@@ -264,6 +278,7 @@ function renderNotifications() {
   if (readAllNotificationsButton) readAllNotificationsButton.disabled = unread.length === 0;
   if (!unread.length) {
     notificationList.innerHTML = '<p class="empty-sheet">No notifications right now.</p>';
+    renderDashboardCards();
     return;
   }
   notificationList.innerHTML = unread
@@ -279,6 +294,48 @@ function renderNotifications() {
       </article>
     `)
     .join("");
+  renderDashboardCards();
+}
+
+function renderDashboardCards() {
+  if (!dashboardCards || !dashboardMode) return;
+  dashboardMode.textContent = displayRoleMode();
+  const today = todayLocal();
+  const unresolved = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
+  const myOpen = unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
+  const teamToday = unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
+  const olderOpen = unresolved.filter((request) => {
+    const day = requestDay(request);
+    return day && day < today && !isStandingOrderRequest(request);
+  }).length;
+  const belowMin = allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
+  const standingDue = standingOrders.filter((order) => {
+    const expected = String(order.expectedDate || "").trim();
+    return expected && expected <= today;
+  }).length;
+  const unread = notifications.filter((note) => !note.isRead).length;
+
+  const cards = isOperationalRole()
+    ? [
+      ["Today active", teamToday, "Open order lines still waiting today"],
+      ["Older open", olderOpen, "Still waiting from previous days"],
+      ["Below minimum", belowMin, "Inventory items currently under minimum"],
+      ["Standing due", standingDue, "Standing orders due now or overdue"]
+    ]
+    : [
+      ["My open", myOpen, "Items you still have open"],
+      ["Today active", teamToday, "Open order lines still waiting today"],
+      ["Older open", olderOpen, "Still waiting from previous days"],
+      ["Unread", unread, "Notifications waiting for you"]
+    ];
+
+  dashboardCards.innerHTML = cards.map(([label, value, hint]) => `
+    <article class="dashboard-card">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+      <small>${escapeHtml(hint)}</small>
+    </article>
+  `).join("");
 }
 
 function renderPushStatus(detail = {}) {
@@ -403,12 +460,13 @@ function renderOpenOrders() {
 }
 
 function renderStandingOrders() {
+  const visibleOrders = isOperationalRole() ? standingOrders : standingOrders.slice(0, 6);
   standingOrderCount.textContent = `${standingOrders.length} scheduled`;
-  if (!standingOrders.length) {
+  if (!visibleOrders.length) {
     standingOrderList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     return;
   }
-  standingOrderList.innerHTML = standingOrders
+  standingOrderList.innerHTML = visibleOrders
     .slice(0, 100)
     .map((order) => {
       return `
@@ -436,6 +494,7 @@ async function refresh() {
   notifications = data.notifications || [];
   populateDailyAreaFilter();
   populateDailyUserFilter();
+  renderDashboardCards();
   renderDailyOrder();
   renderOpenOrders();
   renderStandingOrders();

@@ -1,4 +1,4 @@
-﻿const loginScreen = document.querySelector("#loginScreen");
+const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");

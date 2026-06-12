@@ -179,6 +179,26 @@ async function ensurePostgresSchemaUpgrades() {
       create index if not exists idx_supplier_delivery_notes_date_supplier
         on supplier_delivery_notes (delivery_date, supplier_name)
     `);
+    await db().query(`
+      create table if not exists audit_log_entries (
+        id uuid primary key default gen_random_uuid(),
+        action_date date not null default current_date,
+        action_type text not null check (action_type in ('add', 'change', 'delete')),
+        entity_type text not null,
+        entity_id text not null default '',
+        entity_name text not null default '',
+        actor_username text not null default '',
+        reason_code text not null default '',
+        note text not null default '',
+        before_json jsonb,
+        after_json jsonb,
+        created_at timestamptz not null default now()
+      )
+    `);
+    await db().query(`
+      create index if not exists idx_audit_log_entries_date_created
+        on audit_log_entries (action_date desc, created_at desc)
+    `);
   })().catch((error) => {
     postgresSchemaReady = null;
     throw error;
@@ -201,6 +221,89 @@ function todayIso() {
     month: "2-digit",
     day: "2-digit"
   }).format(new Date());
+}
+
+function cleanAuditSnapshot(value) {
+  if (value == null) return null;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+
+function auditChanged(before, after) {
+  return JSON.stringify(cleanAuditSnapshot(before)) !== JSON.stringify(cleanAuditSnapshot(after));
+}
+
+async function pgRecordAuditEntry({
+  actionType,
+  entityType,
+  entityId = "",
+  entityName = "",
+  actorUsername = "",
+  reasonCode = "",
+  note = "",
+  before = null,
+  after = null,
+  actionDate = todayIso()
+}) {
+  await ensurePostgresSchemaUpgrades();
+  await db().query(`
+    insert into audit_log_entries (
+      action_date, action_type, entity_type, entity_id, entity_name,
+      actor_username, reason_code, note, before_json, after_json
+    )
+    values ($1::date, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
+  `, [
+    /^\d{4}-\d{2}-\d{2}$/.test(actionDate || "") ? actionDate : todayIso(),
+    actionType,
+    entityType,
+    String(entityId || ""),
+    String(entityName || ""),
+    String(actorUsername || ""),
+    String(reasonCode || ""),
+    String(note || ""),
+    JSON.stringify(cleanAuditSnapshot(before)),
+    JSON.stringify(cleanAuditSnapshot(after))
+  ]);
+}
+
+async function pgListAuditEntries(date) {
+  await ensurePostgresSchemaUpgrades();
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  const result = await db().query(`
+    select
+      id,
+      action_date::text as action_date,
+      action_type,
+      entity_type,
+      entity_id,
+      entity_name,
+      actor_username,
+      reason_code,
+      note,
+      before_json,
+      after_json,
+      created_at
+    from audit_log_entries
+    where action_date = $1::date
+    order by created_at desc, entity_type, entity_name
+  `, [selectedDate]);
+  return result.rows.map((row) => ({
+    id: row.id,
+    date: row.action_date || selectedDate,
+    actionType: row.action_type || "",
+    entityType: row.entity_type || "",
+    entityId: row.entity_id || "",
+    entityName: row.entity_name || "",
+    actorUsername: row.actor_username || "",
+    reasonCode: row.reason_code || "",
+    note: row.note || "",
+    before: row.before_json || null,
+    after: row.after_json || null,
+    createdAt: row.created_at || ""
+  }));
 }
 
 function parseUsers() {
@@ -699,14 +802,22 @@ async function pgListSuppliersAdmin() {
   }));
 }
 
-async function pgSaveSupplier(payload, recordId = "") {
+async function pgSaveSupplier(payload, recordId = "", actorUsername = "") {
   const name = String(payload.name || "").trim();
   const contact = String(payload.contact || "").trim();
   const active = payload.active !== false;
   if (!name) throw new Error("Supplier name is required.");
   let result;
+  let before = null;
   if (recordId) {
     if (!isValidId(recordId)) throw new Error("Invalid supplier record.");
+    const current = await db().query(`select id, name, contact_information, active from suppliers where id = $1`, [recordId]);
+    before = current.rows[0] ? {
+      id: current.rows[0].id,
+      name: current.rows[0].name || "",
+      contact: current.rows[0].contact_information || "",
+      active: current.rows[0].active !== false
+    } : null;
     result = await db().query(`
       update suppliers
       set name = $2,
@@ -726,16 +837,36 @@ async function pgSaveSupplier(payload, recordId = "") {
   cache.suppliers.expiresAt = 0;
   cache.items.expiresAt = 0;
   const row = result.rows[0];
-  return {
+  const saved = {
     id: row.id,
     name: row.name || "",
     contact: row.contact_information || "",
     active: row.active !== false
   };
+  if (!recordId || auditChanged(before, saved)) {
+    await pgRecordAuditEntry({
+      actionType: recordId ? "change" : "add",
+      entityType: "supplier",
+      entityId: saved.id,
+      entityName: saved.name,
+      actorUsername,
+      reasonCode: recordId ? "supplier-update" : "supplier-create",
+      before,
+      after: saved
+    });
+  }
+  return saved;
 }
 
-async function pgDeleteSupplier(recordId) {
+async function pgDeleteSupplier(recordId, actorUsername = "") {
   if (!isValidId(recordId)) throw new Error("Invalid supplier record.");
+  const current = await db().query(`select id, name, contact_information, active from suppliers where id = $1`, [recordId]);
+  const before = current.rows[0] ? {
+    id: current.rows[0].id,
+    name: current.rows[0].name || "",
+    contact: current.rows[0].contact_information || "",
+    active: current.rows[0].active !== false
+  } : null;
   const inUse = await db().query(`
     select exists(select 1 from inventory_items where primary_supplier_id = $1) as inventory_used,
            exists(select 1 from standing_orders where supplier_id = $1) as standing_used,
@@ -748,6 +879,17 @@ async function pgDeleteSupplier(recordId) {
   await db().query(`delete from suppliers where id = $1`, [recordId]);
   cache.suppliers.expiresAt = 0;
   cache.items.expiresAt = 0;
+  if (before) {
+    await pgRecordAuditEntry({
+      actionType: "delete",
+      entityType: "supplier",
+      entityId: recordId,
+      entityName: before.name,
+      actorUsername,
+      reasonCode: "supplier-delete",
+      before
+    });
+  }
   return { ok: true, recordId };
 }
 
@@ -1114,6 +1256,8 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
   const data = await pgStandingOrderFields(payload);
   const client = await db().connect();
   let createdNew = false;
+  const beforeOrders = recordId ? await pgListStandingOrders() : [];
+  const before = recordId ? beforeOrders.find((entry) => entry.id === recordId) || null : null;
   try {
     await client.query("begin");
 
@@ -1182,6 +1326,16 @@ async function pgSaveStandingOrderDefinition(payload, user, recordId = "") {
       await pgGenerateStandingOrdersForDate(data.expectedDate, user.name || "System");
     }
     await pgSyncStandingOrderRunsForOrder(orderId, user.name || "System");
+    await pgRecordAuditEntry({
+      actionType: createdNew ? "add" : "change",
+      entityType: "standing-order",
+      entityId: orderId,
+      entityName: savedOrder.name || data.name,
+      actorUsername: user.name || "",
+      reasonCode: createdNew ? "standing-order-create" : "standing-order-update",
+      before,
+      after: savedOrder
+    });
     const notifyUsers = await pgNotificationUsers("new-order", user.name);
     if (notifyUsers.length) {
       await pgCreateNotificationsForUsers(notifyUsers, {
@@ -1398,6 +1552,8 @@ async function pgSyncStandingOrderRunsForOrder(orderId, userName = "System") {
 async function pgDeleteStandingOrder(recordId, user) {
   if (!user.permissions?.canAdminUsers) throw new Error("Only admins can delete standing orders.");
   if (!isValidId(recordId)) throw new Error("Invalid standing order.");
+  const beforeOrders = await pgListStandingOrders();
+  const before = beforeOrders.find((entry) => entry.id === recordId) || null;
   await db().query(`
     update standing_orders
     set deleted = true,
@@ -1405,6 +1561,17 @@ async function pgDeleteStandingOrder(recordId, user) {
         updated_at = now()
     where id = $1
   `, [recordId]);
+  if (before) {
+    await pgRecordAuditEntry({
+      actionType: "delete",
+      entityType: "standing-order",
+      entityId: recordId,
+      entityName: before.name || before.supplierName || "",
+      actorUsername: user.name || "",
+      reasonCode: "standing-order-delete",
+      before
+    });
+  }
   return { id: recordId, deleted: true };
 }
 
@@ -1610,7 +1777,7 @@ async function pgFindAppUserByName(name) {
   };
 }
 
-async function pgCreateAppUser(payload) {
+async function pgCreateAppUser(payload, actorUsername = "") {
   await ensurePostgresSchemaUpgrades();
   const username = String(payload.name || payload.username || "").trim().toLowerCase();
   const displayName = String(payload.name || payload.username || "").trim();
@@ -1672,10 +1839,20 @@ async function pgCreateAppUser(payload) {
   `, [createdId]) : { rows: result.rows };
   const row = refreshed.rows[0];
   cache.appUsers.expiresAt = 0;
-  return mapPgAppUserRow(row);
+  const saved = mapPgAppUserRow(row);
+  await pgRecordAuditEntry({
+    actionType: "add",
+    entityType: "app-user",
+    entityId: saved.id,
+    entityName: saved.name || saved.displayName || username,
+    actorUsername,
+    reasonCode: "user-create",
+    after: saved
+  });
+  return saved;
 }
 
-async function pgUpdateAppUser(recordId, payload) {
+async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
   await ensurePostgresSchemaUpgrades();
   if (!isValidId(recordId)) throw new Error("Invalid app user record.");
   const current = await db().query(`
@@ -1689,6 +1866,7 @@ async function pgUpdateAppUser(recordId, payload) {
   `, [recordId]);
   const user = current.rows[0];
   if (!user) throw new Error("User was not found.");
+  const before = mapPgAppUserRow(user);
   const nextName = String(payload.name || user.display_name || user.username).trim();
   const nextUsername = nextName.toLowerCase();
   const nextRole = normalizeRole(payload.role || user.role);
@@ -1756,12 +1934,46 @@ async function pgUpdateAppUser(recordId, payload) {
   `, [updatedId]);
   const row = refreshed.rows[0];
   cache.appUsers.expiresAt = 0;
-  return mapPgAppUserRow(row);
+  const saved = mapPgAppUserRow(row);
+  if (auditChanged(before, saved)) {
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "app-user",
+      entityId: saved.id,
+      entityName: saved.name || saved.displayName || nextUsername,
+      actorUsername,
+      reasonCode: "user-update",
+      before,
+      after: saved
+    });
+  }
+  return saved;
 }
 
-async function pgDeleteAppUser(recordId) {
+async function pgDeleteAppUser(recordId, actorUsername = "") {
+  const current = await db().query(`
+    select id, username, display_name, role, theme, active, must_change_password,
+           is_driver,
+           notify_on_new_orders, notify_on_delivery,
+           notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           source, last_login_at
+    from app_users
+    where id = $1
+  `, [recordId]);
+  const before = current.rows[0] ? mapPgAppUserRow(current.rows[0]) : null;
   const result = await db().query(`delete from app_users where id = $1 returning id`, [recordId]);
   cache.appUsers.expiresAt = 0;
+  if (before) {
+    await pgRecordAuditEntry({
+      actionType: "delete",
+      entityType: "app-user",
+      entityId: recordId,
+      entityName: before.name || before.displayName || "",
+      actorUsername,
+      reasonCode: "user-delete",
+      before
+    });
+  }
   return { id: result.rows[0]?.id || recordId, deleted: Boolean(result.rowCount) };
 }
 
@@ -1781,7 +1993,17 @@ async function pgChangeOwnPassword(userName, currentPassword, newPassword, optio
   `, [user.id, passwordHash]);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
-  return mapPgAppUserRow(row);
+  const saved = mapPgAppUserRow(row);
+  await pgRecordAuditEntry({
+    actionType: "change",
+    entityType: "app-user",
+    entityId: saved.id,
+    entityName: saved.name || saved.displayName || userName,
+    actorUsername: saved.name || userName,
+    reasonCode: options.forceChange ? "password-reset" : "password-change",
+    note: options.forceChange ? "Password reset through admin or forced change flow." : "User changed password."
+  });
+  return saved;
 }
 
 async function pgListNotificationsForUser(userName, limit = 20) {
@@ -2061,11 +2283,25 @@ async function pgSaveSupplierDeliveryNote(payload, userName) {
   const supplierName = String(payload.supplierName || "").trim();
   const memo = String(payload.memo || "").trim();
   if (!supplierName) throw new Error("Choose the supplier for this memo.");
+  const existingNotes = await pgListSupplierDeliveryNotes(selectedDate);
+  const before = existingNotes.find((entry) => entry.supplierName.toLowerCase() === supplierName.toLowerCase()) || null;
   if (!memo) {
     await db().query(`
       delete from supplier_delivery_notes
       where delivery_date = $1::date and lower(supplier_name) = lower($2)
     `, [selectedDate, supplierName]);
+    if (before) {
+      await pgRecordAuditEntry({
+        actionType: "delete",
+        entityType: "supplier-delivery-note",
+        entityId: `${selectedDate}:${supplierName}`,
+        entityName: `${supplierName} ${selectedDate}`,
+        actorUsername: userName,
+        reasonCode: "supplier-note-delete",
+        before,
+        actionDate: selectedDate
+      });
+    }
     return { supplierName, memo: "", enteredBy: userName, updatedAt: new Date().toISOString() };
   }
   const result = await db().query(`
@@ -2077,12 +2313,24 @@ async function pgSaveSupplierDeliveryNote(payload, userName) {
           updated_at = now()
     returning supplier_name, memo, entered_by_username, updated_at
   `, [selectedDate, supplierName, memo, userName]);
-  return {
+  const saved = {
     supplierName: result.rows[0]?.supplier_name || supplierName,
     memo: result.rows[0]?.memo || memo,
     enteredBy: result.rows[0]?.entered_by_username || userName,
     updatedAt: result.rows[0]?.updated_at || new Date().toISOString()
   };
+  await pgRecordAuditEntry({
+    actionType: before ? "change" : "add",
+    entityType: "supplier-delivery-note",
+    entityId: `${selectedDate}:${supplierName}`,
+    entityName: `${supplierName} ${selectedDate}`,
+    actorUsername: userName,
+    reasonCode: before ? "supplier-note-update" : "supplier-note-create",
+    before,
+    after: saved,
+    actionDate: selectedDate
+  });
+  return saved;
 }
 
 async function pgGetDailyGuestCount(date) {
@@ -2103,6 +2351,7 @@ async function pgSaveDailyGuestCount(payload, user) {
   const notes = String(payload.notes || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) throw new Error("Choose a valid date.");
   if (!Number.isFinite(guests) || guests < 0) throw new Error("Guest count must be zero or greater.");
+  const before = await pgGetDailyGuestCount(selectedDate);
   const result = await db().query(`
     insert into daily_guest_counts (report_date, guests, notes, entered_by_username, entered_at)
     values ($1::date, $2, $3, $4, now())
@@ -2113,7 +2362,19 @@ async function pgSaveDailyGuestCount(payload, user) {
           entered_at = excluded.entered_at
     returning id, report_date::text as date, guests, notes, entered_by_username as "enteredBy", entered_at as "enteredAt"
   `, [selectedDate, Math.max(0, Math.round(guests)), notes, user.name]);
-  return result.rows[0];
+  const saved = result.rows[0];
+  await pgRecordAuditEntry({
+    actionType: before ? "change" : "add",
+    entityType: "daily-guests",
+    entityId: selectedDate,
+    entityName: `Guest count ${selectedDate}`,
+    actorUsername: user.name || "",
+    reasonCode: before ? "guest-count-update" : "guest-count-create",
+    before,
+    after: saved,
+    actionDate: selectedDate
+  });
+  return saved;
 }
 
 async function pgEnsureDriverSheetLines(selectedDate) {
@@ -2266,9 +2527,10 @@ async function pgListOrderReport(date) {
   await pgGenerateStandingOrdersForDate(selectedDate);
   await pgSyncStandingOrderRunsForDate(selectedDate);
   await pgEnsureDriverSheetLines(selectedDate);
-  const [guestCount, standingOrders] = await Promise.all([
+  const [guestCount, standingOrders, activity] = await Promise.all([
     pgGetDailyGuestCount(selectedDate),
-    pgListStandingOrders()
+    pgListStandingOrders(),
+    pgListAuditEntries(selectedDate)
   ]);
   const result = await db().query(`
     select
@@ -2340,7 +2602,8 @@ async function pgListOrderReport(date) {
     },
     guestCount,
     rows: reportRows,
-    standingOrders
+    standingOrders,
+    activity
   };
 }
 
@@ -2357,6 +2620,7 @@ async function pgCreateRequest(payload, requestedByOverride = "") {
   if (orderUnit && !allowedUnits.has(orderUnit)) throw new Error("Unit must be box, bag, item, or bottle.");
   const client = await db().connect();
   let requestId = "";
+  let updatedExisting = false;
   try {
     await client.query("begin");
     const existingResult = await client.query(`
@@ -2374,6 +2638,7 @@ async function pgCreateRequest(payload, requestedByOverride = "") {
     const primary = existingRows[0];
 
     if (primary) {
+      updatedExisting = true;
       await client.query(`
         update order_requests
         set quantity_needed = $2,
@@ -2412,7 +2677,18 @@ async function pgCreateRequest(payload, requestedByOverride = "") {
   }
   cache.requests.expiresAt = 0;
   const requests = await pgListRequests(200);
-  return requests.find((entry) => entry.id === requestId) || { id: requestId };
+  const saved = requests.find((entry) => entry.id === requestId) || { id: requestId };
+  await pgRecordAuditEntry({
+    actionType: updatedExisting ? "change" : "add",
+    entityType: "order-request",
+    entityId: saved.id || requestId,
+    entityName: saved.itemName || saved.requestId || itemId,
+    actorUsername: requestedBy,
+    reasonCode: updatedExisting ? "order-update" : "order-create",
+    note: updatedExisting ? "Existing open order updated instead of duplicated." : "New order entered.",
+    after: saved
+  });
+  return saved;
 }
 
 async function pgCreateRequestsBatch(payload, requestedByOverride = "") {
@@ -2476,7 +2752,7 @@ async function pgCreateStockCount(payload, userName) {
     `, [itemId, countedQuantity, item.unit || "item"]);
     await client.query("commit");
     cache.items.expiresAt = 0;
-    return {
+    const saved = {
       count: { id: "", fields: {} },
       item: {
         id: updated.rows[0].id,
@@ -2485,6 +2761,18 @@ async function pgCreateStockCount(payload, userName) {
         unit: updated.rows[0].unit || "item"
       }
     };
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "stock-count",
+      entityId: itemId,
+      entityName: item.name || "",
+      actorUsername: userName,
+      reasonCode: "stock-count",
+      note: notes || "Manual stock count saved.",
+      before: { quantity: pgNumber(item.current_quantity || 0), unit: item.unit || "item" },
+      after: { quantity: saved.item.quantity, unit: saved.item.unit }
+    });
+    return saved;
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -2522,6 +2810,16 @@ async function pgDeliverRequest(recordId, userName, options = {}) {
     `, [recordId]);
     const request = requestResult.rows[0];
     if (!request) throw new Error("Request not found.");
+    const before = {
+      id: request.id,
+      itemName: request.item_name || "",
+      quantityNeeded: Number(request.quantity_needed || 0),
+      requestedBy: request.requested_by_username || "",
+      delivered: Boolean(request.delivered),
+      status: request.status || "",
+      notes: request.notes || "",
+      unit: request.unit || ""
+    };
     if (request.delivered || request.status === "Fulfilled") {
       await client.query("commit");
       const requests = await pgListRequests(200);
@@ -2617,6 +2915,19 @@ async function pgDeliverRequest(recordId, userName, options = {}) {
     }
     const requests = await pgListRequests(200);
     const latest = requests.find((entry) => entry.id === recordId) || { id: recordId, delivered: isFullReceipt };
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "order-request",
+      entityId: recordId,
+      entityName: request.item_name || "",
+      actorUsername: userName,
+      reasonCode: isFullReceipt ? "delivery-complete" : "delivery-partial",
+      note: isFullReceipt
+        ? `Order fully received. ${receivedQty} ${request.unit || ""} added to stock.`
+        : `Order partially received. ${receivedQty} ${request.unit || ""} added, ${remainingQty} ${request.unit || ""} still open.`,
+      before,
+      after: latest
+    });
     return { ...latest, receivedQuantity: receivedQty, remainingQuantity: remainingQty, fullyDelivered: isFullReceipt };
   } catch (error) {
     await client.query("rollback");
@@ -2647,6 +2958,16 @@ async function pgAssignDriverToSheet(date, driverName, user) {
     where sheet_date = $1::date
     returning id
   `, [selectedDate, cleaned]);
+  await pgRecordAuditEntry({
+    actionType: "change",
+    entityType: "driver-assignment",
+    entityId: selectedDate,
+    entityName: `Driver assignment ${selectedDate}`,
+    actorUsername: user.name || "",
+    reasonCode: "driver-assign",
+    note: `${presentUserName(cleaned)} assigned to ${selectedDate}.`,
+    after: { date: selectedDate, driverName: cleaned, updated: result.rowCount }
+  });
   return { date: selectedDate, driverName: cleaned, updated: result.rowCount };
 }
 
@@ -2661,6 +2982,8 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
   `, [recordId]);
   const current = currentResult.rows[0];
   if (!current) throw new Error("Driver line was not found.");
+  const beforeSheet = await pgListDriverSheet(current.sheet_date || todayIso());
+  const before = beforeSheet.requests.find((request) => request.driverLineId === recordId) || null;
   const fields = [];
   const values = [recordId];
   const requestFields = [];
@@ -2725,6 +3048,27 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
   }
   const sheet = await pgListDriverSheet(current.sheet_date || todayIso());
   const match = sheet.requests.find((request) => request.driverLineId === recordId);
+  if (match && auditChanged(before, match)) {
+    const reasonCode = Object.prototype.hasOwnProperty.call(payload, "supplierName")
+      ? (payload.updatePrimarySupplier ? "supplier-primary-change" : "supplier-temp-change")
+      : Object.prototype.hasOwnProperty.call(payload, "unit")
+        ? "unit-change"
+        : Object.prototype.hasOwnProperty.call(payload, "toDeliver")
+          ? "delivery-plan-change"
+          : Object.prototype.hasOwnProperty.call(payload, "ordered")
+            ? "picked-change"
+            : "driver-line-change";
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "driver-line",
+      entityId: recordId,
+      entityName: match.itemName || before?.itemName || "Driver line",
+      actorUsername: userName,
+      reasonCode,
+      before,
+      after: match
+    });
+  }
   return match ? {
     id: match.driverLineId,
     ordered: match.ordered,
@@ -2786,9 +3130,22 @@ async function pgDeliverDriverLine(recordId, requestRecordId, userName, options 
   };
 }
 
-async function pgDeleteRequest(recordId) {
+async function pgDeleteRequest(recordId, actorUsername = "") {
+  const requests = await pgListRequests(200);
+  const before = requests.find((request) => request.id === recordId) || null;
   const result = await db().query(`delete from order_requests where id = $1 returning id`, [recordId]);
   cache.requests.expiresAt = 0;
+  if (before) {
+    await pgRecordAuditEntry({
+      actionType: "delete",
+      entityType: "order-request",
+      entityId: recordId,
+      entityName: before.itemName || before.requestId || "",
+      actorUsername,
+      reasonCode: "order-delete",
+      before
+    });
+  }
   return { id: result.rows[0]?.id || recordId, deleted: Boolean(result.rowCount) };
 }
 
@@ -2871,11 +3228,18 @@ async function pgResolveShelfCodeRecord(name, storageLocation) {
   return inserted.rows[0].id;
 }
 
-async function pgSaveStorageLocation(payload, recordId = "") {
+async function pgSaveStorageLocation(payload, recordId = "", actorUsername = "") {
   const name = String(payload.name || payload.storageLocation || "").trim();
   const active = payload.active !== false;
   if (!name) throw new Error("Storage location name is required.");
+  let before = null;
   if (recordId) {
+    const current = await db().query(`select id, name, active from storage_locations where id = $1`, [recordId]);
+    before = current.rows[0] ? {
+      id: current.rows[0].id,
+      name: current.rows[0].name || "",
+      active: current.rows[0].active !== false
+    } : null;
     const result = await db().query(`
       update storage_locations
       set name = $2, active = $3, updated_at = now()
@@ -2883,7 +3247,20 @@ async function pgSaveStorageLocation(payload, recordId = "") {
       returning id, name, active
     `, [recordId, name, active]);
     cache.lookups.expiresAt = 0;
-    return { id: result.rows[0].id, name: result.rows[0].name, active: result.rows[0].active !== false };
+    const saved = { id: result.rows[0].id, name: result.rows[0].name, active: result.rows[0].active !== false };
+    if (auditChanged(before, saved)) {
+      await pgRecordAuditEntry({
+        actionType: "change",
+        entityType: "storage-location",
+        entityId: saved.id,
+        entityName: saved.name,
+        actorUsername,
+        reasonCode: "storage-location-update",
+        before,
+        after: saved
+      });
+    }
+    return saved;
   }
   const result = await db().query(`
     insert into storage_locations (name, active, sort_order)
@@ -2891,13 +3268,26 @@ async function pgSaveStorageLocation(payload, recordId = "") {
     returning id, name, active
   `, [name, active]);
   cache.lookups.expiresAt = 0;
-  return { id: result.rows[0].id, name: result.rows[0].name, active: result.rows[0].active !== false };
+  const saved = { id: result.rows[0].id, name: result.rows[0].name, active: result.rows[0].active !== false };
+  await pgRecordAuditEntry({
+    actionType: "add",
+    entityType: "storage-location",
+    entityId: saved.id,
+    entityName: saved.name,
+    actorUsername,
+    reasonCode: "storage-location-create",
+    after: saved
+  });
+  return saved;
 }
 
-async function pgSaveCategory(payload, recordId = "") {
+async function pgSaveCategory(payload, recordId = "", actorUsername = "") {
   const name = String(payload.name || payload.category || "").trim();
   if (!name) throw new Error("Category name is required.");
+  let before = null;
   if (recordId) {
+    const current = await db().query(`select id, name from categories where id = $1`, [recordId]);
+    before = current.rows[0] ? { id: current.rows[0].id, name: current.rows[0].name || "" } : null;
     const result = await db().query(`
       update categories
       set name = $2, updated_at = now()
@@ -2905,7 +3295,20 @@ async function pgSaveCategory(payload, recordId = "") {
       returning id, name
     `, [recordId, name]);
     cache.lookups.expiresAt = 0;
-    return { id: result.rows[0].id, name: result.rows[0].name };
+    const saved = { id: result.rows[0].id, name: result.rows[0].name };
+    if (auditChanged(before, saved)) {
+      await pgRecordAuditEntry({
+        actionType: "change",
+        entityType: "category",
+        entityId: saved.id,
+        entityName: saved.name,
+        actorUsername,
+        reasonCode: "category-update",
+        before,
+        after: saved
+      });
+    }
+    return saved;
   }
   const result = await db().query(`
     insert into categories (name, active, sort_order)
@@ -2913,22 +3316,58 @@ async function pgSaveCategory(payload, recordId = "") {
     returning id, name
   `, [name]);
   cache.lookups.expiresAt = 0;
-  return { id: result.rows[0].id, name: result.rows[0].name };
+  const saved = { id: result.rows[0].id, name: result.rows[0].name };
+  await pgRecordAuditEntry({
+    actionType: "add",
+    entityType: "category",
+    entityId: saved.id,
+    entityName: saved.name,
+    actorUsername,
+    reasonCode: "category-create",
+    after: saved
+  });
+  return saved;
 }
 
-async function pgDeleteCategory(recordId) {
+async function pgDeleteCategory(recordId, actorUsername = "") {
+  const current = await db().query(`select id, name from categories where id = $1`, [recordId]);
+  const before = current.rows[0] ? { id: current.rows[0].id, name: current.rows[0].name || "" } : null;
   await db().query(`delete from categories where id = $1`, [recordId]);
   cache.lookups.expiresAt = 0;
+  if (before) {
+    await pgRecordAuditEntry({
+      actionType: "delete",
+      entityType: "category",
+      entityId: recordId,
+      entityName: before.name,
+      actorUsername,
+      reasonCode: "category-delete",
+      before
+    });
+  }
   return { ok: true, recordId };
 }
 
-async function pgSaveShelfCode(payload, recordId = "") {
+async function pgSaveShelfCode(payload, recordId = "", actorUsername = "") {
   const name = String(payload.name || payload.shelfCode || "").trim();
   const storageLocation = String(payload.storageLocation || "").trim();
   const active = payload.active !== false;
   if (!name) throw new Error("Shelf code is required.");
   const storageLocationId = storageLocation ? await pgFindOrCreateLookupRecord("storageLocations", storageLocation) : null;
+  let before = null;
   if (recordId) {
+    const current = await db().query(`
+      select sc.id, sc.code, sc.active, sl.name as storage_location
+      from shelf_codes sc
+      left join storage_locations sl on sl.id = sc.storage_location_id
+      where sc.id = $1
+    `, [recordId]);
+    before = current.rows[0] ? {
+      id: current.rows[0].id,
+      name: current.rows[0].code || "",
+      storageLocation: current.rows[0].storage_location || "",
+      active: current.rows[0].active !== false
+    } : null;
     const result = await db().query(`
       update shelf_codes
       set code = $2, storage_location_id = $3, active = $4, updated_at = now()
@@ -2936,7 +3375,20 @@ async function pgSaveShelfCode(payload, recordId = "") {
       returning id, code, active
     `, [recordId, name, storageLocationId, active]);
     cache.lookups.expiresAt = 0;
-    return { id: result.rows[0].id, name: result.rows[0].code, storageLocation, storageLocationId, active: result.rows[0].active !== false };
+    const saved = { id: result.rows[0].id, name: result.rows[0].code, storageLocation, storageLocationId, active: result.rows[0].active !== false };
+    if (auditChanged(before, saved)) {
+      await pgRecordAuditEntry({
+        actionType: "change",
+        entityType: "shelf-code",
+        entityId: saved.id,
+        entityName: `${saved.storageLocation || "No Location"} / ${saved.name}`,
+        actorUsername,
+        reasonCode: "shelf-code-update",
+        before,
+        after: saved
+      });
+    }
+    return saved;
   }
   const result = await db().query(`
     insert into shelf_codes (storage_location_id, code, active, sort_order)
@@ -2944,10 +3396,20 @@ async function pgSaveShelfCode(payload, recordId = "") {
     returning id, code, active
   `, [storageLocationId, name, active]);
   cache.lookups.expiresAt = 0;
-  return { id: result.rows[0].id, name: result.rows[0].code, storageLocation, storageLocationId, active: result.rows[0].active !== false };
+  const saved = { id: result.rows[0].id, name: result.rows[0].code, storageLocation, storageLocationId, active: result.rows[0].active !== false };
+  await pgRecordAuditEntry({
+    actionType: "add",
+    entityType: "shelf-code",
+    entityId: saved.id,
+    entityName: `${saved.storageLocation || "No Location"} / ${saved.name}`,
+    actorUsername,
+    reasonCode: "shelf-code-create",
+    after: saved
+  });
+  return saved;
 }
 
-async function pgUpdateItemSettings(recordId, payload) {
+async function pgUpdateItemSettings(recordId, payload, actorUsername = "") {
   const itemName = String(payload.name || payload.itemName || "").trim();
   const minimum = Number(payload.minimumThreshold);
   const unit = String(payload.unit || "").trim().toLowerCase();
@@ -2964,6 +3426,8 @@ async function pgUpdateItemSettings(recordId, payload) {
   const areaId = await pgFindOrCreateLookupRecord("inventoryAreas", inventoryArea);
   const storageLocationId = await pgFindOrCreateLookupRecord("storageLocations", storageLocation);
   const shelfCodeId = await pgResolveShelfCodeRecord(shelfCode, storageLocation);
+  const beforeItems = await pgListItems();
+  const before = beforeItems.find((item) => item.id === recordId) || null;
   await db().query(`
     update inventory_items
     set name = $2,
@@ -2979,17 +3443,43 @@ async function pgUpdateItemSettings(recordId, payload) {
   `, [recordId, itemName, minimum, unitId || null, categoryId || null, areaId || null, storageLocationId || null, shelfCodeId || null, isValidId(supplierId) ? supplierId : null]);
   cache.items.expiresAt = 0;
   const items = await pgListItems();
-  return items.find((item) => item.id === recordId);
+  const saved = items.find((item) => item.id === recordId);
+  if (saved && auditChanged(before, saved)) {
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "inventory-item",
+      entityId: recordId,
+      entityName: saved.name || itemName,
+      actorUsername,
+      reasonCode: "inventory-update",
+      before,
+      after: saved
+    });
+  }
+  return saved;
 }
 
-async function pgDeleteInventoryItem(recordId) {
+async function pgDeleteInventoryItem(recordId, actorUsername = "") {
+  const items = await pgListItems();
+  const before = items.find((item) => item.id === recordId) || null;
   await db().query(`delete from inventory_items where id = $1`, [recordId]);
   cache.items.expiresAt = 0;
   cache.requests.expiresAt = 0;
+  if (before) {
+    await pgRecordAuditEntry({
+      actionType: "delete",
+      entityType: "inventory-item",
+      entityId: recordId,
+      entityName: before.name || "",
+      actorUsername,
+      reasonCode: "inventory-delete",
+      before
+    });
+  }
   return { ok: true, recordId };
 }
 
-async function pgCreateInventoryItem(payload) {
+async function pgCreateInventoryItem(payload, actorUsername = "") {
   const itemName = String(payload.itemName || "").trim();
   const category = String(payload.category || "").trim();
   const storageLocation = String(payload.storageLocation || "").trim();
@@ -3017,7 +3507,19 @@ async function pgCreateInventoryItem(payload) {
   `, [itemName, categoryId || null, storageLocationId || null, shelfId || null, inventoryAreaId || null, isValidId(supplierId) ? supplierId : null, unitId || null, currentQuantity, minimum]);
   cache.items.expiresAt = 0;
   const items = await pgListItems();
-  return items.find((item) => item.id === result.rows[0].id);
+  const saved = items.find((item) => item.id === result.rows[0].id);
+  if (saved) {
+    await pgRecordAuditEntry({
+      actionType: "add",
+      entityType: "inventory-item",
+      entityId: saved.id,
+      entityName: saved.name || itemName,
+      actorUsername,
+      reasonCode: "inventory-create",
+      after: saved
+    });
+  }
+  return saved;
 }
 
 async function listItems() {
@@ -3093,9 +3595,9 @@ async function listSuppliersAdmin() {
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }));
 }
 
-async function saveSupplier(payload, recordId = "") {
+async function saveSupplier(payload, recordId = "", actorUsername = "") {
   if (hasPostgres()) {
-    return pgSaveSupplier(payload, recordId);
+    return pgSaveSupplier(payload, recordId, actorUsername);
   }
   const name = String(payload.name || "").trim();
   const contact = String(payload.contact || "").trim();
@@ -3119,9 +3621,9 @@ async function saveSupplier(payload, recordId = "") {
   };
 }
 
-async function deleteSupplier(recordId) {
+async function deleteSupplier(recordId, actorUsername = "") {
   if (hasPostgres()) {
-    return pgDeleteSupplier(recordId);
+    return pgDeleteSupplier(recordId, actorUsername);
   }
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid supplier record.");
@@ -3375,9 +3877,9 @@ async function findAppUserById(recordId) {
   return appUsers.find((user) => user.id === recordId);
 }
 
-async function createAppUser(payload) {
+async function createAppUser(payload, actorUsername = "") {
   if (hasPostgres()) {
-    return pgCreateAppUser(payload);
+    return pgCreateAppUser(payload, actorUsername);
   }
   const tableId = await getAppUsersTableId();
   if (!tableId) throw new Error("App Users table is not configured yet. Create an Airtable table named App Users with fields Name, Password, Role, Active.");
@@ -3883,9 +4385,9 @@ async function listStandingOrderRuns(limit = 50) {
   });
 }
 
-async function updateStandingOrderRecord(recordId, payload) {
+async function updateStandingOrderRecord(recordId, payload, user) {
   if (hasPostgres()) {
-    return pgUpdateStandingOrderRecord(recordId, payload);
+    return pgUpdateStandingOrderRecord(recordId, payload, user);
   }
   const tableId = await getStandingOrdersTableId();
   if (!tableId) throw new Error("Standing Orders table is not configured.");
@@ -4067,9 +4569,9 @@ async function generateStandingOrdersForDate(selectedDate, userName = "System") 
   return generated;
 }
 
-async function updateAppUser(recordId, payload) {
+async function updateAppUser(recordId, payload, actorUsername = "") {
   if (hasPostgres()) {
-    return pgUpdateAppUser(recordId, payload);
+    return pgUpdateAppUser(recordId, payload, actorUsername);
   }
   const tableId = await getAppUsersTableId();
   if (!tableId || !/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid app user record.");
@@ -4086,9 +4588,9 @@ async function updateAppUser(recordId, payload) {
   return normalizeAppUser(record);
 }
 
-async function deleteAppUser(recordId) {
+async function deleteAppUser(recordId, actorUsername = "") {
   if (hasPostgres()) {
-    return pgDeleteAppUser(recordId);
+    return pgDeleteAppUser(recordId, actorUsername);
   }
   const tableId = await getAppUsersTableId();
   if (!tableId || !/^rec[a-zA-Z0-9]+$/.test(recordId || "")) throw new Error("Invalid app user record.");
@@ -4437,9 +4939,9 @@ async function resolveShelfCodeRecord(name, storageLocation) {
   return created.id;
 }
 
-async function saveStorageLocation(payload, recordId = "") {
+async function saveStorageLocation(payload, recordId = "", actorUsername = "") {
   if (hasPostgres()) {
-    return pgSaveStorageLocation(payload, recordId);
+    return pgSaveStorageLocation(payload, recordId, actorUsername);
   }
   const schema = await getSchema();
   const tableId = schema.tables.storageLocations;
@@ -4458,9 +4960,9 @@ async function saveStorageLocation(payload, recordId = "") {
   return normalizeStorageLocation(record);
 }
 
-async function saveCategory(payload, recordId = "") {
+async function saveCategory(payload, recordId = "", actorUsername = "") {
   if (hasPostgres()) {
-    return pgSaveCategory(payload, recordId);
+    return pgSaveCategory(payload, recordId, actorUsername);
   }
   const schema = await getSchema();
   const tableId = schema.tables.categories;
@@ -4484,9 +4986,9 @@ async function saveCategory(payload, recordId = "") {
   return normalizeCategory(record);
 }
 
-async function deleteCategory(recordId) {
+async function deleteCategory(recordId, actorUsername = "") {
   if (hasPostgres()) {
-    return pgDeleteCategory(recordId);
+    return pgDeleteCategory(recordId, actorUsername);
   }
   const schema = await getSchema();
   const tableId = schema.tables.categories;
@@ -4500,9 +5002,9 @@ async function deleteCategory(recordId) {
   return { ok: true, recordId };
 }
 
-async function saveShelfCode(payload, recordId = "") {
+async function saveShelfCode(payload, recordId = "", actorUsername = "") {
   if (hasPostgres()) {
-    return pgSaveShelfCode(payload, recordId);
+    return pgSaveShelfCode(payload, recordId, actorUsername);
   }
   let schema = await getSchema();
   schema = await ensureShelfCodeStorageLocationField(schema);
@@ -4991,9 +5493,9 @@ async function createStandingOrder(payload, user) {
   return { standingOrder, generated };
 }
 
-async function updateItemSettings(recordId, payload) {
+async function updateItemSettings(recordId, payload, actorUsername = "") {
   if (hasPostgres()) {
-    return pgUpdateItemSettings(recordId, payload);
+    return pgUpdateItemSettings(recordId, payload, actorUsername);
   }
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid item record.");
@@ -5044,9 +5546,9 @@ async function updateItemSettings(recordId, payload) {
   return normalizeItem(record, supplierById, lookups);
 }
 
-async function deleteInventoryItem(recordId) {
+async function deleteInventoryItem(recordId, actorUsername = "") {
   if (hasPostgres()) {
-    return pgDeleteInventoryItem(recordId);
+    return pgDeleteInventoryItem(recordId, actorUsername);
   }
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid item record.");
@@ -5078,9 +5580,9 @@ async function updateItemPrimarySupplier(itemRecordId, supplier) {
   cache.items.expiresAt = 0;
 }
 
-async function createInventoryItem(payload) {
+async function createInventoryItem(payload, actorUsername = "") {
   if (hasPostgres()) {
-    return pgCreateInventoryItem(payload);
+    return pgCreateInventoryItem(payload, actorUsername);
   }
   const itemName = String(payload.itemName || "").trim();
   const category = String(payload.category || "").trim();
@@ -5752,9 +6254,9 @@ async function deliverDriverLine(recordId, requestRecordId, userName) {
   };
 }
 
-async function deleteRequest(recordId) {
+async function deleteRequest(recordId, actorUsername = "") {
   if (hasPostgres()) {
-    return pgDeleteRequest(recordId);
+    return pgDeleteRequest(recordId, actorUsername);
   }
   if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
     throw new Error("Invalid request record.");
@@ -5902,7 +6404,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 403, { error: "Only God can create admin or god users." });
         return;
       }
-      const created = await createAppUser(payload);
+      const created = await createAppUser(payload, user.name);
       send(res, 201, { user: publicUserForAdmin(created, user) });
       return;
     }
@@ -5922,7 +6424,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 403, { error: "Only God can change admin roles. Admins can manage power users and users only." });
         return;
       }
-      const updated = await updateAppUser(recordId, payload);
+      const updated = await updateAppUser(recordId, payload, user.name);
       send(res, 200, { user: publicUserForAdmin(updated, user) });
       return;
     }
@@ -5945,7 +6447,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 403, { error: "Only God can delete admin users. Admins can delete power users and users only." });
         return;
       }
-      const result = await deleteAppUser(recordId);
+      const result = await deleteAppUser(recordId, user.name);
       send(res, 200, { result });
       return;
     }
@@ -5992,7 +6494,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const category = await saveCategory(await readJson(req));
+      const category = await saveCategory(await readJson(req), "", user.name);
       send(res, 201, { category });
       return;
     }
@@ -6001,7 +6503,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const supplier = await saveSupplier(await readJson(req));
+      const supplier = await saveSupplier(await readJson(req), "", user.name);
       send(res, 201, { supplier });
       return;
     }
@@ -6011,7 +6513,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const recordId = req.url.split("/")[4];
-      const category = await saveCategory(await readJson(req), recordId);
+      const category = await saveCategory(await readJson(req), recordId, user.name);
       send(res, 200, { category });
       return;
     }
@@ -6021,7 +6523,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const recordId = req.url.split("/")[4];
-      const supplier = await saveSupplier(await readJson(req), recordId);
+      const supplier = await saveSupplier(await readJson(req), recordId, user.name);
       send(res, 200, { supplier });
       return;
     }
@@ -6031,7 +6533,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const recordId = req.url.split("/")[4];
-      const result = await deleteSupplier(recordId);
+      const result = await deleteSupplier(recordId, user.name);
       send(res, 200, { result });
       return;
     }
@@ -6041,7 +6543,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const recordId = req.url.split("/")[4];
-      const result = await deleteCategory(recordId);
+      const result = await deleteCategory(recordId, user.name);
       send(res, 200, { result });
       return;
     }
@@ -6050,7 +6552,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const storageLocation = await saveStorageLocation(await readJson(req));
+      const storageLocation = await saveStorageLocation(await readJson(req), "", user.name);
       send(res, 201, { storageLocation });
       return;
     }
@@ -6060,7 +6562,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const recordId = req.url.split("/")[4];
-      const storageLocation = await saveStorageLocation(await readJson(req), recordId);
+      const storageLocation = await saveStorageLocation(await readJson(req), recordId, user.name);
       send(res, 200, { storageLocation });
       return;
     }
@@ -6080,7 +6582,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const shelfCode = await saveShelfCode(await readJson(req));
+      const shelfCode = await saveShelfCode(await readJson(req), "", user.name);
       send(res, 201, { shelfCode });
       return;
     }
@@ -6090,7 +6592,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
       const recordId = req.url.split("/")[4];
-      const shelfCode = await saveShelfCode(await readJson(req), recordId);
+      const shelfCode = await saveShelfCode(await readJson(req), recordId, user.name);
       send(res, 200, { shelfCode });
       return;
     }
@@ -6280,7 +6782,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can edit inventory setup.")) return;
       const recordId = req.url.split("/")[3];
-      const item = await updateItemSettings(recordId, await readJson(req));
+      const item = await updateItemSettings(recordId, await readJson(req), user.name);
       send(res, 200, { item });
       return;
     }
@@ -6290,7 +6792,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can delete inventory items.")) return;
       const recordId = req.url.split("/")[3];
-      const result = await deleteInventoryItem(recordId);
+      const result = await deleteInventoryItem(recordId, user.name);
       send(res, 200, { result });
       return;
     }
@@ -6299,7 +6801,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireUser(req, res);
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can add inventory items.")) return;
-      const item = await createInventoryItem(await readJson(req));
+      const item = await createInventoryItem(await readJson(req), user.name);
       send(res, 201, { item });
       return;
     }
@@ -6415,7 +6917,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 403, { error: "Regular users can only remove order lines they added themselves." });
         return;
       }
-      const result = await deleteRequest(recordId);
+      const result = await deleteRequest(recordId, user.name);
       send(res, 200, { result });
       return;
     }

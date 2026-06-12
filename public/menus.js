@@ -28,8 +28,9 @@
 
   function renderSelect(label, selectId, items) {
     const visibleItems = items.filter(allowed);
+    if (!visibleItems.length) return "";
     const selectedHref = visibleItems.some((item) => item.href === currentPath) ? currentPath : "";
-    const defaultLabel = label === "Go to" ? "Choose screen" : "Choose setting";
+    const defaultLabel = label === "Go to" ? "Where next?" : "Backoffice tasks";
     return `
       <label class="feature-select">
         <span>${label}</span>
@@ -47,7 +48,7 @@
     return `
       <div class="menu-duo" data-generated-menus>
         ${renderSelect("Go to", "featureMenu", gotoItems)}
-        ${renderSelect("Settings", "backofficeMenu", backofficeItems)}
+        ${renderSelect("Backoffice", "backofficeMenu", backofficeItems)}
       </div>
     `;
   }

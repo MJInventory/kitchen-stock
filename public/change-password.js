@@ -1,4 +1,4 @@
-﻿const form = document.querySelector("#passwordForm");
+const form = document.querySelector("#passwordForm");
 const currentPassword = document.querySelector("#currentPassword");
 const newPassword = document.querySelector("#newPassword");
 const repeatPassword = document.querySelector("#repeatPassword");

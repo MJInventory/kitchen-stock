@@ -614,21 +614,8 @@ async function submitSelected() {
       method: "POST",
       body: JSON.stringify({ requests })
     });
-    const byId = new Map(recentRequests.map((request) => [request.id, request]));
-    for (const request of data.requests || []) {
-      byId.set(request.id, request);
-    }
-    recentRequests = [...byId.values()]
-      .sort((left, right) => {
-        const leftTime = new Date(left.requestedAt || 0).getTime() || 0;
-        const rightTime = new Date(right.requestedAt || 0).getTime() || 0;
-        if (leftTime !== rightTime) return rightTime - leftTime;
-        return Number(right.requestId || 0) - Number(left.requestId || 0);
-      })
-      .slice(0, 100);
     const saved = selected.size;
-    selected = buildSelectedFromRecentRequests();
-    render();
+    await refresh();
     setMessage(`${saved} item(s) saved to today's order.`);
   } catch (error) {
     setMessage(error.message, true);
@@ -801,6 +788,7 @@ selectedChips.addEventListener("click", (event) => {
 dailyOrderList.addEventListener("click", (event) => {
   const deliverButton = event.target.closest(".deliver-order-button");
   if (deliverButton) {
+    if (!window.confirm("Mark this item as received and add it to inventory?")) return;
     deliverButton.disabled = true;
     deliverDailyOrder(deliverButton.dataset.deliverId).catch((error) => {
       setMessage(error.message, true);
@@ -811,6 +799,7 @@ dailyOrderList.addEventListener("click", (event) => {
 
   const button = event.target.closest(".delete-order-button");
   if (!button) return;
+  if (!window.confirm("Remove this item from the order list?")) return;
 
   button.disabled = true;
   deleteDailyOrder(button.dataset.requestId).catch((error) => {

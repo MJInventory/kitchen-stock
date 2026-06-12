@@ -110,6 +110,12 @@ function renderUsers(users) {
         <strong>${escapeHtml(user.name)}</strong>
         <span>${user.editable ? "Online user" : "Render user - move to App Users to edit"}</span>
         <span>${escapeHtml(formatLastLogin(user.lastLoginAt))}</span>
+        <div class="notify-area-grid compact">
+          <label class="check-label"><input class="user-notify-area-bar" type="checkbox" ${user.notifyAreas?.bar !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Bar</label>
+          <label class="check-label"><input class="user-notify-area-foh" type="checkbox" ${user.notifyAreas?.foh !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> FOH</label>
+          <label class="check-label"><input class="user-notify-area-kitchen" type="checkbox" ${user.notifyAreas?.kitchen !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Kitchen</label>
+          <label class="check-label"><input class="user-notify-area-general" type="checkbox" ${user.notifyAreas?.general !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> General</label>
+        </div>
       </div>
       <label>New password
         <input class="user-password" type="text" placeholder="Leave blank to keep current" ${user.editable && user.canSave ? "" : "disabled"}>
@@ -161,16 +167,22 @@ async function saveUser(row) {
 
   const data = await api(`/api/app-users/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({
-      name,
-      password: row.querySelector(".user-password").value,
-      role: row.querySelector(".user-role").value,
-      theme: row.querySelector(".user-theme").value,
-      notifyOnNewOrders: row.querySelector(".user-notify-orders").checked,
-      notifyOnDelivery: row.querySelector(".user-notify-delivery").checked,
-      active: row.querySelector(".user-active").checked,
-      mustChangePassword: row.querySelector(".user-must-change").checked
-    })
+      body: JSON.stringify({
+        name,
+        password: row.querySelector(".user-password").value,
+        role: row.querySelector(".user-role").value,
+        theme: row.querySelector(".user-theme").value,
+        notifyOnNewOrders: row.querySelector(".user-notify-orders").checked,
+        notifyOnDelivery: row.querySelector(".user-notify-delivery").checked,
+        notifyAreas: {
+          bar: row.querySelector(".user-notify-area-bar").checked,
+          foh: row.querySelector(".user-notify-area-foh").checked,
+          kitchen: row.querySelector(".user-notify-area-kitchen").checked,
+          general: row.querySelector(".user-notify-area-general").checked
+        },
+        active: row.querySelector(".user-active").checked,
+        mustChangePassword: row.querySelector(".user-must-change").checked
+      })
   });
   row.querySelector(".user-password").value = "";
   row.querySelector(".user-must-change").checked = data.user.mustChangePassword;
@@ -213,6 +225,12 @@ newUserForm.addEventListener("submit", async (event) => {
         theme: document.querySelector("#newTheme").value,
         notifyOnNewOrders: document.querySelector("#newNotifyOrders").checked,
         notifyOnDelivery: document.querySelector("#newNotifyDelivery").checked,
+        notifyAreas: {
+          bar: document.querySelector("#newNotifyBar").checked,
+          foh: document.querySelector("#newNotifyFoh").checked,
+          kitchen: document.querySelector("#newNotifyKitchen").checked,
+          general: document.querySelector("#newNotifyGeneral").checked
+        },
         active: true,
         mustChangePassword: document.querySelector("#newMustChange").checked
       })

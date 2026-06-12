@@ -65,6 +65,18 @@
         </div>
       </header>
 
+      <section class="daily-order-panel home-order-panel notification-panel">
+        <div class="daily-order-heading">
+          <h2>Notifications</h2>
+          <span id="notificationCount"></span>
+        </div>
+        <div class="notification-actions">
+          <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
+          <button id="enablePushButton" class="icon-button" type="button" hidden>Enable phone notifications</button>
+        </div>
+        <div id="notificationList" class="daily-order-list notification-list"></div>
+      </section>
+
       <section class="daily-order-panel home-order-panel">
         <div class="daily-order-heading">
           <h2>Today's Order</h2>
@@ -80,18 +92,6 @@
         </div>
         <p id="message" class="order-message" role="status"></p>
         <div id="dailyOrderList" class="daily-order-list"></div>
-      </section>
-
-      <section class="daily-order-panel home-order-panel notification-panel">
-        <div class="daily-order-heading">
-          <h2>Notifications</h2>
-          <span id="notificationCount"></span>
-        </div>
-        <div class="notification-actions">
-          <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
-          <button id="enablePushButton" class="icon-button" type="button" hidden>Enable phone notifications</button>
-        </div>
-        <div id="notificationList" class="daily-order-list notification-list"></div>
       </section>
 
       <section class="daily-order-panel home-order-panel">
@@ -111,13 +111,15 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v122</footer>
+    <footer class="app-version">MJ Stock Magic v124</footer>
     <script src="/menus.js"></script>
     <script src="/push.js"></script>
     <script src="/theme.js"></script>
     <script src="/dashboard.js" type="module"></script>
   </body>
 </html>
+
+
 
 
 

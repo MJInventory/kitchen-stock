@@ -53,6 +53,15 @@
               <option value="light">Light</option>
             </select>
           </label>
+          <fieldset class="inline-fieldset wide-field">
+            <legend>Notify for area orders</legend>
+            <div class="notify-area-grid">
+              <label class="check-label"><input id="newNotifyBar" type="checkbox" checked> Bar</label>
+              <label class="check-label"><input id="newNotifyFoh" type="checkbox" checked> FOH</label>
+              <label class="check-label"><input id="newNotifyKitchen" type="checkbox" checked> Kitchen</label>
+              <label class="check-label"><input id="newNotifyGeneral" type="checkbox" checked> General</label>
+            </div>
+          </fieldset>
           <label class="check-label"><input id="newNotifyOrders" type="checkbox"> Notify on new orders</label>
           <label class="check-label"><input id="newNotifyDelivery" type="checkbox" checked> Notify on delivered items</label>
           <label class="check-label"><input id="newMustChange" type="checkbox"> Force password change</label>
@@ -64,13 +73,15 @@
       <section id="userList" class="settings-list"></section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v122</footer>
+    <footer class="app-version">MJ Stock Magic v124</footer>
     <script src="/menus.js"></script>
     <script src="/push.js"></script>
     <script src="/theme.js"></script>
     <script src="/user-admin.js" type="module"></script>
   </body>
 </html>
+
+
 
 
 

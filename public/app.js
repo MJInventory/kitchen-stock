@@ -155,6 +155,10 @@ function normalize(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function searchTokens(value) {
+  return normalize(value).split(/\s+/).filter(Boolean);
+}
+
 function hasSearchTerm() {
   return Boolean(normalize(searchInput.value));
 }
@@ -214,6 +218,7 @@ function filterItems() {
   const area = areaFilter.value;
   const location = locationFilter.value;
   const search = normalize(searchInput.value);
+  const tokens = searchTokens(searchInput.value);
 
   return allItems.filter((item) => {
     const areaMatches = !area || !item.inventoryArea || item.inventoryArea === area;
@@ -226,8 +231,31 @@ function filterItems() {
       item.shelfCode,
       item.supplierName
     ].join(" "));
-    return areaMatches && locationMatches && (!search || searchText.includes(search));
+    const searchMatches = !tokens.length || (searchText.includes(search) && tokens.every((token) => searchText.includes(token)));
+    return areaMatches && locationMatches && searchMatches;
   });
+}
+
+function itemSearchScore(item) {
+  const query = normalize(searchInput.value);
+  if (!query) return 0;
+  const name = normalize(item.name);
+  const category = normalize(item.category);
+  const supplier = normalize(item.supplierName);
+  const meta = normalize([
+    item.storageLocation,
+    item.inventoryArea,
+    item.shelfCode
+  ].join(" "));
+  if (name === query) return 400;
+  if (name.startsWith(query)) return 300;
+  if (name.includes(query)) return 220;
+  if (category.startsWith(query)) return 160;
+  if (category.includes(query)) return 130;
+  if (supplier.startsWith(query)) return 110;
+  if (supplier.includes(query)) return 90;
+  if (meta.includes(query)) return 60;
+  return 10;
 }
 
 function categoryStats(category, items) {
@@ -425,15 +453,21 @@ function renderCategories() {
 
 function renderProductList() {
   const items = filterItems()
-    .filter((item) => !activeCategory || itemCategory(item) === activeCategory)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .filter((item) => !activeCategory || itemCategory(item) === activeCategory);
   const selectedCount = items.filter((item) => selected.has(item.id)).length;
 
   const searchMode = hasSearchTerm();
+  const sortedItems = [...items].sort((a, b) => {
+    if (searchMode) {
+      const scoreDiff = itemSearchScore(b) - itemSearchScore(a);
+      if (scoreDiff) return scoreDiff;
+    }
+    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+  });
   categoryTitle.textContent = searchMode ? "Search Results" : (activeCategory || "All Products");
   categoryMeta.textContent = `${items.length} products${selectedCount ? ` / ${selectedCount} selected` : ""}`;
   backButton.hidden = searchMode;
-  productList.innerHTML = items
+  productList.innerHTML = sortedItems
     .map((item) => {
       const entry = selected.get(item.id);
       const checked = Boolean(entry);
@@ -470,7 +504,7 @@ function renderProductList() {
     })
     .join("");
 
-  if (!items.length) {
+  if (!sortedItems.length) {
     const addButton = hasSearchTerm() && sessionPermissions.canAddInventoryItems
       ? `<a class="button" href="${escapeHtml(addItemHrefFromSearch())}">Add "${escapeHtml(searchInput.value.trim())}"</a>`
       : "";
@@ -829,8 +863,19 @@ readAllNotificationsButton?.addEventListener("click", () => {
   });
 });
 
-[areaFilter, locationFilter, searchInput].forEach((control) => {
+[areaFilter, locationFilter].forEach((control) => {
   control.addEventListener("input", () => {
+    if (!productView.hidden && !hasSearchTerm()) {
+      activeCategory = "";
+      productView.hidden = true;
+      categoryView.hidden = false;
+    }
+    render();
+  });
+});
+
+["input", "change", "search"].forEach((eventName) => {
+  searchInput.addEventListener(eventName, () => {
     if (!productView.hidden && !hasSearchTerm()) {
       activeCategory = "";
       productView.hidden = true;

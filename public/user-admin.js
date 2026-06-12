@@ -1,4 +1,4 @@
-﻿const loginScreen = document.querySelector("#loginScreen");
+const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");
@@ -134,6 +134,7 @@ function renderUsers(users) {
           <option value="light"${user.theme === "light" ? " selected" : ""}>Light</option>
         </select>
       </label>
+      <label class="check-label"><input class="user-is-driver" type="checkbox" ${user.isDriver ? "checked" : ""} ${user.editable ? "" : "disabled"}> Dedicated driver</label>
       <label class="check-label"><input class="user-notify-orders" type="checkbox" ${user.notifyOnNewOrders ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on new orders</label>
       <label class="check-label"><input class="user-notify-delivery" type="checkbox" ${user.notifyOnDelivery ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on delivered items</label>
       <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
@@ -172,6 +173,7 @@ async function saveUser(row) {
         password: row.querySelector(".user-password").value,
         role: row.querySelector(".user-role").value,
         theme: row.querySelector(".user-theme").value,
+        isDriver: row.querySelector(".user-is-driver").checked,
         notifyOnNewOrders: row.querySelector(".user-notify-orders").checked,
         notifyOnDelivery: row.querySelector(".user-notify-delivery").checked,
         notifyAreas: {
@@ -223,6 +225,7 @@ newUserForm.addEventListener("submit", async (event) => {
         password: document.querySelector("#newPassword").value,
         role: document.querySelector("#newRole").value,
         theme: document.querySelector("#newTheme").value,
+        isDriver: document.querySelector("#newIsDriver").checked,
         notifyOnNewOrders: document.querySelector("#newNotifyOrders").checked,
         notifyOnDelivery: document.querySelector("#newNotifyDelivery").checked,
         notifyAreas: {

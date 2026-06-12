@@ -1,4 +1,4 @@
-﻿const loginScreen = document.querySelector("#loginScreen");
+const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
 const passwordInput = document.querySelector("#passwordInput");
@@ -39,6 +39,7 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+const bootstrapCacheKey = "kitchenStockOrderingBootstrap";
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -200,6 +201,37 @@ function expectedDateFromRequest(request) {
 
 function itemUnit(item) {
   return item.unit || "item";
+}
+
+function loadBootstrapCache() {
+  try {
+    return JSON.parse(localStorage.getItem(bootstrapCacheKey) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveBootstrapCache(data) {
+  try {
+    localStorage.setItem(bootstrapCacheKey, JSON.stringify({
+      items: data.items || [],
+      requests: data.requests || [],
+      standingOrders: data.standingOrders || [],
+      notifications: data.notifications || [],
+      cachedAt: new Date().toISOString()
+    }));
+  } catch {
+    // Ignore cache write problems.
+  }
+}
+
+function applyBootstrapData(data = {}) {
+  allItems = Array.isArray(data.items) ? data.items : [];
+  recentRequests = Array.isArray(data.requests) ? data.requests : [];
+  standingOrders = Array.isArray(data.standingOrders) ? data.standingOrders : [];
+  notifications = Array.isArray(data.notifications) ? data.notifications : [];
+  selected = buildSelectedFromRecentRequests();
+  render();
 }
 
 function entryUnit(entry) {
@@ -617,15 +649,11 @@ function toggleProduct(row) {
   render();
 }
 
-async function refresh() {
-  setMessage("Loading products...");
+async function refresh(silent = false) {
+  if (!silent) setMessage("Loading products...");
   const data = await api("/api/bootstrap");
-  allItems = data.items;
-  recentRequests = data.requests;
-  standingOrders = data.standingOrders || [];
-  notifications = data.notifications || [];
-  selected = buildSelectedFromRecentRequests();
-  render();
+  applyBootstrapData(data);
+  saveBootstrapCache(data);
   setMessage("");
 }
 
@@ -911,9 +939,15 @@ readAllNotificationsButton?.addEventListener("click", () => {
 });
 
 if (sessionToken && sessionUser) {
+  showApp();
+  const cached = loadBootstrapCache();
+  if (cached) {
+    applyBootstrapData(cached);
+    setMessage("");
+  }
   refreshSession()
     .then((ok) => {
-      if (ok) return refresh();
+      if (ok) return refresh(Boolean(cached));
       return null;
     })
     .catch((error) => setMessage(error.message, true));

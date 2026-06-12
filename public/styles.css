@@ -290,7 +290,12 @@ button:hover,
 }
 
 .user-admin-row {
-  grid-template-columns: minmax(200px, 1.15fr) minmax(180px, 1fr) minmax(130px, 0.75fr) minmax(120px, 0.7fr) minmax(110px, 0.55fr) minmax(150px, 0.7fr) minmax(120px, 0.55fr);
+  grid-template-columns:
+    minmax(220px, 1.2fr)
+    minmax(180px, 1fr)
+    minmax(140px, 0.75fr)
+    minmax(130px, 0.75fr)
+    repeat(7, minmax(110px, 0.55fr));
 }
 
 .standing-history-panel {
@@ -700,6 +705,27 @@ button:hover,
   text-align: right;
 }
 
+.supplier-note-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  border: 1px solid #98a2b3;
+  border-top: 0;
+  background: #fff;
+  padding: 10px;
+}
+
+.supplier-note-card label {
+  margin: 0;
+}
+
+.supplier-note-input {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -759,7 +785,9 @@ th {
 }
 
 .driver-supplier-select,
-.driver-unit-select {
+.driver-unit-select,
+.delivery-day-input,
+.receive-qty-input {
   width: 150px;
   min-width: 130px;
   border: 1px solid #98a2b3;
@@ -773,6 +801,16 @@ th {
 .driver-unit-select {
   width: 86px;
   min-width: 76px;
+}
+
+.delivery-day-input {
+  width: 132px;
+  min-width: 116px;
+}
+
+.receive-qty-input {
+  width: 92px;
+  min-width: 78px;
 }
 
 td small {
@@ -2122,6 +2160,10 @@ body.order-app {
     text-align: left;
   }
 
+  .supplier-note-card {
+    grid-template-columns: 1fr;
+  }
+
   .order-topbar {
     position: static;
     min-height: auto;
@@ -2422,6 +2464,10 @@ body.order-app {
     page-break-inside: auto;
   }
 
+  .driver-supplier table {
+    table-layout: fixed;
+  }
+
   thead {
     display: table-header-group;
   }
@@ -2446,5 +2492,51 @@ body.order-app {
     width: 12px;
     height: 12px;
     border-width: 1px;
+  }
+
+  .driver-supplier th:nth-child(1),
+  .driver-supplier td:nth-child(1),
+  .driver-supplier th:nth-child(2),
+  .driver-supplier td:nth-child(2) {
+    width: 30px;
+  }
+
+  .driver-supplier th:nth-child(4),
+  .driver-supplier td:nth-child(4) {
+    width: 108px;
+  }
+
+  .driver-supplier th:nth-child(5),
+  .driver-supplier td:nth-child(5) {
+    width: 34px;
+  }
+
+  .driver-supplier th:nth-child(6),
+  .driver-supplier td:nth-child(6) {
+    width: 38px;
+  }
+
+  .driver-supplier th:nth-child(7),
+  .driver-supplier td:nth-child(7),
+  .driver-supplier th:nth-child(8),
+  .driver-supplier td:nth-child(8) {
+    width: 46px;
+  }
+
+  .driver-supplier th:nth-child(9),
+  .driver-supplier td:nth-child(9) {
+    width: 74px;
+  }
+
+  .driver-supplier .driver-supplier-select,
+  .driver-supplier .driver-unit-select,
+  .driver-supplier .delivery-day-input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 8px;
+    line-height: 1.1;
   }
 }

@@ -108,7 +108,8 @@ async function ensurePostgresSchemaUpgrades() {
         add column if not exists notify_area_bar boolean not null default true,
         add column if not exists notify_area_foh boolean not null default true,
         add column if not exists notify_area_kitchen boolean not null default true,
-        add column if not exists notify_area_general boolean not null default true
+        add column if not exists notify_area_general boolean not null default true,
+        add column if not exists is_driver boolean not null default false
     `);
     await db().query(`
       alter table standing_orders
@@ -152,6 +153,31 @@ async function ensurePostgresSchemaUpgrades() {
     await db().query(`
       create index if not exists idx_push_subscriptions_user
         on push_subscriptions (user_id, updated_at desc)
+    `);
+    await db().query(`
+      create table if not exists driver_sheet_assignments (
+        sheet_date date primary key,
+        driver_username text not null,
+        assigned_by_username text not null default '',
+        assigned_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `);
+    await db().query(`
+      create table if not exists supplier_delivery_notes (
+        id uuid primary key default gen_random_uuid(),
+        delivery_date date not null,
+        supplier_name text not null,
+        memo text not null default '',
+        entered_by_username text not null default '',
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        unique (delivery_date, supplier_name)
+      )
+    `);
+    await db().query(`
+      create index if not exists idx_supplier_delivery_notes_date_supplier
+        on supplier_delivery_notes (delivery_date, supplier_name)
     `);
   })().catch((error) => {
     postgresSchemaReady = null;
@@ -260,6 +286,7 @@ function mapPgAppUserRow(row) {
     role: normalizeRole(row.role),
     theme: row.theme === "light" ? "light" : "dark",
     active: row.active !== false,
+    isDriver: Boolean(row.is_driver),
     mustChangePassword: Boolean(row.must_change_password),
     notifyOnNewOrders: Boolean(row.notify_on_new_orders),
     notifyOnDelivery: row.notify_on_delivery !== false,
@@ -280,6 +307,7 @@ function publicUserForAdmin(user, actor = null) {
     ...publicUser(user),
     id: user.id || "",
     lastLoginAt: user.lastLoginAt || "",
+    isDriver: Boolean(user.isDriver),
     notifyOnNewOrders: Boolean(user.notifyOnNewOrders),
     notifyOnDelivery: user.notifyOnDelivery !== false,
     notifyAreas: {
@@ -1550,6 +1578,7 @@ async function pgListAppUsers() {
   await ensurePostgresSchemaUpgrades();
   const result = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
+           is_driver,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1565,6 +1594,7 @@ async function pgFindAppUserByName(name) {
   if (!normalized) return null;
   const result = await db().query(`
     select id, username, display_name, password_hash, role, theme, active, must_change_password,
+           is_driver,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1591,15 +1621,18 @@ async function pgCreateAppUser(payload) {
   const theme = String(payload.theme || "dark").trim().toLowerCase() === "light" ? "light" : "dark";
   const passwordHash = await bcrypt.hash(password, 10);
   const notifyAreas = payload.notifyAreas || {};
+  const wantsDriver = Boolean(payload.isDriver);
   const result = await db().query(`
     insert into app_users (
       username, display_name, password_hash, role, theme, active, must_change_password,
+      is_driver,
       notify_on_new_orders, notify_on_delivery,
       notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
       source
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'postgres')
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'postgres')
     returning id, username, display_name, role, theme, active, must_change_password,
+              is_driver,
               notify_on_new_orders, notify_on_delivery,
               notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
               source, last_login_at
@@ -1611,6 +1644,7 @@ async function pgCreateAppUser(payload) {
     theme,
     payload.active !== false,
     Boolean(payload.mustChangePassword),
+    wantsDriver,
     Boolean(payload.notifyOnNewOrders),
     payload.notifyOnDelivery !== false,
     notifyAreas.bar !== false,
@@ -1618,7 +1652,25 @@ async function pgCreateAppUser(payload) {
     notifyAreas.kitchen !== false,
     notifyAreas.general !== false
   ]);
-  const row = result.rows[0];
+  const createdId = result.rows[0]?.id || "";
+  if (wantsDriver && createdId) {
+    await db().query(`
+      update app_users
+      set is_driver = case when id = $1 then true else false end,
+          updated_at = now()
+      where is_driver = true or id = $1
+    `, [createdId]);
+  }
+  const refreshed = createdId ? await db().query(`
+    select id, username, display_name, role, theme, active, must_change_password,
+           is_driver,
+           notify_on_new_orders, notify_on_delivery,
+           notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           source, last_login_at
+    from app_users
+    where id = $1
+  `, [createdId]) : { rows: result.rows };
+  const row = refreshed.rows[0];
   cache.appUsers.expiresAt = 0;
   return mapPgAppUserRow(row);
 }
@@ -1628,6 +1680,7 @@ async function pgUpdateAppUser(recordId, payload) {
   if (!isValidId(recordId)) throw new Error("Invalid app user record.");
   const current = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
+           is_driver,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1649,8 +1702,11 @@ async function pgUpdateAppUser(recordId, payload) {
   const nextNotifyAreaFoh = notifyAreas.foh !== false;
   const nextNotifyAreaKitchen = notifyAreas.kitchen !== false;
   const nextNotifyAreaGeneral = notifyAreas.general !== false;
+  const nextIsDriver = Object.prototype.hasOwnProperty.call(payload, "isDriver")
+    ? Boolean(payload.isDriver)
+    : Boolean(user.is_driver);
   let passwordSql = "";
-  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral];
+  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextIsDriver, nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral];
   if (String(payload.password || "").trim()) {
     const passwordHash = await bcrypt.hash(String(payload.password).trim(), 10);
     values.push(passwordHash);
@@ -1664,21 +1720,41 @@ async function pgUpdateAppUser(recordId, payload) {
         theme = $5,
         active = $6,
         must_change_password = $7,
-        notify_on_new_orders = $8,
-        notify_on_delivery = $9,
-        notify_area_bar = $10,
-        notify_area_foh = $11,
-        notify_area_kitchen = $12,
-        notify_area_general = $13,
+        is_driver = $8,
+        notify_on_new_orders = $9,
+        notify_on_delivery = $10,
+        notify_area_bar = $11,
+        notify_area_foh = $12,
+        notify_area_kitchen = $13,
+        notify_area_general = $14,
         updated_at = now()
         ${passwordSql}
     where id = $1
     returning id, username, display_name, role, theme, active, must_change_password,
+              is_driver,
               notify_on_new_orders, notify_on_delivery,
               notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
               source, last_login_at
   `, values);
-  const row = result.rows[0];
+  const updatedId = result.rows[0]?.id || recordId;
+  if (nextIsDriver && updatedId) {
+    await db().query(`
+      update app_users
+      set is_driver = case when id = $1 then true else false end,
+          updated_at = now()
+      where is_driver = true or id = $1
+    `, [updatedId]);
+  }
+  const refreshed = await db().query(`
+    select id, username, display_name, role, theme, active, must_change_password,
+           is_driver,
+           notify_on_new_orders, notify_on_delivery,
+           notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           source, last_login_at
+    from app_users
+    where id = $1
+  `, [updatedId]);
+  const row = refreshed.rows[0];
   cache.appUsers.expiresAt = 0;
   return mapPgAppUserRow(row);
 }
@@ -1931,6 +2007,84 @@ async function pgRecordSuccessfulLogin(userId) {
   return result.rows[0]?.last_login_at || "";
 }
 
+async function pgGetDedicatedDriverName() {
+  await ensurePostgresSchemaUpgrades();
+  const result = await db().query(`
+    select display_name, username
+    from app_users
+    where active = true and is_driver = true
+    order by updated_at desc, username
+    limit 1
+  `);
+  const row = result.rows[0];
+  return presentUserName(row?.display_name || row?.username || "");
+}
+
+async function pgGetAssignedDriverName(date) {
+  await ensurePostgresSchemaUpgrades();
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  const result = await db().query(`
+    select driver_username
+    from driver_sheet_assignments
+    where sheet_date = $1::date
+    limit 1
+  `, [selectedDate]);
+  return presentUserName(result.rows[0]?.driver_username || "");
+}
+
+async function pgResolveDriverName(date) {
+  const assigned = await pgGetAssignedDriverName(date);
+  if (assigned) return assigned;
+  return pgGetDedicatedDriverName();
+}
+
+async function pgListSupplierDeliveryNotes(date) {
+  await ensurePostgresSchemaUpgrades();
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
+  const result = await db().query(`
+    select supplier_name, memo, entered_by_username, updated_at
+    from supplier_delivery_notes
+    where delivery_date = $1::date
+    order by supplier_name
+  `, [selectedDate]);
+  return result.rows.map((row) => ({
+    supplierName: row.supplier_name || "",
+    memo: row.memo || "",
+    enteredBy: row.entered_by_username || "",
+    updatedAt: row.updated_at || ""
+  }));
+}
+
+async function pgSaveSupplierDeliveryNote(payload, userName) {
+  await ensurePostgresSchemaUpgrades();
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.date || "").trim()) ? String(payload.date).trim() : todayIso();
+  const supplierName = String(payload.supplierName || "").trim();
+  const memo = String(payload.memo || "").trim();
+  if (!supplierName) throw new Error("Choose the supplier for this memo.");
+  if (!memo) {
+    await db().query(`
+      delete from supplier_delivery_notes
+      where delivery_date = $1::date and lower(supplier_name) = lower($2)
+    `, [selectedDate, supplierName]);
+    return { supplierName, memo: "", enteredBy: userName, updatedAt: new Date().toISOString() };
+  }
+  const result = await db().query(`
+    insert into supplier_delivery_notes (delivery_date, supplier_name, memo, entered_by_username)
+    values ($1::date, $2, $3, $4)
+    on conflict (delivery_date, supplier_name) do update
+      set memo = excluded.memo,
+          entered_by_username = excluded.entered_by_username,
+          updated_at = now()
+    returning supplier_name, memo, entered_by_username, updated_at
+  `, [selectedDate, supplierName, memo, userName]);
+  return {
+    supplierName: result.rows[0]?.supplier_name || supplierName,
+    memo: result.rows[0]?.memo || memo,
+    enteredBy: result.rows[0]?.entered_by_username || userName,
+    updatedAt: result.rows[0]?.updated_at || new Date().toISOString()
+  };
+}
+
 async function pgGetDailyGuestCount(date) {
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
   const result = await db().query(`
@@ -1963,6 +2117,7 @@ async function pgSaveDailyGuestCount(payload, user) {
 }
 
 async function pgEnsureDriverSheetLines(selectedDate) {
+  const resolvedDriver = await pgResolveDriverName(selectedDate);
   await db().query(`
     insert into driver_sheet_lines (
       sheet_date, order_request_id, supplier_id, driver_username, ordered, received, to_deliver, delivery_day, notes
@@ -1971,7 +2126,7 @@ async function pgEnsureDriverSheetLines(selectedDate) {
       $1::date,
       r.id,
       i.primary_supplier_id,
-      null,
+      $3,
       r.ordered,
       r.delivered,
       r.to_deliver,
@@ -1987,7 +2142,16 @@ async function pgEnsureDriverSheetLines(selectedDate) {
         from driver_sheet_lines d
         where d.sheet_date = $1::date and d.order_request_id = r.id
       )
-  `, [selectedDate, appTimeZone]);
+  `, [selectedDate, appTimeZone, resolvedDriver || null]);
+
+  if (resolvedDriver) {
+    await db().query(`
+      update driver_sheet_lines
+      set driver_username = $2, updated_at = now()
+      where sheet_date = $1::date
+        and coalesce(nullif(trim(driver_username), ''), '') = ''
+    `, [selectedDate, resolvedDriver]);
+  }
 }
 
 async function pgDriverSheetRequests(selectedDate) {
@@ -2073,7 +2237,7 @@ async function pgListDriverSheet(date) {
     pgListSuppliers()
   ]);
   const filteredRequests = requests.filter((request) => !isStandingOrderRequestRow(request));
-  const driverName = filteredRequests.find((request) => request.driverName)?.driverName || "";
+  const driverName = await pgResolveDriverName(selectedDate);
   return { date: selectedDate, driverName, requests: filteredRequests, suppliers };
 }
 
@@ -2081,15 +2245,17 @@ async function pgListReceivingSheet(date) {
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
   await pgGenerateStandingOrdersForDate(selectedDate);
   await pgSyncStandingOrderRunsForDate(selectedDate);
-  const [requests, suppliers] = await Promise.all([
+  const [requests, suppliers, supplierNotes] = await Promise.all([
     pgDriverSheetRequests(selectedDate),
-    pgListSuppliers()
+    pgListSuppliers(),
+    pgListSupplierDeliveryNotes(selectedDate)
   ]);
   const receiverName = "";
   return {
     date: selectedDate,
     driverName: receiverName,
     suppliers,
+    supplierNotes,
     requests: requests
       .filter((request) => !request.delivered && request.status !== "Fulfilled")
   };
@@ -2327,7 +2493,7 @@ async function pgCreateStockCount(payload, userName) {
   }
 }
 
-async function pgDeliverRequest(recordId, userName) {
+async function pgDeliverRequest(recordId, userName, options = {}) {
   if (!isValidId(recordId)) throw new Error("Invalid request record.");
   const client = await db().connect();
   try {
@@ -2341,6 +2507,7 @@ async function pgDeliverRequest(recordId, userName) {
              r.delivered,
              r.status,
              r.notes,
+             r.standing_order_run_line_id,
              i.name as item_name,
              i.current_quantity,
              (
@@ -2360,58 +2527,97 @@ async function pgDeliverRequest(recordId, userName) {
       const requests = await pgListRequests(200);
       return requests.find((entry) => entry.id === recordId) || { id: recordId };
     }
-    const qty = Number(request.quantity_needed || 0);
-    const newQty = Number(request.current_quantity || 0) + qty;
+    const orderedQty = Number(request.quantity_needed || 0);
+    const receivedQty = Number(
+      options.quantityReceived === undefined || options.quantityReceived === null || options.quantityReceived === ""
+        ? orderedQty
+        : options.quantityReceived
+    );
+    if (!Number.isFinite(receivedQty) || receivedQty <= 0) {
+      throw new Error("Received quantity must be greater than zero.");
+    }
+    if (receivedQty > orderedQty) {
+      throw new Error("Received quantity cannot be higher than the ordered quantity.");
+    }
+    const isFullReceipt = receivedQty >= orderedQty;
+    const remainingQty = isFullReceipt ? 0 : Math.max(0, orderedQty - receivedQty);
+    const newQty = Number(request.current_quantity || 0) + receivedQty;
     await client.query(`
       insert into stock_counts (inventory_item_id, counted_quantity, previous_quantity, counted_by_username, counted_at, notes)
       values ($1, $2, $3, $4, now(), $5)
-    `, [request.inventory_item_id, newQty, request.current_quantity || 0, userName, `Delivered from order request ${request.request_number}: added ${qty} ${request.unit || ""}.`]);
+    `, [request.inventory_item_id, newQty, request.current_quantity || 0, userName, `${isFullReceipt ? "Delivered" : "Partially delivered"} from order request ${request.request_number}: added ${receivedQty} ${request.unit || ""}.${remainingQty > 0 ? ` Remaining open: ${remainingQty} ${request.unit || ""}.` : ""}`]);
     await client.query(`
       update inventory_items
       set current_quantity = $2, updated_at = now()
       where id = $1
     `, [request.inventory_item_id, newQty]);
-    await client.query(`
-      update order_requests
-      set delivered = true,
-          delivered_at = now(),
-          delivered_by_username = $2,
-          status = 'Fulfilled',
-          updated_at = now()
-      where id = $1
-    `, [recordId, userName]);
 
-    const standingLineUpdate = await client.query(`
-      update standing_order_run_lines
-      set received = true,
-          received_at = now(),
-          received_by_username = $2,
-          status = 'Received'
-      where order_request_id = $1
-      returning standing_order_run_id
-    `, [recordId, userName]);
-    for (const row of standingLineUpdate.rows) {
-      await pgCloseStandingOrderRunIfCompleteTx(client, row.standing_order_run_id, userName);
+    if (isFullReceipt) {
+      await client.query(`
+        update order_requests
+        set delivered = true,
+            delivered_at = now(),
+            delivered_by_username = $2,
+            status = 'Fulfilled',
+            updated_at = now()
+        where id = $1
+      `, [recordId, userName]);
+
+      const standingLineUpdate = await client.query(`
+        update standing_order_run_lines
+        set received = true,
+            received_at = now(),
+            received_by_username = $2,
+            status = 'Received'
+        where order_request_id = $1
+        returning standing_order_run_id
+      `, [recordId, userName]);
+      for (const row of standingLineUpdate.rows) {
+        await pgCloseStandingOrderRunIfCompleteTx(client, row.standing_order_run_id, userName);
+      }
+    } else {
+      await client.query(`
+        update order_requests
+        set quantity_needed = $2,
+            delivered = false,
+            delivered_at = null,
+            delivered_by_username = '',
+            status = 'Approved',
+            updated_at = now()
+        where id = $1
+      `, [recordId, remainingQty]);
+      if (request.standing_order_run_line_id && isValidId(request.standing_order_run_line_id)) {
+        await client.query(`
+          update standing_order_run_lines
+          set quantity = $2,
+              received = false,
+              received_at = null,
+              received_by_username = '',
+              status = 'Scheduled'
+          where id = $1
+        `, [request.standing_order_run_line_id, remainingQty]);
+      }
     }
     await client.query("commit");
     cache.items.expiresAt = 0;
     cache.requests.expiresAt = 0;
     const notifyUser = String(request.requested_by_username || "").trim();
-    if (notifyUser && !notifyUser.toLowerCase().includes("standing order")) {
+    if (isFullReceipt && notifyUser && !notifyUser.toLowerCase().includes("standing order")) {
       const deliveryUsers = await pgNotificationUsers("delivery");
       const optedIn = deliveryUsers.find((name) => String(name || "").trim().toLowerCase() === notifyUser.toLowerCase());
       if (optedIn) {
         await pgCreateNotificationsForUsers([notifyUser], {
           type: "delivery",
           title: `${request.item_name || "Item"} delivered`,
-          body: `${qty} ${request.unit || ""} received and added to stock by ${presentUserName(userName)}.`,
+          body: `${receivedQty} ${request.unit || ""} received and added to stock by ${presentUserName(userName)}.`,
           relatedRequestId: recordId,
           url: "/"
         });
       }
     }
     const requests = await pgListRequests(200);
-    return requests.find((entry) => entry.id === recordId) || { id: recordId, delivered: true };
+    const latest = requests.find((entry) => entry.id === recordId) || { id: recordId, delivered: isFullReceipt };
+    return { ...latest, receivedQuantity: receivedQty, remainingQuantity: remainingQty, fullyDelivered: isFullReceipt };
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -2423,9 +2629,18 @@ async function pgDeliverRequest(recordId, userName) {
 async function pgAssignDriverToSheet(date, driverName, user) {
   if (!user.permissions?.canAdminUsers) throw new Error("Only admins can assign a driver.");
   const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
-  await pgEnsureDriverSheetLines(selectedDate);
   const cleaned = String(driverName || "").trim();
   if (!cleaned) throw new Error("Driver name is required.");
+  await ensurePostgresSchemaUpgrades();
+  await db().query(`
+    insert into driver_sheet_assignments (sheet_date, driver_username, assigned_by_username)
+    values ($1::date, $2, $3)
+    on conflict (sheet_date) do update
+      set driver_username = excluded.driver_username,
+          assigned_by_username = excluded.assigned_by_username,
+          updated_at = now()
+  `, [selectedDate, cleaned, user.name || ""]);
+  await pgEnsureDriverSheetLines(selectedDate);
   const result = await db().query(`
     update driver_sheet_lines
     set driver_username = $2, updated_at = now()
@@ -2523,14 +2738,22 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
   } : { id: recordId };
 }
 
-async function pgDeliverDriverLine(recordId, requestRecordId, userName) {
+async function pgDeliverDriverLine(recordId, requestRecordId, userName, options = {}) {
   if (!isValidId(recordId) || !isValidId(requestRecordId)) throw new Error("Invalid driver line or request record.");
-  const request = await pgDeliverRequest(requestRecordId, userName);
-  await db().query(`
-    update driver_sheet_lines
-    set received = true, received_at = now(), received_by_username = $2, updated_at = now()
-    where id = $1
-  `, [recordId, userName]);
+  const request = await pgDeliverRequest(requestRecordId, userName, { quantityReceived: options.quantityReceived });
+  if (request.fullyDelivered) {
+    await db().query(`
+      update driver_sheet_lines
+      set received = true, received_at = now(), received_by_username = $2, updated_at = now()
+      where id = $1
+    `, [recordId, userName]);
+  } else {
+    await db().query(`
+      update driver_sheet_lines
+      set received = false, received_at = null, received_by_username = '', updated_at = now()
+      where id = $1
+    `, [recordId]);
+  }
   const lineResult = await db().query(`
     select d.id, d.driver_username, d.ordered, d.to_deliver, d.delivery_day::text as delivery_day,
            d.received, d.received_at, d.received_by_username,
@@ -5936,6 +6159,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "POST" && req.url === "/api/receiving-notes") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      const note = await pgSaveSupplierDeliveryNote(await readJson(req), user.name);
+      send(res, 200, { note });
+      return;
+    }
+
     if (req.method === "GET" && req.url.startsWith("/api/order-report")) {
       if (!requireUser(req, res)) return;
       const url = new URL(req.url, "http://localhost");
@@ -6169,7 +6400,9 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const recordId = req.url.split("/")[3];
       const payload = await readJson(req);
-      const result = await deliverDriverLine(recordId, String(payload.requestId || ""), user.name);
+      const result = await deliverDriverLine(recordId, String(payload.requestId || ""), user.name, {
+        quantityReceived: payload.quantityReceived
+      });
       send(res, 200, result);
       return;
     }

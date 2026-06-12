@@ -1,4 +1,4 @@
-﻿const sheetDate = document.querySelector("#sheetDate");
+const sheetDate = document.querySelector("#sheetDate");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -261,7 +261,7 @@ function renderSheet(data) {
     ...data,
     requests: (data.requests || []).filter((request) => !isStandingOrderRequest(request))
   };
-  if (data.driverName && !driverName.value) driverName.value = formatUserDisplay(data.driverName);
+  driverName.value = formatUserDisplay(data.driverName || driverName.value || "");
   printDate.textContent = `Date: ${data.date}`;
   printDriver.textContent = `Driver: ${formatUserDisplay(driverName.value) || "________________"}`;
 

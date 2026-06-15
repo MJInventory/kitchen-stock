@@ -813,6 +813,10 @@ th {
   min-width: 68px;
 }
 
+.print-value {
+  display: none;
+}
+
 .driver-unit-select {
   width: 86px;
   min-width: 76px;
@@ -2713,14 +2717,18 @@ body.order-app {
   }
 
   .driver-supplier .driver-supplier-select,
+  .driver-supplier .driver-qty-input,
   .driver-supplier .driver-unit-select,
   .driver-supplier .delivery-day-input {
+    display: none;
+  }
+
+  .driver-supplier .print-value {
+    display: inline-block;
     width: 100%;
     min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
     font-size: 8px;
     line-height: 1.1;
+    white-space: normal;
   }
 }

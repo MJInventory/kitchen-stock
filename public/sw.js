@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v147";
+const CACHE_NAME = "kitchen-stock-v148";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -39,10 +39,10 @@ const APP_SHELL = [
   "/stock-count.js",
   "/invoice-capture.js",
   "/manifest.webmanifest",
-  "/madame-janette-logo.png",
-  "/mjordering-icon-192.png",
-  "/mjordering-icon-512.png",
-  "/mjordering-apple-touch-icon.png",
+  "/madame-janette-logo-v148.png",
+  "/mjstock-icon-192-v148.png",
+  "/mjstock-icon-512-v148.png",
+  "/mjstock-apple-touch-v148.png",
   "/icon.svg"
 ];
 
@@ -122,8 +122,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "MJ Stock Magic";
   const options = {
     body: payload.body || "",
-    icon: "/mjordering-icon-192.png",
-    badge: "/mjordering-icon-192.png",
+    icon: "/mjstock-icon-192-v148.png",
+    badge: "/mjstock-icon-192-v148.png",
     tag: payload.tag || "mj-stock-magic",
     data: payload.data || { url: payload.url || "/" }
   };
@@ -147,6 +147,7 @@ self.addEventListener("notificationclick", (event) => {
     await clients.openWindow(targetUrl);
   })());
 });
+
 
 
 

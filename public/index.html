@@ -77,11 +77,12 @@
         <div id="notificationList" class="daily-order-list notification-list"></div>
       </section>
 
-      <section class="daily-order-panel home-order-panel dashboard-panel">
+      <section class="daily-order-panel home-order-panel dashboard-panel sticky-summary-panel">
         <div class="daily-order-heading">
           <h2>Overview</h2>
           <span id="dashboardMode"></span>
         </div>
+        <p class="section-helper">Today’s quick picture so nobody has to remember what is still waiting.</p>
         <div id="dashboardCards" class="dashboard-cards"></div>
       </section>
 
@@ -91,6 +92,11 @@
           <span id="dailyOrderCount"></span>
         </div>
         <div class="order-filters daily-order-filters">
+          <select id="dailyScopeFilter" aria-label="Filter orders by scope">
+            <option value="">All work</option>
+            <option value="__mine__">My stuff</option>
+            <option value="__team__">Team stuff</option>
+          </select>
           <select id="dailyAreaFilter" aria-label="Filter today's orders by area">
             <option value="">All Areas</option>
           </select>
@@ -119,7 +125,7 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v142</footer>
+    <footer class="app-version">MJ Stock Magic v143</footer>
     <script src="/menus.js"></script>
     <script src="/push.js"></script>
     <script src="/theme.js"></script>

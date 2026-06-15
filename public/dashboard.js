@@ -19,6 +19,7 @@ const standingOrderCount = document.querySelector("#standingOrderCount");
 const standingOrderList = document.querySelector("#standingOrderList");
 const notificationCount = document.querySelector("#notificationCount");
 const notificationList = document.querySelector("#notificationList");
+const notificationPanel = document.querySelector(".notification-panel");
 const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
 const enablePushButton = document.querySelector("#enablePushButton");
 const dashboardMode = document.querySelector("#dashboardMode");
@@ -310,10 +311,11 @@ function formatNotificationDate(value) {
 function renderNotifications() {
   if (!notificationList || !notificationCount) return;
   const unread = notifications.filter((note) => !note.isRead);
+  if (notificationPanel) notificationPanel.hidden = unread.length === 0;
   notificationCount.textContent = `${unread.length} unread`;
   if (readAllNotificationsButton) readAllNotificationsButton.disabled = unread.length === 0;
   if (!unread.length) {
-    notificationList.innerHTML = '<p class="empty-sheet">No notifications right now.</p>';
+    notificationList.innerHTML = "";
     renderDashboardCards();
     return;
   }

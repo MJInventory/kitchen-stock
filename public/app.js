@@ -28,6 +28,7 @@ const notificationCount = document.querySelector("#notificationCount");
 const notificationList = document.querySelector("#notificationList");
 const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
 const message = document.querySelector("#message");
+const pageParams = new URLSearchParams(window.location.search);
 
 let allItems = [];
 let recentRequests = [];
@@ -40,6 +41,8 @@ let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 const bootstrapCacheKey = "kitchenStockOrderingBootstrap";
+let pendingJumpItemId = String(pageParams.get("itemId") || "").trim();
+let pendingJumpCategory = String(pageParams.get("category") || "").trim();
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -386,6 +389,67 @@ function groupRequestsByCategory(requests) {
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
+function groupRequestsForOrderSheet(requests) {
+  const groups = new Map();
+  for (const request of requests) {
+    const sortInfo = requestSortValue(request);
+    const supplierName = sortInfo.supplier || "Unassigned Supplier";
+    const categoryName = sortInfo.category || "Uncategorized";
+    if (!groups.has(supplierName)) {
+      groups.set(supplierName, new Map());
+    }
+    const supplierGroups = groups.get(supplierName);
+    if (!supplierGroups.has(categoryName)) {
+      supplierGroups.set(categoryName, []);
+    }
+    supplierGroups.get(categoryName).push(request);
+  }
+  return [...groups.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([supplierName, categoryGroups]) => ({
+      supplierName,
+      categories: [...categoryGroups.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([categoryName, requestsInCategory]) => ({
+          categoryName,
+          requests: [...requestsInCategory].sort((left, right) =>
+            itemNameFromRequest(left).localeCompare(itemNameFromRequest(right), undefined, { numeric: true, sensitivity: "base" })
+          )
+        }))
+    }));
+}
+
+function selectorValue(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function jumpToItem(itemId, category = "") {
+  const item = allItems.find((candidate) => String(candidate.id) === String(itemId));
+  if (!item) return;
+  pendingJumpItemId = String(item.id);
+  pendingJumpCategory = category || itemCategory(item);
+  searchInput.value = "";
+  activeCategory = pendingJumpCategory || itemCategory(item);
+  categoryView.hidden = true;
+  productView.hidden = false;
+  render();
+  const row = productList.querySelector(`.product-row[data-item-id="${selectorValue(item.id)}"]`);
+  if (!row) return;
+  row.classList.add("jump-highlight");
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => row.classList.remove("jump-highlight"), 2400);
+}
+
+function applyPendingJump() {
+  if (!pendingJumpItemId) return;
+  jumpToItem(pendingJumpItemId, pendingJumpCategory);
+  pendingJumpItemId = "";
+  pendingJumpCategory = "";
+  if (window.history?.replaceState) {
+    window.history.replaceState({}, "", "/ordering.html");
+  }
+}
+
 function renderDailyOrder() {
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
@@ -394,36 +458,44 @@ function renderDailyOrder() {
     .filter(hasValidRequestItemId)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
-  const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
+  const grouped = groupRequestsForOrderSheet(activeRequests.slice(0, 100));
   dailyOrderList.innerHTML = grouped
-    .map(([category, requests]) => `
-      <section class="daily-order-group">
-        <div class="daily-order-group-heading">
-          <h3>${escapeHtml(category)}</h3>
-          <span>${requests.length} item${requests.length === 1 ? "" : "s"}</span>
+    .map((supplier) => `
+      <section class="sheet-group">
+        <div class="supplier-heading">
+          <h2>${escapeHtml(supplier.supplierName)}</h2>
         </div>
-        <div class="daily-order-group-list">
-          ${requests
-            .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
-            .map((request) => `
-              <article class="daily-order-row">
-                <div>
-                  <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
-                  <span>${escapeHtml([
-                    request.quantity,
-                    allItems.find((candidate) => candidate.id === request.itemId)?.category || request.category,
-                    request.inventoryArea,
-                    request.storageLocation,
-                    isStandingOrder(request) ? `Standing order${expectedDateFromRequest(request) ? ` expected ${expectedDateFromRequest(request)}` : ""}` : ""
-                  ].filter(Boolean).join(" / "))}</span>
-                </div>
-                <div class="daily-order-actions">
-                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button>
-                  ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}
-                </div>
-              </article>
-            `).join("")}
-        </div>
+        ${supplier.categories.map((categoryGroup) => `
+          <div class="driver-supplier">
+            <div class="driver-supplier-title">
+              <h3>${escapeHtml(categoryGroup.categoryName)}</h3>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Received</th>
+                  <th>Remove</th>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Unit</th>
+                  <th>Priority</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${categoryGroup.requests.map((request) => `
+                  <tr data-request-id="${escapeHtml(request.id)}" data-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryGroup.categoryName)}">
+                    <td><button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button></td>
+                    <td>${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}</td>
+                    <td><button class="order-sheet-item-link" type="button" data-jump-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryGroup.categoryName)}">${escapeHtml(itemNameFromRequest(request))}</button></td>
+                    <td>${escapeHtml(request.quantity)}</td>
+                    <td>${escapeHtml(request.unit || "item")}</td>
+                    <td>${escapeHtml(request.urgency || "Medium")}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `).join("")}
       </section>
     `)
     .join("");
@@ -515,6 +587,8 @@ function renderProductList() {
       const quantity = entry?.quantity ?? defaultQuantity(item);
       const urgency = entry?.urgency || (Number(item.quantity || 0) < Number(item.minimum || 0) ? "High" : "Medium");
       const lowStock = item.minimum !== null && Number(item.quantity || 0) < Number(item.minimum || 0);
+      const hasExistingOrder = Boolean(entry?.requestId);
+      const deleteRequested = Boolean(entry?.deleteRequested);
       return `
         <article class="product-row${checked ? " selected" : ""}" data-item-id="${item.id}">
           <button class="product-check" type="button" aria-label="Select ${escapeHtml(item.name)}">${checked ? "&#10003;" : ""}</button>
@@ -539,6 +613,12 @@ function renderProductList() {
             <select class="urgency-input" aria-label="Urgency">
               ${["Low", "Medium", "High", "Critical"].map((level) => `<option${level === urgency ? " selected" : ""}>${level}</option>`).join("")}
             </select>
+            ${hasExistingOrder ? `
+              <label class="product-delete-toggle">
+                <input class="delete-request-input" type="checkbox"${deleteRequested ? " checked" : ""}>
+                <span>Delete order</span>
+              </label>
+            ` : ""}
           </div>
         </article>
       `;
@@ -584,7 +664,8 @@ function selectItem(item, quantity = defaultQuantity(item), urgency = "Medium") 
     item,
     quantity: Math.max(1, Number(quantity || 1)),
     urgency,
-    unit: itemUnit(item)
+    unit: itemUnit(item),
+    deleteRequested: false
   });
 }
 
@@ -614,9 +695,11 @@ function buildSelectedFromRecentRequests() {
     if (!item) continue;
     map.set(request.itemId, {
       item,
+      requestId: request.id,
       quantity: Math.max(1, Number(request.quantity || 1)),
       urgency: request.urgency || "Medium",
-      unit: request.unit || itemUnit(item)
+      unit: request.unit || itemUnit(item),
+      deleteRequested: false
     });
   }
 
@@ -626,11 +709,14 @@ function buildSelectedFromRecentRequests() {
 function syncProductRow(row) {
   const item = allItems.find((candidate) => candidate.id === row.dataset.itemId);
   if (!item || !selected.has(item.id)) return;
+  const current = selected.get(item.id) || {};
   selected.set(item.id, {
     item,
+    requestId: current.requestId,
     quantity: Math.max(1, Number(row.querySelector(".qty-input").value || 1)),
     urgency: row.querySelector(".urgency-input").value,
-    unit: row.querySelector(".unit-input")?.value || itemUnit(item)
+    unit: row.querySelector(".unit-input")?.value || itemUnit(item),
+    deleteRequested: Boolean(row.querySelector(".delete-request-input")?.checked)
   });
 }
 
@@ -643,7 +729,10 @@ function toggleProduct(row) {
   } else {
     selectItem(item, row.querySelector(".qty-input").value, row.querySelector(".urgency-input").value);
     const entry = selected.get(item.id);
-    if (entry) entry.unit = row.querySelector(".unit-input")?.value || itemUnit(item);
+    if (entry) {
+      entry.unit = row.querySelector(".unit-input")?.value || itemUnit(item);
+      entry.deleteRequested = Boolean(row.querySelector(".delete-request-input")?.checked);
+    }
   }
 
   render();
@@ -653,6 +742,7 @@ async function refresh(silent = false) {
   if (!silent) setMessage("Loading products...");
   const data = await api("/api/bootstrap");
   applyBootstrapData(data);
+  applyPendingJump();
   saveBootstrapCache(data);
   setMessage("");
 }
@@ -664,8 +754,15 @@ async function submitSelected() {
   setMessage("Saving order...");
 
   try {
-    const requests = [...selected.values()]
-      .filter((entry) => entry?.item?.id)
+    const entries = [...selected.values()].filter((entry) => entry?.item?.id);
+    const deleteEntries = entries.filter((entry) => entry.deleteRequested && entry.requestId);
+    const saveEntries = entries.filter((entry) => !entry.deleteRequested);
+
+    if (deleteEntries.length) {
+      await Promise.all(deleteEntries.map((entry) => api(`/api/requests/${entry.requestId}`, { method: "DELETE" })));
+    }
+
+    const requests = saveEntries
       .map((entry) => ({
       itemId: String(entry.item.id || "").trim(),
       quantityNeeded: entry.quantity,
@@ -678,15 +775,20 @@ async function submitSelected() {
       notes: ""
     }))
       .filter((entry) => entry.itemId);
-    if (!requests.length) {
+    if (!requests.length && !deleteEntries.length) {
       throw new Error("No valid items were selected to save.");
     }
-    const data = await api("/api/requests/batch", {
-      method: "POST",
-      body: JSON.stringify({ requests })
-    });
-    const saved = selected.size;
-    const byId = new Map(recentRequests.map((request) => [request.id, request]));
+    let data = { requests: [] };
+    if (requests.length) {
+      data = await api("/api/requests/batch", {
+        method: "POST",
+        body: JSON.stringify({ requests })
+      });
+    }
+    const deletedIds = new Set(deleteEntries.map((entry) => entry.requestId).filter(Boolean));
+    const saved = requests.length;
+    const deleted = deleteEntries.length;
+    const byId = new Map(recentRequests.filter((request) => !deletedIds.has(request.id)).map((request) => [request.id, request]));
     for (const request of data.requests || []) {
       if (request?.id) byId.set(request.id, request);
     }
@@ -700,7 +802,10 @@ async function submitSelected() {
       .slice(0, 200);
     selected = buildSelectedFromRecentRequests();
     render();
-    setMessage(`${saved} item(s) saved to today's order.`);
+    const actions = [];
+    if (saved) actions.push(`${saved} item(s) saved`);
+    if (deleted) actions.push(`${deleted} item(s) deleted`);
+    setMessage(`${actions.join(" and ")}.`);
     window.setTimeout(() => {
       refresh().catch((error) => setMessage(error.message, true));
     }, 250);
@@ -873,6 +978,12 @@ selectedChips.addEventListener("click", (event) => {
 });
 
 dailyOrderList.addEventListener("click", (event) => {
+  const jumpButton = event.target.closest(".order-sheet-item-link");
+  if (jumpButton) {
+    jumpToItem(jumpButton.dataset.jumpItemId, jumpButton.dataset.jumpCategory);
+    return;
+  }
+
   const deliverButton = event.target.closest(".deliver-order-button");
   if (deliverButton) {
     if (!window.confirm("Mark this item as received and add it to inventory?")) return;
@@ -943,6 +1054,7 @@ if (sessionToken && sessionUser) {
   const cached = loadBootstrapCache();
   if (cached) {
     applyBootstrapData(cached);
+    applyPendingJump();
     setMessage("");
   }
   refreshSession()

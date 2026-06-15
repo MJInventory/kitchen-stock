@@ -19,7 +19,8 @@
     { label: "Categories", href: "/categories.html", permission: "canAddInventoryItems" },
     { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },
     { label: "Storage & Shelves", href: "/shelf-codes.html", permission: "canAddInventoryItems" },
-    { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" }
+    { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" },
+    { label: "Log Out", href: "__logout__" }
   ];
 
   function allowed(item) {
@@ -73,9 +74,27 @@
 
     menus.querySelectorAll("select").forEach((select) => {
       select.addEventListener("change", (event) => {
-        if (event.target.value) window.location.href = event.target.value;
+        if (!event.target.value) return;
+        if (event.target.value === "__logout__") {
+          const logoutButton = document.querySelector("#logoutButton");
+          if (logoutButton) {
+            logoutButton.click();
+            event.target.value = "";
+            return;
+          }
+          localStorage.removeItem("kitchenStockToken");
+          localStorage.removeItem("kitchenStockUser");
+          localStorage.removeItem("kitchenStockRole");
+          localStorage.removeItem("kitchenStockPermissions");
+          window.location.href = currentPath === "/" ? "/" : "/";
+          return;
+        }
+        window.location.href = event.target.value;
       });
     });
+
+    const logoutButton = document.querySelector("#logoutButton");
+    if (logoutButton) logoutButton.hidden = true;
   }
 
   if (document.readyState === "loading") {

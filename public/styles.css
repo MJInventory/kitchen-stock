@@ -785,6 +785,7 @@ th {
 }
 
 .driver-supplier-select,
+.driver-qty-input,
 .driver-unit-select,
 .delivery-day-input,
 .receive-qty-input {
@@ -796,6 +797,11 @@ th {
   color: #101828;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+.driver-qty-input {
+  width: 78px;
+  min-width: 68px;
 }
 
 .driver-unit-select {

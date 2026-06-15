@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v149";
+const CACHE_NAME = "kitchen-stock-v151";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -147,6 +147,8 @@ self.addEventListener("notificationclick", (event) => {
     await clients.openWindow(targetUrl);
   })());
 });
+
+
 
 
 

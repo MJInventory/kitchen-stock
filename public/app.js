@@ -12,6 +12,7 @@ const submitButton = document.querySelector("#submitButton");
 const featureMenu = document.querySelector("#featureMenu");
 const backofficeMenu = document.querySelector("#backofficeMenu");
 const searchInput = document.querySelector("#searchInput");
+const requestScopeFilter = document.querySelector("#requestScopeFilter");
 const selectedChips = document.querySelector("#selectedChips");
 const categoryView = document.querySelector("#categoryView");
 const categoryGrid = document.querySelector("#categoryGrid");
@@ -27,6 +28,8 @@ const standingOrderList = document.querySelector("#standingOrderList");
 const notificationCount = document.querySelector("#notificationCount");
 const notificationList = document.querySelector("#notificationList");
 const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
+const orderingMode = document.querySelector("#orderingMode");
+const orderingSummaryCards = document.querySelector("#orderingSummaryCards");
 const message = document.querySelector("#message");
 const pageParams = new URLSearchParams(window.location.search);
 
@@ -193,8 +196,108 @@ function isStandingOrder(request) {
     || String(request.notes || "").toLowerCase().includes("standing order");
 }
 
+function requestUser(request) {
+  return String(request?.requestedBy || "").trim();
+}
+
+function requestArea(request) {
+  return request?.inventoryArea || allItems.find((item) => item.id === request?.itemId)?.inventoryArea || "";
+}
+
+function requestLocation(request) {
+  return request?.storageLocation || allItems.find((item) => item.id === request?.itemId)?.storageLocation || "";
+}
+
+function requestDay(request) {
+  return localDateKey(request?.requestedAt || "");
+}
+
+function selectedRequestScope() {
+  return String(requestScopeFilter?.value || "").trim();
+}
+
+function requestMatchesScope(request) {
+  const scope = selectedRequestScope();
+  if (scope === "__mine__") return sameUser(requestUser(request), sessionUser);
+  if (scope === "__team__") return !sameUser(requestUser(request), sessionUser);
+  return true;
+}
+
 function hasValidRequestItemId(request) {
   return Boolean(String(request?.itemId || "").trim());
+}
+
+function displayRoleMode() {
+  if (sessionRole === "god") return "God view";
+  if (sessionRole === "admin") return "Admin view";
+  if (sessionRole === "power-user") return "Power user view";
+  return "Team view";
+}
+
+function requestOpenStatsForItem(itemId) {
+  const open = recentRequests
+    .filter((request) => String(request.itemId) === String(itemId))
+    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !request.standingRunId)
+    .filter((request) => !isStandingOrder(request));
+  return {
+    mine: open.filter((request) => sameUser(requestUser(request), sessionUser)).length,
+    team: open.filter((request) => !sameUser(requestUser(request), sessionUser)).length,
+    total: open.length
+  };
+}
+
+function requestStatusChips(request, today = todayLocal()) {
+  const chips = [];
+  const day = requestDay(request);
+  if (day && day < today) chips.push(["Older open", "older"]);
+  else chips.push(["Today", "today"]);
+  chips.push([
+    sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`,
+    sameUser(requestUser(request), sessionUser) ? "mine" : "team"
+  ]);
+  if (request.toDeliver) chips.push(["2Deliver", "deliver"]);
+  if (String(request.urgency || "").toLowerCase() === "high") chips.push(["High", "high"]);
+  if (String(request.urgency || "").toLowerCase() === "critical") chips.push(["Critical", "critical"]);
+  return chips;
+}
+
+function renderStatusChips(chips = []) {
+  if (!chips.length) return "";
+  return `<div class="status-chip-row">${chips.map(([label, tone]) => `<span class="status-chip ${tone}">${escapeHtml(label)}</span>`).join("")}</div>`;
+}
+
+function renderOrderingSummary() {
+  if (!orderingSummaryCards || !orderingMode) return;
+  orderingMode.textContent = displayRoleMode();
+  const today = todayLocal();
+  const unresolved = recentRequests
+    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => !request.standingRunId)
+    .filter((request) => !isStandingOrder(request));
+
+  const summary = [
+    ["Saved by me", selected.size, "Items you are actively editing right now"],
+    ["My open", unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length, "Still open with your name on them"],
+    ["Team open", unresolved.filter((request) => !sameUser(requestUser(request), sessionUser)).length, "Open lines from everybody else"],
+    ["Older open", unresolved.filter((request) => {
+      const day = requestDay(request);
+      return day && day < today;
+    }).length, "Still waiting from previous days"],
+    ["Below minimum", allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length, "Items already below their minimum"],
+    ["Standing due", standingOrders.filter((order) => {
+      const expected = String(order.expectedDate || "").trim();
+      return expected && expected <= today;
+    }).length, "Standing orders due now or overdue"]
+  ];
+
+  orderingSummaryCards.innerHTML = summary.map(([label, value, hint]) => `
+    <article class="dashboard-card">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+      <small>${escapeHtml(hint)}</small>
+    </article>
+  `).join("");
 }
 
 function expectedDateFromRequest(request) {
@@ -462,11 +565,13 @@ function applyPendingJump() {
 }
 
 function renderDailyOrder() {
+  const selectedDay = todayLocal();
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !request.standingRunId)
     .filter((request) => !isStandingOrder(request))
     .filter(hasValidRequestItemId)
+    .filter(requestMatchesScope)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
@@ -493,7 +598,10 @@ function renderDailyOrder() {
                 <tr data-request-id="${escapeHtml(request.id)}" data-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">
                   <td><button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button></td>
                   <td>${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}</td>
-                  <td><button class="order-sheet-item-link" type="button" data-jump-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">${escapeHtml(itemNameFromRequest(request))}</button></td>
+                  <td>
+                    <button class="order-sheet-item-link" type="button" data-jump-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">${escapeHtml(itemNameFromRequest(request))}</button>
+                    ${renderStatusChips(requestStatusChips(request, selectedDay))}
+                  </td>
                   <td>${escapeHtml(request.quantity)}</td>
                   <td>${escapeHtml(request.unit || "item")}</td>
                   <td>${escapeHtml(request.urgency || "Medium")}</td>
@@ -550,10 +658,14 @@ function renderCategories() {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([category, groupItems]) => {
       const stats = categoryStats(category, groupItems);
+      const openMine = groupItems.reduce((sum, item) => sum + requestOpenStatsForItem(item.id).mine, 0);
+      const openTeam = groupItems.reduce((sum, item) => sum + requestOpenStatsForItem(item.id).team, 0);
       const subtitle = [
         `${groupItems.length} products`,
         stats.chosen ? `${stats.chosen} selected` : "",
-        stats.low ? `${stats.low} below min` : ""
+        stats.low ? `${stats.low} below min` : "",
+        openMine ? `${openMine} my open` : "",
+        openTeam ? `${openTeam} team open` : ""
       ].filter(Boolean).join(" / ");
       return `
         <button class="category-card" type="button" data-category="${escapeHtml(category)}">
@@ -595,6 +707,11 @@ function renderProductList() {
       const lowStock = item.minimum !== null && Number(item.quantity || 0) < Number(item.minimum || 0);
       const hasExistingOrder = Boolean(entry?.requestId);
       const deleteRequested = Boolean(entry?.deleteRequested);
+      const openStats = requestOpenStatsForItem(item.id);
+      const chips = [];
+      if (lowStock) chips.push([`Below min ${item.quantity ?? 0}/${item.minimum ?? 0}`, "critical"]);
+      if (openStats.mine) chips.push([`${openStats.mine} my open`, "mine"]);
+      if (openStats.team) chips.push([`${openStats.team} team open`, "team"]);
       return `
         <article class="product-row${checked ? " selected" : ""}" data-item-id="${item.id}">
           <button class="product-check" type="button" aria-label="Select ${escapeHtml(item.name)}">${checked ? "&#10003;" : ""}</button>
@@ -602,7 +719,7 @@ function renderProductList() {
             <strong>${escapeHtml(item.name)}</strong>
             <span>${escapeHtml(itemMeta(item) || itemCategory(item))}</span>
             <small>${escapeHtml(stockMeta(item))}</small>
-            ${lowStock ? `<em>Below minimum: ${item.quantity ?? 0} / ${item.minimum} ${escapeHtml(itemUnit(item))}</em>` : ""}
+            ${renderStatusChips(chips)}
           </div>
           <div class="product-controls">
             <label class="stock-adjust">
@@ -659,6 +776,7 @@ function render() {
     renderProductList();
   }
   renderSelectedChips();
+  renderOrderingSummary();
   renderDailyOrder();
   renderStandingOrders();
   renderNotifications();
@@ -1042,6 +1160,11 @@ readAllNotificationsButton?.addEventListener("click", () => {
     }
     render();
   });
+});
+
+requestScopeFilter?.addEventListener("change", () => {
+  renderOrderingSummary();
+  renderDailyOrder();
 });
 
 ["input", "change", "search"].forEach((eventName) => {

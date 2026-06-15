@@ -341,14 +341,17 @@ function renderSheet(data) {
                           <select class="driver-supplier-select" ${request.driverLineId ? "" : "disabled"} aria-label="Supplier for ${escapeHtml(request.itemName)}">
                             ${supplierOptions(request.supplierName)}
                           </select>
+                          <span class="print-value">${escapeHtml(request.supplierName || "Unassigned Supplier")}</span>
                         </td>
                         <td>
                           <input class="driver-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(request.quantity ?? "")}" ${request.driverLineId ? "" : "disabled"} aria-label="Quantity for ${escapeHtml(request.itemName)}">
+                          <span class="print-value">${escapeHtml(request.quantity ?? "")}</span>
                         </td>
                         <td>
                           <select class="driver-unit-select" ${request.driverLineId ? "" : "disabled"} aria-label="Unit for ${escapeHtml(request.itemName)}">
                             ${unitOptions(request.unit)}
                           </select>
+                          <span class="print-value">${escapeHtml(request.unit || "item")}</span>
                         </td>
                         <td>${escapeHtml(request.urgency || "")}</td>
                         <td>
@@ -358,6 +361,7 @@ function renderSheet(data) {
                         </td>
                         <td>
                           <input class="delivery-day-input" type="date" value="${escapeHtml(request.deliveryDay || "")}" ${request.driverLineId ? "" : "disabled"} aria-label="Delivery day for ${escapeHtml(request.itemName)}">
+                          <span class="print-value">${escapeHtml(request.deliveryDay || "")}</span>
                         </td>
                       </tr>
                     `)

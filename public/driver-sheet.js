@@ -198,15 +198,13 @@ function buildPlainTextSheet(supplierFilter = "") {
     .map(([supplier, supplierRequests]) => {
       const lines = supplierRequests.map((request) => `${formatQuantity(request.quantity)} x ${String(request.unit || "item").trim() || "item"} ${String(request.itemName || "").trim()}`.trim());
       return [
-        "===========",
+        supplier,
+        "",
         "Bon dia,",
         "Can i please order the following items:",
-        "=================",
         "",
-        supplier,
         ...lines,
         "",
-        "=========",
         "thank in advance"
       ].join("\n");
     })

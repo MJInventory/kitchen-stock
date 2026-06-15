@@ -34,7 +34,7 @@
     <main class="order-shell">
       <header class="order-topbar">
         <div class="brand-block">
-          <img class="brand-mark brand-logo" src="/madame-janette-logo.png" alt="Madame Janette">
+          <img class="brand-mark brand-logo" src="/madame-janette-logo.png?v=144" alt="Madame Janette">
           <div>
             <h1>MJ Stock Magic</h1>
             <p>MADAME JANETTE</p>
@@ -66,7 +66,18 @@
         </div>
       </header>
 
-      <section class="daily-order-panel sticky-summary-panel ordering-summary-panel">
+      <section class="daily-order-panel notification-panel">
+        <div class="daily-order-heading">
+          <h2>Notifications</h2>
+          <span id="notificationCount"></span>
+        </div>
+        <div class="notification-actions">
+          <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
+        </div>
+        <div id="notificationList" class="notification-list"></div>
+      </section>
+
+      <section class="daily-order-panel ordering-summary-panel">
         <div class="daily-order-heading">
           <h2>Ordering Snapshot</h2>
           <span id="orderingMode">Team view</span>
@@ -105,17 +116,6 @@
         <p id="message" class="order-message" role="status"></p>
       </section>
 
-      <section class="daily-order-panel notification-panel">
-        <div class="daily-order-heading">
-          <h2>Notifications</h2>
-          <span id="notificationCount"></span>
-        </div>
-        <div class="notification-actions">
-          <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
-        </div>
-        <div id="notificationList" class="notification-list"></div>
-      </section>
-
       <section id="categoryView" class="category-view">
         <div class="order-divider"><span>All Categories</span></div>
         <div id="categoryGrid" class="category-grid"></div>
@@ -150,13 +150,17 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v143</footer>
+    <footer class="app-version">MJ Stock Magic v145</footer>
     <script src="/menus.js"></script>
     <script src="/push.js"></script>
     <script src="/theme.js"></script>
     <script src="/app.js" type="module"></script>
   </body>
 </html>
+
+
+
+
 
 
 

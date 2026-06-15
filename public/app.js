@@ -483,7 +483,6 @@ function renderDailyOrder() {
                 <th>Received</th>
                 <th>Remove</th>
                 <th>Item</th>
-                <th>Supplier</th>
                 <th>Qty</th>
                 <th>Unit</th>
                 <th>Priority</th>
@@ -495,7 +494,6 @@ function renderDailyOrder() {
                   <td><button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button></td>
                   <td>${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}</td>
                   <td><button class="order-sheet-item-link" type="button" data-jump-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">${escapeHtml(itemNameFromRequest(request))}</button></td>
-                  <td>${escapeHtml(requestSortValue(request).supplier || request.supplierName || "Unassigned Supplier")}</td>
                   <td>${escapeHtml(request.quantity)}</td>
                   <td>${escapeHtml(request.unit || "item")}</td>
                   <td>${escapeHtml(request.urgency || "Medium")}</td>

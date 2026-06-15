@@ -1,0 +1,124 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
+    <title>Order Report</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Order Report</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell sheet-shell">
+      <header class="topbar no-print">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Order Report</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <a class="button secondary" href="/driver-sheet.html">Driver Sheet</a>
+          <a class="button secondary" href="/receiving-sheet.html">Receiving</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel no-print">
+        <div class="row">
+          <label>
+            Report date
+            <input id="reportDate" type="date">
+          </label>
+          <label id="guestCountField" hidden>
+            Guests
+            <input id="guestCountInput" type="number" min="0" step="1" placeholder="Daily guests">
+          </label>
+          <label id="guestNotesField" hidden>
+            Guest notes
+            <input id="guestNotesInput" type="text" placeholder="Optional note">
+          </label>
+        </div>
+        <div class="sheet-actions">
+          <button id="loadReportButton" type="button">Load Report</button>
+          <button id="saveGuestsButton" type="button" hidden>Save Guests</button>
+          <button id="printReportButton" type="button">Print / Save PDF</button>
+        </div>
+        <p id="reportMessage" role="status"></p>
+      </section>
+
+      <section class="print-sheet order-report-sheet">
+        <div class="sheet-header">
+          <div>
+            <p class="eyebrow">Daily Order Status</p>
+            <h1>Order Report</h1>
+          </div>
+          <div class="sheet-meta">
+            <span id="printDate"></span>
+          </div>
+        </div>
+
+        <div id="reportSummary" class="report-summary"></div>
+        <div id="reportList" class="sheet-list"></div>
+        <div class="standing-report-section">
+          <div class="sheet-header standing-report-header">
+            <div>
+              <p class="eyebrow">Scheduled Deliveries</p>
+              <h2>Standing Orders</h2>
+            </div>
+          </div>
+          <div id="standingReportList" class="sheet-list"></div>
+        </div>
+        <div class="standing-report-section">
+          <div class="sheet-header standing-report-header">
+            <div>
+              <p class="eyebrow">Daily Changes</p>
+              <h2>Adds, Changes, Deletes</h2>
+            </div>
+          </div>
+          <div id="activitySummary" class="report-summary report-summary-compact"></div>
+          <div id="activityReportList" class="sheet-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-version no-print">MJ Stock Magic v133</footer>
+    <script src="/menus.js"></script>
+    <script src="/push.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/order-report.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,104 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
+    <title>User Administration</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>User Admin</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell setup-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>User Administration</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Add User</h2>
+        <form id="newUserForm" class="admin-form-grid">
+          <label>Name <input id="newName" type="text" required></label>
+          <label>Password <input id="newPassword" type="text" required></label>
+          <label>Role
+            <select id="newRole">
+              <option value="user">User</option>
+              <option value="power-user">Power User</option>
+              <option value="admin" data-god-only>Admin</option>
+              <option value="god" data-god-only>God</option>
+            </select>
+          </label>
+          <label>Theme
+            <select id="newTheme">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+          <fieldset class="inline-fieldset wide-field">
+            <legend>Notify for area orders</legend>
+            <div class="notify-area-grid">
+              <label class="check-label"><input id="newNotifyBar" type="checkbox" checked> Bar</label>
+              <label class="check-label"><input id="newNotifyFoh" type="checkbox" checked> FOH</label>
+              <label class="check-label"><input id="newNotifyKitchen" type="checkbox" checked> Kitchen</label>
+              <label class="check-label"><input id="newNotifyGeneral" type="checkbox" checked> General</label>
+            </div>
+          </fieldset>
+          <label class="check-label"><input id="newNotifyOrders" type="checkbox"> Notify on new orders</label>
+          <label class="check-label"><input id="newNotifyDelivery" type="checkbox" checked> Notify on delivered items</label>
+          <label class="check-label"><input id="newIsDriver" type="checkbox"> Dedicated driver</label>
+          <label class="check-label"><input id="newMustChange" type="checkbox"> Force password change</label>
+          <button type="submit">Add User</button>
+        </form>
+        <p id="adminMessage" role="status"></p>
+      </section>
+
+      <section id="userList" class="settings-list"></section>
+    </main>
+
+    <footer class="app-version">MJ Stock Magic v133</footer>
+    <script src="/menus.js"></script>
+    <script src="/push.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/user-admin.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

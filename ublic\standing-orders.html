@@ -1,0 +1,101 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
+    <title>Standing Orders</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Standing Orders</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell setup-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Standing Orders</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <form id="standingOrderForm" class="admin-form-grid">
+          <label class="wide-field">Standing order name <input id="standingName" type="text" placeholder="Weekly dry goods, Monday delivery"></label>
+          <label>Supplier <select id="standingSupplier" required></select></label>
+          <label>Delivery date <input id="expectedDate" type="date" required></label>
+          <label>Schedule
+            <select id="schedule">
+              <option>Weekly</option>
+              <option>Daily</option>
+              <option>One Time</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>Other schedule <input id="otherSchedule" type="text" placeholder="Every 2 weeks, monthly, manual"></label>
+          <fieldset class="wide-field inline-fieldset">
+            <legend>Items</legend>
+            <div class="standing-item-adder">
+              <input id="standingItemSearch" type="search" placeholder="Search inventory items">
+              <input id="standingQuantity" type="number" min="1" step="1" value="1" aria-label="Quantity">
+            </div>
+            <div id="standingItemResults" class="search-pick-list"></div>
+            <div id="standingItems" class="standing-items"></div>
+          </fieldset>
+          <label class="wide-field">Notes <textarea id="standingNotes" rows="3"></textarea></label>
+          <button type="submit">Create Standing Order</button>
+          <p id="standingMessage" role="status"></p>
+        </form>
+      </section>
+
+      <section id="standingList" class="settings-list"></section>
+
+      <section class="panel standing-history-panel">
+        <h2>Recent Standing Order Runs</h2>
+        <div id="standingRunList" class="settings-list"></div>
+      </section>
+    </main>
+
+    <footer class="app-version">MJ Stock Magic v133</footer>
+    <script src="/menus.js"></script>
+    <script src="/push.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/standing-orders.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

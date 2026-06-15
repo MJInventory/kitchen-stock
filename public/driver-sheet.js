@@ -10,7 +10,6 @@ const driverName = document.querySelector("#driverName");
 const loadSheetButton = document.querySelector("#loadSheetButton");
 const saveDriverButton = document.querySelector("#saveDriverButton");
 const printSheetButton = document.querySelector("#printSheetButton");
-const textSheetButton = document.querySelector("#textSheetButton");
 const sheetMessage = document.querySelector("#sheetMessage");
 const printDate = document.querySelector("#printDate");
 const printDriver = document.querySelector("#printDriver");
@@ -172,9 +171,17 @@ function formatQuantity(value) {
   return Number.isInteger(number) ? String(number) : String(number);
 }
 
-function buildPlainTextSheet() {
+function plainTextFileName(label) {
+  return String(label || "supplier")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "supplier";
+}
+
+function buildPlainTextSheet(supplierFilter = "") {
   const grouped = new Map();
   const requests = [...(currentSheet.requests || [])]
+    .filter((request) => !supplierFilter || String(request.supplierName || "Unassigned Supplier").trim() === supplierFilter)
     .sort((left, right) => {
       const supplier = String(left.supplierName || "").localeCompare(String(right.supplierName || ""), undefined, { sensitivity: "base" });
       if (supplier) return supplier;
@@ -190,24 +197,40 @@ function buildPlainTextSheet() {
   return [...grouped.entries()]
     .map(([supplier, supplierRequests]) => {
       const lines = supplierRequests.map((request) => `${formatQuantity(request.quantity)} x ${String(request.unit || "item").trim() || "item"} ${String(request.itemName || "").trim()}`.trim());
-      return [supplier, ...lines].join("\n");
+      return [
+        "===========",
+        "Bon dia,",
+        "Can i please order the following items:",
+        "=================",
+        "",
+        supplier,
+        ...lines,
+        "",
+        "=========",
+        "thank in advance"
+      ].join("\n");
     })
     .join("\n\n");
 }
 
-function openTextSheet() {
+function openTextSheet(supplierFilter = "") {
   if (!currentSheet.requests?.length) {
     setMessage("Load a driver sheet first.", true);
     return;
   }
-  const text = buildPlainTextSheet();
+  const text = buildPlainTextSheet(supplierFilter);
+  if (!String(text || "").trim()) {
+    setMessage("No items found for that supplier.", true);
+    return;
+  }
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   if (!opened) {
     const link = document.createElement("a");
     link.href = url;
-    link.download = `driver-sheet-${sheetDate.value || todayLocal()}.txt`;
+    const label = supplierFilter ? plainTextFileName(supplierFilter) : "driver-sheet";
+    link.download = `${label}-${sheetDate.value || todayLocal()}.txt`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -275,7 +298,7 @@ function renderSheet(data) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, supplier]) => `
       <section class="sheet-group">
-        <div class="supplier-heading">
+        <div class="supplier-heading supplier-text-trigger" role="button" tabindex="0" data-supplier-name="${escapeHtml(supplier.supplier)}" aria-label="Open text list for ${escapeHtml(supplier.supplier)}">
           <h2>${escapeHtml(supplier.supplier)}</h2>
           ${supplier.contact ? `<pre>${escapeHtml(supplier.contact)}</pre>` : ""}
         </div>
@@ -542,9 +565,13 @@ driverName.addEventListener("input", () => {
   printDriver.textContent = `Driver: ${formatUserDisplay(driverName.value) || "________________"}`;
 });
 printSheetButton.addEventListener("click", () => window.print());
-textSheetButton.addEventListener("click", openTextSheet);
 
 sheetList.addEventListener("click", (event) => {
+  const supplierTrigger = event.target.closest(".supplier-text-trigger");
+  if (supplierTrigger?.dataset.supplierName) {
+    openTextSheet(supplierTrigger.dataset.supplierName);
+    return;
+  }
   const button = event.target.closest(".driver-check-button");
   if (!button) return;
   const row = button.closest("tr");
@@ -558,6 +585,14 @@ sheetList.addEventListener("click", (event) => {
   if (button.dataset.action === "toDeliver") {
     toggleToDeliver(row, button);
   }
+});
+
+sheetList.addEventListener("keydown", (event) => {
+  const supplierTrigger = event.target.closest(".supplier-text-trigger");
+  if (!supplierTrigger?.dataset.supplierName) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  openTextSheet(supplierTrigger.dataset.supplierName);
 });
 
 sheetList.addEventListener("change", (event) => {

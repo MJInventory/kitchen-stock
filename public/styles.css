@@ -1725,6 +1725,31 @@ body.order-app {
   font-size: 12px;
 }
 
+.product-delete-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--order-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--order-ink);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.product-delete-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--order-gold);
+}
+
+.product-delete-toggle span {
+  min-width: 0;
+  color: inherit;
+}
+
 .stock-count-toolbar {
   width: min(860px, calc(100% - 32px));
   margin: 28px auto 18px;
@@ -2470,6 +2495,11 @@ body.order-app {
 
   .product-controls select {
     width: 112px;
+  }
+
+  .product-delete-toggle {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .stock-count-heading {

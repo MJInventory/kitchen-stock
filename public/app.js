@@ -292,13 +292,19 @@ function renderOrderingSummary() {
     }).length, "Standing orders due now or overdue"]
   ];
 
-  orderingSummaryCards.innerHTML = summary.map(([label, value, hint]) => `
+  orderingSummaryCards.innerHTML = summary
+    .filter(([, value]) => Number(value || 0) > 0)
+    .map(([label, value, hint]) => `
     <article class="dashboard-card">
       <strong>${escapeHtml(value)}</strong>
       <span>${escapeHtml(label)}</span>
       <small>${escapeHtml(hint)}</small>
     </article>
   `).join("");
+
+  if (!orderingSummaryCards.innerHTML) {
+    orderingSummaryCards.innerHTML = '<p class="empty-sheet">Nothing needs attention right now.</p>';
+  }
 }
 
 function expectedDateFromRequest(request) {

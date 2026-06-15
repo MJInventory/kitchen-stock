@@ -66,12 +66,26 @@
         </div>
       </header>
 
+      <section class="daily-order-panel sticky-summary-panel ordering-summary-panel">
+        <div class="daily-order-heading">
+          <h2>Ordering Snapshot</h2>
+          <span id="orderingMode">Team view</span>
+        </div>
+        <p class="section-helper">What is saved, already open, or below minimum right now.</p>
+        <div id="orderingSummaryCards" class="dashboard-cards ordering-summary-cards"></div>
+      </section>
+
       <section class="order-search-band">
         <label class="search-box">
           <span>Search</span>
           <input id="searchInput" type="search" placeholder="Quick search products..." autocomplete="off">
         </label>
         <div class="order-filters">
+          <select id="requestScopeFilter" aria-label="Filter order list by scope">
+            <option value="">All work</option>
+            <option value="__mine__">My stuff</option>
+            <option value="__team__">Team stuff</option>
+          </select>
           <select id="areaFilter" aria-label="Inventory area">
             <option value="">All Areas</option>
             <option>Bar</option>
@@ -123,6 +137,7 @@
           <h2>Today's Order</h2>
           <span id="dailyOrderCount"></span>
         </div>
+        <p class="section-helper">Open order lines grouped by category so the team can see what is already in motion.</p>
         <div id="dailyOrderList" class="daily-order-list"></div>
       </section>
 
@@ -135,7 +150,7 @@
       </section>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v142</footer>
+    <footer class="app-version">MJ Stock Magic v143</footer>
     <script src="/menus.js"></script>
     <script src="/push.js"></script>
     <script src="/theme.js"></script>

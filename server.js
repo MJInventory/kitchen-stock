@@ -2974,7 +2974,8 @@ async function pgAssignDriverToSheet(date, driverName, user) {
 async function pgUpdateDriverLine(recordId, payload, userName) {
   if (!isValidId(recordId)) throw new Error("Invalid driver line record.");
   const currentResult = await db().query(`
-    select d.id, d.sheet_date::text as sheet_date, d.order_request_id, r.inventory_item_id, sp.id as current_supplier_id
+    select d.id, d.sheet_date::text as sheet_date, d.order_request_id, r.inventory_item_id,
+           r.standing_order_run_line_id, sp.id as current_supplier_id
     from driver_sheet_lines d
     join order_requests r on r.id = d.order_request_id
     left join suppliers sp on sp.id = d.supplier_id
@@ -3030,6 +3031,24 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
     requestValues.push(unit);
     requestFields.push(`order_unit = $${requestValues.length}`);
   }
+  if (Object.prototype.hasOwnProperty.call(payload, "quantity")) {
+    const quantity = Number(payload.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Quantity must be greater than zero.");
+    }
+    values.push(quantity);
+    fields.push(`quantity = $${values.length}`);
+    requestValues.push(quantity);
+    requestFields.push(`quantity_needed = $${requestValues.length}`);
+    if (current.standing_order_run_line_id && isValidId(current.standing_order_run_line_id)) {
+      await db().query(`
+        update standing_order_run_lines
+        set quantity = $2,
+            updated_at = now()
+        where id = $1
+      `, [current.standing_order_run_line_id, quantity]);
+    }
+  }
   if (!fields.length && !requestFields.length) throw new Error("Nothing to update.");
   if (fields.length) {
     const updateSql = `
@@ -3049,15 +3068,18 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
   const sheet = await pgListDriverSheet(current.sheet_date || todayIso());
   const match = sheet.requests.find((request) => request.driverLineId === recordId);
   if (match && auditChanged(before, match)) {
-    const reasonCode = Object.prototype.hasOwnProperty.call(payload, "supplierName")
-      ? (payload.updatePrimarySupplier ? "supplier-primary-change" : "supplier-temp-change")
-      : Object.prototype.hasOwnProperty.call(payload, "unit")
-        ? "unit-change"
-        : Object.prototype.hasOwnProperty.call(payload, "toDeliver")
-          ? "delivery-plan-change"
-          : Object.prototype.hasOwnProperty.call(payload, "ordered")
-            ? "picked-change"
-            : "driver-line-change";
+    let reasonCode = "driver-line-change";
+    if (Object.prototype.hasOwnProperty.call(payload, "supplierName")) {
+      reasonCode = payload.updatePrimarySupplier ? "supplier-primary-change" : "supplier-temp-change";
+    } else if (Object.prototype.hasOwnProperty.call(payload, "unit")) {
+      reasonCode = "unit-change";
+    } else if (Object.prototype.hasOwnProperty.call(payload, "quantity")) {
+      reasonCode = "quantity-change";
+    } else if (Object.prototype.hasOwnProperty.call(payload, "toDeliver")) {
+      reasonCode = "delivery-plan-change";
+    } else if (Object.prototype.hasOwnProperty.call(payload, "ordered")) {
+      reasonCode = "picked-change";
+    }
     await pgRecordAuditEntry({
       actionType: "change",
       entityType: "driver-line",
@@ -3078,7 +3100,8 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
     driverName: match.driverName,
     supplierName: match.supplierName,
     supplierContact: match.supplierContact,
-    unit: match.unit || ""
+    unit: match.unit || "",
+    quantity: match.quantity
   } : { id: recordId };
 }
 
@@ -6186,6 +6209,14 @@ async function updateDriverLine(recordId, payload, userName) {
       throw new Error("Unit must be box, bag, item, or bottle.");
     }
     fields.Unit = unit;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "quantity")) {
+    const quantity = Number(payload.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Quantity must be greater than zero.");
+    }
+    fields.Quantity = quantity;
   }
 
   if (!Object.keys(fields).length) {

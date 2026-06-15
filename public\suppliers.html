@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
+    <title>Supplier Admin</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory Setup</p>
+        <h1>Supplier Admin</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell setup-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory Setup</p>
+          <h1>Supplier Admin</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/inventory-settings.html">Setup</a>
+          <a class="button secondary" href="/">Main Menu</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Add Supplier</h2>
+        <form id="supplierForm" class="admin-form-grid">
+          <label>Supplier name <input id="supplierName" type="text" required></label>
+          <label>Contact information <textarea id="supplierContact" rows="3" placeholder="Phone, email, notes"></textarea></label>
+          <label class="check-label"><input id="supplierActive" type="checkbox" checked> Active</label>
+          <button type="submit">Add Supplier</button>
+          <p id="supplierMessage" role="status"></p>
+        </form>
+      </section>
+
+      <section id="supplierList" class="settings-list"></section>
+    </main>
+
+    <footer class="app-version">MJ Stock Magic v132</footer>
+    <script src="/menus.js"></script>
+    <script src="/push.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/suppliers.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+

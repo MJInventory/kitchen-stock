@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>MJ Stock Magic Home</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="order-app">
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>MJ Stock Magic</h1>
+        <label>
+          Username
+          <input id="usernameInput" type="text" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="order-shell">
+      <header class="order-topbar">
+        <div class="brand-block">
+          <img class="brand-mark brand-logo" src="/madame-janette-logo.png" alt="Madame Janette">
+          <div>
+            <h1>MJ Stock Magic</h1>
+            <p>MADAME JANETTE</p>
+          </div>
+        </div>
+        <label class="feature-select">
+          <span>Go to</span>
+          <select id="featureMenu" aria-label="Inventory tools">
+            <option value="/">Front Page</option>
+            <option value="/ordering.html">Ordering</option>
+            <option value="/receiving-sheet.html">Receiving</option>
+            <option value="/driver-sheet.html">Driver Sheet</option>
+            <option value="/order-report.html">Reports</option>
+            <option value="/standing-orders.html" data-permission="canAddInventoryItems">Standing Orders</option>
+            <option value="/stock-count.html">Stock Count</option>
+            <option value="/inventory-settings.html" data-permission="canAddInventoryItems">Inventory Items</option>
+            <option value="/suppliers.html" data-permission="canAddInventoryItems">Suppliers</option>
+            <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Storage Locations</option>
+            <option value="/shelf-codes.html" data-permission="canAddInventoryItems">Shelf Codes</option>
+            <option value="/invoice-capture.html" data-permission="canUseInvoices">Invoices</option>
+            <option value="/user-admin.html" data-permission="canAdminUsers">User Admin</option>
+          </select>
+        </label>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh">Refresh</button>
+          <button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>
+        </div>
+      </header>
+
+      <section class="daily-order-panel home-order-panel notification-panel">
+        <div class="daily-order-heading">
+          <h2>Notifications</h2>
+          <span id="notificationCount"></span>
+        </div>
+        <div class="notification-actions">
+          <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
+          <button id="enablePushButton" class="icon-button" type="button" hidden>Enable phone notifications</button>
+        </div>
+        <div id="notificationList" class="daily-order-list notification-list"></div>
+      </section>
+
+      <section class="daily-order-panel home-order-panel dashboard-panel">
+        <div class="daily-order-heading">
+          <h2>Overview</h2>
+          <span id="dashboardMode"></span>
+        </div>
+        <div id="dashboardCards" class="dashboard-cards"></div>
+      </section>
+
+      <section class="daily-order-panel home-order-panel">
+        <div class="daily-order-heading">
+          <h2>Today's Order</h2>
+          <span id="dailyOrderCount"></span>
+        </div>
+        <div class="order-filters daily-order-filters">
+          <select id="dailyAreaFilter" aria-label="Filter today's orders by area">
+            <option value="">All Areas</option>
+          </select>
+          <select id="dailyUserFilter" aria-label="Filter today's orders by user">
+            <option value="">All Users</option>
+          </select>
+        </div>
+        <p id="message" class="order-message" role="status"></p>
+        <div id="dailyOrderList" class="daily-order-list"></div>
+      </section>
+
+      <section class="daily-order-panel home-order-panel">
+        <div class="daily-order-heading">
+          <h2>Open Orders</h2>
+          <span id="openOrderCount"></span>
+        </div>
+        <div id="openOrderList" class="daily-order-list"></div>
+      </section>
+
+      <section class="daily-order-panel home-order-panel">
+        <div class="daily-order-heading">
+          <h2>Standing Orders</h2>
+          <span id="standingOrderCount"></span>
+        </div>
+        <div id="standingOrderList" class="daily-order-list"></div>
+      </section>
+    </main>
+
+    <footer class="app-version">MJ Stock Magic v132</footer>
+    <script src="/menus.js"></script>
+    <script src="/push.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/dashboard.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

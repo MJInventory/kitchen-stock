@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="MJ Stock Magic">
+    <title>Invoice Capture</title>
+    <link rel="apple-touch-icon" href="/mjordering-apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Inventory</p>
+        <h1>Invoice Capture</h1>
+        <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+        <label>Password <input id="passwordInput" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+        <button type="submit">Log In</button>
+        <p id="loginMessage" role="status"></p>
+      </form>
+    </section>
+
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Inventory</p>
+          <h1>Invoice Capture</h1>
+        </div>
+        <div class="top-actions">
+          <span id="currentUser" class="user-chip"></span>
+          <a class="button secondary" href="/">Main Menu</a>
+          <button id="logoutButton" class="secondary" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <form id="invoiceForm">
+          <label>
+            Supplier
+            <input id="supplierName" type="text" autocomplete="organization">
+          </label>
+          <div class="row">
+            <label>
+              Invoice number
+              <input id="invoiceNumber" type="text">
+            </label>
+            <label>
+              Invoice total
+              <input id="invoiceTotal" type="number" min="0" step="0.01">
+            </label>
+          </div>
+          <label>
+            Photo URL
+            <input id="photoUrl" type="url" placeholder="https://...">
+          </label>
+          <label>
+            Invoice file
+            <input id="invoicePhoto" type="file" accept="image/*,application/pdf,.pdf" capture="environment">
+          </label>
+          <div class="row">
+            <label>
+              OCR mode
+              <select id="ocrMode">
+                <option value="auto">Auto clean</option>
+                <option value="contrast">High contrast</option>
+                <option value="threshold">Black and white</option>
+                <option value="original">Original image</option>
+              </select>
+            </label>
+            <label>
+              Rotate
+              <select id="ocrRotation">
+                <option value="0">No rotation</option>
+                <option value="90">Rotate right</option>
+                <option value="270">Rotate left</option>
+                <option value="180">Upside down</option>
+              </select>
+            </label>
+            <label>
+              Text type
+              <select id="ocrTextType">
+                <option value="invoice">Invoice lines</option>
+                <option value="dense">Small dense receipt</option>
+              </select>
+            </label>
+          </div>
+          <div class="row action-row">
+            <button id="ocrButton" class="secondary" type="button">OCR File</button>
+            <button id="emailInvoiceButton" class="secondary" type="button">Send to Accounting</button>
+            <button id="applyLinesButton" type="button" disabled>Apply Selected Lines</button>
+          </div>
+          <p class="helper-text">Use a straight, bright photo that fills the frame, or a clear PDF under 1 MB. If a photo OCR result is messy, try Black and white or High contrast.</p>
+          <img id="invoicePreview" class="invoice-preview" alt="" hidden>
+          <canvas id="ocrCanvas" class="invoice-preview" hidden></canvas>
+          <label>
+            Extracted text / line notes
+            <textarea id="extractedText" rows="5"></textarea>
+          </label>
+          <div class="row action-row">
+            <button id="buildLinesButton" class="secondary" type="button">Build Lines From Text</button>
+            <button id="teachHeaderButton" class="secondary" type="button">Teach Header</button>
+            <button id="teachLinesButton" class="secondary" type="button">Teach Lines</button>
+          </div>
+          <section class="invoice-lines-section">
+            <div class="section-header">
+              <h2>Invoice Lines</h2>
+              <span id="ocrProgress"></span>
+            </div>
+            <div id="invoiceLines" class="invoice-lines">
+              <p class="empty-sheet">OCR a photo or PDF to build invoice lines.</p>
+            </div>
+          </section>
+          <label>
+            Notes
+            <textarea id="invoiceNotes" rows="3"></textarea>
+          </label>
+          <button type="submit">Save Invoice Capture</button>
+          <p id="invoiceMessage" role="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <footer class="app-version">MJ Stock Magic v132</footer>
+    <script src="/menus.js"></script>
+    <script src="/push.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/invoice-capture.js" type="module"></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

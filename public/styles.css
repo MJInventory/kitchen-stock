@@ -2477,7 +2477,6 @@ body.order-app {
 
   .order-topbar {
     position: static;
-    position: relative;
     min-height: auto;
     padding: 14px 12px;
     align-items: stretch;
@@ -2495,12 +2494,11 @@ body.order-app {
 
   .order-app .top-actions {
     grid-area: actions;
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: auto;
+    position: static;
+    width: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: flex-end;
     align-items: flex-end;
     gap: 6px;
   }
@@ -2517,7 +2515,7 @@ body.order-app {
 
   .brand-block {
     gap: 10px;
-    padding-right: 124px;
+    padding-right: 108px;
   }
 
   .brand-block h1 {
@@ -2561,10 +2559,6 @@ body.order-app {
     width: 100%;
   }
 
-  .order-app .top-actions {
-    align-items: flex-end;
-  }
-
   .dashboard-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -2594,10 +2588,9 @@ body.order-app {
 
   .order-app .user-chip {
     position: fixed;
-    right: 10px;
-    bottom: 10px;
-    z-index: 8;
-    justify-self: auto;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    z-index: 32;
     font-size: 11px;
     padding: 6px 10px;
     border-radius: 999px;
@@ -2617,9 +2610,12 @@ body.order-app {
   }
 
   .order-app #refreshButton {
-    min-width: 112px;
-    padding: 10px 16px;
-    align-self: flex-end;
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: 12px;
+    z-index: 34;
+    min-width: 96px;
+    padding: 9px 14px;
   }
 
   :root[data-theme="light"] .order-app .user-chip {

@@ -1208,12 +1208,6 @@ body.order-app {
   margin-top: 18px;
 }
 
-.sticky-summary-panel {
-  position: sticky;
-  top: 88px;
-  z-index: 3;
-}
-
 .ordering-summary-panel {
   margin-top: 18px;
 }
@@ -2309,11 +2303,6 @@ body.order-app {
   color: var(--order-danger);
 }
 
-:root[data-theme="light"] .sticky-summary-panel {
-  background: rgba(250, 244, 228, 0.96);
-  backdrop-filter: blur(16px);
-}
-
 :root[data-theme="light"] .status-chip {
   background: #f8f2e3;
   color: #463b22;
@@ -2493,9 +2482,9 @@ body.order-app {
     align-items: stretch;
     grid-template-columns: 1fr;
     grid-template-areas:
+      "actions"
       "brand"
       "nav"
-      "actions";
     gap: 12px;
   }
 
@@ -2506,6 +2495,10 @@ body.order-app {
   .order-app .top-actions {
     grid-area: actions;
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: end;
+    gap: 6px;
   }
 
   .brand-mark {
@@ -2564,19 +2557,12 @@ body.order-app {
   }
 
   .order-app .top-actions {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: stretch;
-    gap: 8px;
   }
 
   .dashboard-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-  }
-
-  .sticky-summary-panel {
-    position: static;
   }
 
   .dashboard-card {
@@ -2602,18 +2588,36 @@ body.order-app {
   }
 
   .order-app .user-chip {
-    grid-column: 1 / -1;
-    justify-self: start;
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 8;
+    justify-self: auto;
     font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--order-line);
+    background: rgba(15, 15, 15, 0.88);
+    color: var(--order-ink);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   }
 
   .order-app .icon-button,
   .save-pill {
-    width: 100%;
+    width: auto;
     min-width: 0;
     min-height: 42px;
     padding: 8px 10px;
     font-size: 11px;
+  }
+
+  .order-app #refreshButton {
+    min-width: 124px;
+  }
+
+  :root[data-theme="light"] .order-app .user-chip {
+    background: rgba(255, 253, 248, 0.96);
+    color: #3f3520;
   }
 
   .save-pill {

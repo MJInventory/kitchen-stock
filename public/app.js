@@ -386,7 +386,18 @@ function groupRequestsByCategory(requests) {
     if (!groups.has(category)) groups.set(category, []);
     groups.get(category).push(request);
   }
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([category, categoryRequests]) => ([
+      category,
+      [...categoryRequests].sort((left, right) => {
+        const byName = itemNameFromRequest(left).localeCompare(itemNameFromRequest(right), undefined, { numeric: true, sensitivity: "base" });
+        if (byName) return byName;
+        const leftSupplier = requestSortValue(left).supplier || "";
+        const rightSupplier = requestSortValue(right).supplier || "";
+        return leftSupplier.localeCompare(rightSupplier, undefined, { sensitivity: "base" });
+      })
+    ]));
 }
 
 function groupRequestsForOrderSheet(requests) {
@@ -458,44 +469,41 @@ function renderDailyOrder() {
     .filter(hasValidRequestItemId)
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
-  const grouped = groupRequestsForOrderSheet(activeRequests.slice(0, 100));
+  const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
   dailyOrderList.innerHTML = grouped
-    .map((supplier) => `
+    .map(([categoryName, categoryRequests]) => `
       <section class="sheet-group">
-        <div class="supplier-heading">
-          <h2>${escapeHtml(supplier.supplierName)}</h2>
-        </div>
-        ${supplier.categories.map((categoryGroup) => `
-          <div class="driver-supplier">
-            <div class="driver-supplier-title">
-              <h3>${escapeHtml(categoryGroup.categoryName)}</h3>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Received</th>
-                  <th>Remove</th>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Unit</th>
-                  <th>Priority</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${categoryGroup.requests.map((request) => `
-                  <tr data-request-id="${escapeHtml(request.id)}" data-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryGroup.categoryName)}">
-                    <td><button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button></td>
-                    <td>${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}</td>
-                    <td><button class="order-sheet-item-link" type="button" data-jump-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryGroup.categoryName)}">${escapeHtml(itemNameFromRequest(request))}</button></td>
-                    <td>${escapeHtml(request.quantity)}</td>
-                    <td>${escapeHtml(request.unit || "item")}</td>
-                    <td>${escapeHtml(request.urgency || "Medium")}</td>
-                  </tr>
-                `).join("")}
-              </tbody>
-            </table>
+        <div class="driver-supplier">
+          <div class="driver-supplier-title">
+            <h3>${escapeHtml(categoryName)}</h3>
           </div>
-        `).join("")}
+          <table>
+            <thead>
+              <tr>
+                <th>Received</th>
+                <th>Remove</th>
+                <th>Item</th>
+                <th>Supplier</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Priority</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${categoryRequests.map((request) => `
+                <tr data-request-id="${escapeHtml(request.id)}" data-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">
+                  <td><button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button></td>
+                  <td>${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}</td>
+                  <td><button class="order-sheet-item-link" type="button" data-jump-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">${escapeHtml(itemNameFromRequest(request))}</button></td>
+                  <td>${escapeHtml(requestSortValue(request).supplier || request.supplierName || "Unassigned Supplier")}</td>
+                  <td>${escapeHtml(request.quantity)}</td>
+                  <td>${escapeHtml(request.unit || "item")}</td>
+                  <td>${escapeHtml(request.urgency || "Medium")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
       </section>
     `)
     .join("");

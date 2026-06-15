@@ -692,6 +692,15 @@ button:hover,
   padding: 8px;
 }
 
+.supplier-text-trigger {
+  cursor: pointer;
+}
+
+.supplier-text-trigger:hover,
+.supplier-text-trigger:focus-visible {
+  background: #e3eaf2;
+}
+
 .supplier-heading h2 {
   margin: 0;
 }

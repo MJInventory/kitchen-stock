@@ -1,4 +1,6 @@
 (function () {
+  const APP_VERSION = "v141";
+
   function applyTheme(theme) {
     const normalized = theme === "light" ? "light" : "dark";
     document.documentElement.dataset.theme = normalized;
@@ -19,7 +21,7 @@
       window.location.reload();
     });
 
-    navigator.serviceWorker.register("/sw.js").then((registration) => {
+    navigator.serviceWorker.register(`/sw.js?${APP_VERSION}`, { updateViaCache: "none" }).then((registration) => {
       function activateWaitingWorker() {
         if (registration.waiting) {
           registration.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -40,7 +42,14 @@
         activateWaitingWorker();
       }
 
-      registration.update().catch(() => {});
+      const checkForUpdates = () => registration.update().catch(() => {});
+      checkForUpdates();
+      window.setInterval(checkForUpdates, 60000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          checkForUpdates();
+        }
+      });
     }).catch(() => {});
   }
 

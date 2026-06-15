@@ -369,13 +369,19 @@ function renderDashboardCards() {
       ["Unread", unread, "Notifications waiting for you"]
     ];
 
-  dashboardCards.innerHTML = cards.map(([label, value, hint]) => `
+  dashboardCards.innerHTML = cards
+    .filter(([, value]) => Number(value || 0) > 0)
+    .map(([label, value, hint]) => `
     <article class="dashboard-card">
       <strong>${escapeHtml(value)}</strong>
       <span>${escapeHtml(label)}</span>
       <small>${escapeHtml(hint)}</small>
     </article>
   `).join("");
+
+  if (!dashboardCards.innerHTML) {
+    dashboardCards.innerHTML = '<p class="empty-sheet">Nothing needs attention right now.</p>';
+  }
 }
 
 function renderPushStatus(detail = {}) {

@@ -2477,14 +2477,15 @@ body.order-app {
 
   .order-topbar {
     position: static;
+    position: relative;
     min-height: auto;
     padding: 14px 12px;
     align-items: stretch;
     grid-template-columns: 1fr;
     grid-template-areas:
-      "actions"
       "brand"
       "nav"
+      "actions";
     gap: 12px;
   }
 
@@ -2494,10 +2495,13 @@ body.order-app {
 
   .order-app .top-actions {
     grid-area: actions;
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr;
-    justify-items: end;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     gap: 6px;
   }
 
@@ -2513,6 +2517,7 @@ body.order-app {
 
   .brand-block {
     gap: 10px;
+    padding-right: 124px;
   }
 
   .brand-block h1 {
@@ -2557,7 +2562,7 @@ body.order-app {
   }
 
   .order-app .top-actions {
-    align-items: stretch;
+    align-items: flex-end;
   }
 
   .dashboard-cards {
@@ -2612,7 +2617,9 @@ body.order-app {
   }
 
   .order-app #refreshButton {
-    min-width: 124px;
+    min-width: 112px;
+    padding: 10px 16px;
+    align-self: flex-end;
   }
 
   :root[data-theme="light"] .order-app .user-chip {

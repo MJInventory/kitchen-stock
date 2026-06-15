@@ -8,6 +8,7 @@ const logoutButton = document.querySelector("#logoutButton");
 const refreshButton = document.querySelector("#refreshButton");
 const featureMenu = document.querySelector("#featureMenu");
 const backofficeMenu = document.querySelector("#backofficeMenu");
+const dailyScopeFilter = document.querySelector("#dailyScopeFilter");
 const dailyAreaFilter = document.querySelector("#dailyAreaFilter");
 const dailyUserFilter = document.querySelector("#dailyUserFilter");
 const dailyOrderCount = document.querySelector("#dailyOrderCount");
@@ -193,6 +194,10 @@ function selectedDailyArea() {
   return String(dailyAreaFilter?.value || "").trim();
 }
 
+function selectedDailyScope() {
+  return String(dailyScopeFilter?.value || "").trim();
+}
+
 function selectedDailyUser() {
   return String(dailyUserFilter?.value || "").trim();
 }
@@ -267,10 +272,33 @@ function populateDailyUserFilter() {
 }
 
 function requesterMatches(request) {
+  const scope = selectedDailyScope();
+  if (scope === "__mine__") {
+    return sameUser(requestUser(request), sessionUser);
+  }
+  if (scope === "__team__") {
+    return !sameUser(requestUser(request), sessionUser);
+  }
   const selectedUser = selectedDailyUser();
   if (!selectedUser) return true;
   if (selectedUser === "__mine__") return sameUser(requestUser(request), sessionUser);
   return sameUser(requestUser(request), selectedUser);
+}
+
+function requestStatusChips(request, today = todayLocal()) {
+  const chips = [];
+  const day = requestDay(request);
+  if (day && day < today) chips.push(["Older open", "older"]);
+  else chips.push(["Today", "today"]);
+  chips.push([sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`, sameUser(requestUser(request), sessionUser) ? "mine" : "team"]);
+  if (request.toDeliver) chips.push(["2Deliver", "deliver"]);
+  if (String(request.urgency || "").toLowerCase() === "high") chips.push(["High", "high"]);
+  if (String(request.urgency || "").toLowerCase() === "critical") chips.push(["Critical", "critical"]);
+  return chips;
+}
+
+function renderStatusChips(chips = []) {
+  return `<div class="status-chip-row">${chips.map(([label, tone]) => `<span class="status-chip ${tone}">${escapeHtml(label)}</span>`).join("")}</div>`;
 }
 
 function formatNotificationDate(value) {
@@ -326,9 +354,11 @@ function renderDashboardCards() {
   const cards = isOperationalRole()
     ? [
       ["Today active", teamToday, "Open order lines still waiting today"],
+      ["My open", myOpen, "Items with your name still open"],
       ["Older open", olderOpen, "Still waiting from previous days"],
       ["Below minimum", belowMin, "Inventory items currently under minimum"],
-      ["Standing due", standingDue, "Standing orders due now or overdue"]
+      ["Standing due", standingDue, "Standing orders due now or overdue"],
+      ["Unread", unread, "Notifications waiting for action"]
     ]
     : [
       ["My open", myOpen, "Items you still have open"],
@@ -396,6 +426,7 @@ function renderDailyOrder() {
                   requestArea(request),
                   requestLocation(request)
                 ].filter(Boolean).join(" / "))}</span>
+                ${renderStatusChips(requestStatusChips(request, selectedDay))}
               </div>
             </a>
           `).join("")}
@@ -446,6 +477,7 @@ function renderOpenOrders() {
                     requestLocation(request),
                     requestDay(request) ? `Requested ${requestDay(request)}` : ""
                   ].filter(Boolean).join(" / "))}</span>
+                  ${renderStatusChips(requestStatusChips(request, selectedDay))}
                 </div>
               </a>
             `).join("")}
@@ -478,6 +510,10 @@ function renderStandingOrders() {
             order.schedule || "",
             order.items?.length ? `${order.items.length} item(s)` : ""
           ].filter(Boolean).join(" / "))}</span>
+          ${renderStatusChips([
+            ["Standing", "standing"],
+            [String(order.expectedDate || "") <= todayLocal() ? "Due now" : "Scheduled", String(order.expectedDate || "") <= todayLocal() ? "high" : "today"]
+          ])}
         </div>
       </a>
     `;
@@ -541,6 +577,15 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", showLogin);
 refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
+dailyScopeFilter?.addEventListener("change", () => {
+  if (dailyScopeFilter.value === "__mine__") {
+    dailyUserFilter.value = "__mine__";
+  } else if (dailyScopeFilter.value === "__team__" && dailyUserFilter.value === "__mine__") {
+    dailyUserFilter.value = "";
+  }
+  renderDailyOrder();
+  renderOpenOrders();
+});
 dailyAreaFilter?.addEventListener("change", () => {
   renderDailyOrder();
   renderOpenOrders();

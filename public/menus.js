@@ -7,18 +7,20 @@
     { label: "Ordering", href: "/ordering.html" },
     { label: "Receiving", href: "/receiving-sheet.html" },
     { label: "Driver Sheet", href: "/driver-sheet.html" },
+    { label: "Stock Count", href: "/stock-count.html" },
     { label: "Reports", href: "/order-report.html" },
     { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
-    { label: "Stock Count", href: "/stock-count.html" },
     { label: "Invoices", href: "/invoice-capture.html", permission: "canUseInvoices" }
   ];
 
   const backofficeItems = [
+    { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
     { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
     { label: "Add Item", href: "/inventory-add.html", permission: "canAddInventoryItems" },
-    { label: "Categories", href: "/categories.html", permission: "canAddInventoryItems" },
     { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },
+    { label: "Categories", href: "/categories.html", permission: "canAddInventoryItems" },
     { label: "Storage & Shelves", href: "/shelf-codes.html", permission: "canAddInventoryItems" },
+    { label: "Invoices", href: "/invoice-capture.html", permission: "canUseInvoices" },
     { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" },
     { label: "Log Out", href: "__logout__" }
   ];
@@ -31,7 +33,7 @@
     const visibleItems = items.filter(allowed);
     if (!visibleItems.length) return "";
     const selectedHref = visibleItems.some((item) => item.href === currentPath) ? currentPath : "";
-    const defaultLabel = label === "Go to" ? "Where next?" : "Backoffice tasks";
+    const defaultLabel = label === "Go to" ? "Choose screen" : "Choose task";
     return `
       <label class="feature-select">
         <span>${label}</span>

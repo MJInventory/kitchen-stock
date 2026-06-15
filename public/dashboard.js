@@ -33,6 +33,14 @@ let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 
+function buildOrderJumpHref(request) {
+  const item = itemForRequest(request);
+  const params = new URLSearchParams();
+  if (request?.itemId) params.set("itemId", String(request.itemId));
+  if (item?.category || requestCategory(request)) params.set("category", item?.category || requestCategory(request));
+  return `/ordering.html?${params.toString()}`;
+}
+
 function todayLocal() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
@@ -379,7 +387,7 @@ function renderDailyOrder() {
           ${requests
             .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
             .map((request) => `
-            <article class="daily-order-row">
+            <a class="daily-order-row daily-order-link" href="${escapeHtml(buildOrderJumpHref(request))}">
               <div>
                 <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
                 <span>${escapeHtml([
@@ -389,11 +397,7 @@ function renderDailyOrder() {
                   requestLocation(request)
                 ].filter(Boolean).join(" / "))}</span>
               </div>
-              <div class="daily-order-actions">
-                <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button>
-                ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}
-              </div>
-            </article>
+            </a>
           `).join("")}
         </div>
       </section>
@@ -432,7 +436,7 @@ function renderOpenOrders() {
           ${requests
             .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
             .map((request) => `
-              <article class="daily-order-row">
+              <a class="daily-order-row daily-order-link" href="${escapeHtml(buildOrderJumpHref(request))}">
                 <div>
                   <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
                   <span>${escapeHtml([
@@ -443,11 +447,7 @@ function renderOpenOrders() {
                     requestDay(request) ? `Requested ${requestDay(request)}` : ""
                   ].filter(Boolean).join(" / "))}</span>
                 </div>
-                <div class="daily-order-actions">
-                  <button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button>
-                  ${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}
-                </div>
-              </article>
+              </a>
             `).join("")}
         </div>
       </section>
@@ -511,20 +511,6 @@ async function markNotificationsRead(ids = []) {
   renderNotifications();
 }
 
-async function deleteDailyOrder(requestId) {
-  await api(`/api/requests/${requestId}`, { method: "DELETE" });
-  recentRequests = recentRequests.filter((request) => request.id !== requestId);
-  renderDailyOrder();
-  renderOpenOrders();
-  setMessage("Item removed from today's order.");
-}
-
-async function deliverDailyOrder(requestId) {
-  await api(`/api/requests/${requestId}/deliver`, { method: "POST" });
-  await refresh();
-  setMessage("Item delivered, added to inventory, and closed.");
-}
-
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setLoginMessage("Logging in...");
@@ -566,24 +552,6 @@ dailyUserFilter?.addEventListener("change", () => {
 [featureMenu, backofficeMenu].forEach((menu) => menu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 }));
-function handleOrderListClick(event) {
-  const deleteButton = event.target.closest(".delete-order-button");
-  if (deleteButton) {
-    if (!window.confirm("Remove this item from the order list?")) return true;
-    deleteDailyOrder(deleteButton.dataset.requestId).catch((error) => setMessage(error.message, true));
-    return true;
-  }
-  const deliverButton = event.target.closest(".deliver-order-button");
-  if (deliverButton) {
-    if (!window.confirm("Mark this item as received and add it to inventory?")) return true;
-    deliverDailyOrder(deliverButton.dataset.deliverId).catch((error) => setMessage(error.message, true));
-    return true;
-  }
-  return false;
-}
-
-dailyOrderList.addEventListener("click", handleOrderListClick);
-openOrderList.addEventListener("click", handleOrderListClick);
 
 notificationList?.addEventListener("click", (event) => {
   const button = event.target.closest(".mark-notification-read");

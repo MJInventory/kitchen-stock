@@ -321,7 +321,9 @@ function renderSheet(data) {
                             ${supplierOptions(request.supplierName)}
                           </select>
                         </td>
-                        <td>${escapeHtml(request.quantity ?? "")}</td>
+                        <td>
+                          <input class="driver-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(request.quantity ?? "")}" ${request.driverLineId ? "" : "disabled"} aria-label="Quantity for ${escapeHtml(request.itemName)}">
+                        </td>
                         <td>
                           <select class="driver-unit-select" ${request.driverLineId ? "" : "disabled"} aria-label="Unit for ${escapeHtml(request.itemName)}">
                             ${unitOptions(request.unit)}
@@ -368,7 +370,8 @@ function updateRequestFromLine(line) {
       delivered: line.received || request.delivered,
       supplierName: line.supplierName || request.supplierName,
       supplierContact: line.supplierContact || request.supplierContact,
-      unit: line.unit || request.unit
+      unit: line.unit || request.unit,
+      quantity: line.quantity ?? request.quantity
     };
   });
 }
@@ -507,6 +510,31 @@ async function changeUnit(row, select) {
   }
 }
 
+async function changeQuantity(row, input) {
+  const lineId = row.dataset.lineId;
+  const quantity = Number(input.value || 0);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    setMessage("Quantity must be greater than zero.", true);
+    renderSheet(currentSheet);
+    return;
+  }
+  input.disabled = true;
+  setMessage("Saving quantity...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ quantity })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage("Quantity updated for this line.");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    input.disabled = false;
+  }
+}
+
 sheetDate.value = todayLocal();
 loadSheetButton.addEventListener("click", () => loadSheet().catch((error) => setMessage(error.message, true)));
 saveDriverButton.addEventListener("click", () => saveDriverAssignment().catch((error) => setMessage(error.message, true)));
@@ -546,6 +574,14 @@ sheetList.addEventListener("change", (event) => {
     const row = unitSelect.closest("tr");
     if (!row?.dataset.lineId) return;
     changeUnit(row, unitSelect);
+    return;
+  }
+
+  const qtyInput = event.target.closest(".driver-qty-input");
+  if (qtyInput) {
+    const row = qtyInput.closest("tr");
+    if (!row?.dataset.lineId) return;
+    changeQuantity(row, qtyInput);
   }
 });
 

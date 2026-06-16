@@ -69,7 +69,7 @@ function saveSession(data) {
 function showApp() {
   loginScreen.hidden = true;
   const role = localStorage.getItem("kitchenStockRole") || "user";
-  const roleLabel = role === "god" ? "God" : role === "admin" ? "Admin" : role === "power-user" ? "Power User" : "User";
+  const roleLabel = role === "god" ? "God" : role === "admin" ? "Admin" : role === "power-user" ? "Power User" : role === "staff" ? "Staff" : "User";
   currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
   window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-god-only]").forEach((option) => {
@@ -123,6 +123,7 @@ function renderUsers(users) {
       <label>Role
         <select class="user-role" ${user.editable && user.canEditRole ? "" : "disabled"}>
           <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
+          <option value="staff"${user.role === "staff" ? " selected" : ""}>Staff</option>
           <option value="power-user"${user.role === "power-user" ? " selected" : ""}>Power User</option>
           <option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>
           <option value="god"${user.role === "god" ? " selected" : ""}>God</option>
@@ -135,6 +136,7 @@ function renderUsers(users) {
         </select>
       </label>
       <label class="check-label"><input class="user-is-driver" type="checkbox" ${user.isDriver ? "checked" : ""} ${user.editable ? "" : "disabled"}> Dedicated driver</label>
+      <label class="check-label"><input class="user-is-picker" type="checkbox" ${user.isPicker ? "checked" : ""} ${user.editable ? "" : "disabled"}> Picker</label>
       <label class="check-label"><input class="user-notify-orders" type="checkbox" ${user.notifyOnNewOrders ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on new orders</label>
       <label class="check-label"><input class="user-notify-delivery" type="checkbox" ${user.notifyOnDelivery ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on delivered items</label>
       <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
@@ -174,6 +176,7 @@ async function saveUser(row) {
         role: row.querySelector(".user-role").value,
         theme: row.querySelector(".user-theme").value,
         isDriver: row.querySelector(".user-is-driver").checked,
+        isPicker: row.querySelector(".user-is-picker").checked,
         notifyOnNewOrders: row.querySelector(".user-notify-orders").checked,
         notifyOnDelivery: row.querySelector(".user-notify-delivery").checked,
         notifyAreas: {
@@ -226,6 +229,7 @@ newUserForm.addEventListener("submit", async (event) => {
         role: document.querySelector("#newRole").value,
         theme: document.querySelector("#newTheme").value,
         isDriver: document.querySelector("#newIsDriver").checked,
+        isPicker: document.querySelector("#newIsPicker").checked,
         notifyOnNewOrders: document.querySelector("#newNotifyOrders").checked,
         notifyOnDelivery: document.querySelector("#newNotifyDelivery").checked,
         notifyAreas: {

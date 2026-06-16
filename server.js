@@ -109,7 +109,8 @@ async function ensurePostgresSchemaUpgrades() {
         add column if not exists notify_area_foh boolean not null default true,
         add column if not exists notify_area_kitchen boolean not null default true,
         add column if not exists notify_area_general boolean not null default true,
-        add column if not exists is_driver boolean not null default false
+        add column if not exists is_driver boolean not null default false,
+        add column if not exists is_picker boolean not null default false
     `);
     await db().query(`
       alter table standing_orders
@@ -198,6 +199,45 @@ async function ensurePostgresSchemaUpgrades() {
     await db().query(`
       create index if not exists idx_audit_log_entries_date_created
         on audit_log_entries (action_date desc, created_at desc)
+    `);
+    await db().query(`
+      create table if not exists internal_order_batches (
+        id uuid primary key default gen_random_uuid(),
+        requested_by_user_id uuid references app_users(id) on delete set null,
+        requested_by_username text not null default '',
+        status text not null default 'open' check (status in ('open', 'ready', 'closed', 'partial')),
+        notes text not null default '',
+        picker_username text not null default '',
+        ready_at timestamptz,
+        ready_by_username text not null default '',
+        closed_at timestamptz,
+        closed_by_username text not null default '',
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `);
+    await db().query(`
+      create index if not exists idx_internal_order_batches_status_user
+        on internal_order_batches (status, requested_by_username, created_at desc)
+    `);
+    await db().query(`
+      create table if not exists internal_order_lines (
+        id uuid primary key default gen_random_uuid(),
+        internal_order_batch_id uuid not null references internal_order_batches(id) on delete cascade,
+        inventory_item_id uuid not null references inventory_items(id) on delete restrict,
+        requested_item_quantity numeric not null default 0,
+        picked_item_quantity numeric not null default 0,
+        shortage_item_quantity numeric not null default 0,
+        status text not null default 'requested' check (status in ('requested', 'partial', 'ready', 'closed', 'cancelled')),
+        shortage_request_id uuid references order_requests(id) on delete set null,
+        notes text not null default '',
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `);
+    await db().query(`
+      create index if not exists idx_internal_order_lines_batch_status
+        on internal_order_lines (internal_order_batch_id, status, created_at)
     `);
   })().catch((error) => {
     postgresSchemaReady = null;
@@ -335,6 +375,7 @@ function normalizeRole(role) {
   if (cleaned === "god") return "god";
   if (cleaned === "admin") return "admin";
   if (cleaned === "power-user" || cleaned === "poweruser" || cleaned === "power") return "power-user";
+  if (cleaned === "staff") return "staff";
   return "user";
 }
 
@@ -343,6 +384,7 @@ function userPermissions(role) {
   const isGod = normalized === "god";
   const isAdmin = normalized === "admin" || isGod;
   const isPower = normalized === "power-user";
+  const isStaff = normalized === "staff";
   return {
     canAdminUsers: isAdmin,
     canManageAdminRoles: isGod,
@@ -350,7 +392,10 @@ function userPermissions(role) {
     canAddInventoryItems: isAdmin || isPower,
     canDeleteAnyOrder: isAdmin || isPower,
     canUseInvoices: isAdmin || isPower,
-    canSendInvoiceToAccounting: isAdmin
+    canSendInvoiceToAccounting: isAdmin,
+    canUseSupplierOrdering: !isStaff,
+    canPlaceInternalOrders: isStaff || isAdmin || isPower,
+    canPickInternalOrders: isAdmin || isPower
   };
 }
 
@@ -369,6 +414,10 @@ function presentUserName(value) {
 
 function publicUser(user) {
   const role = normalizeRole(user?.role);
+  const permissions = userPermissions(role);
+  if (Boolean(user?.isPicker) || Boolean(user?.is_picker)) {
+    permissions.canPickInternalOrders = true;
+  }
   return {
     name: presentUserName(user?.name || ""),
     role,
@@ -376,7 +425,7 @@ function publicUser(user) {
     active: user?.active !== false,
     mustChangePassword: Boolean(user?.mustChangePassword),
     source: user?.source || "airtable",
-    permissions: userPermissions(role)
+    permissions
   };
 }
 
@@ -390,6 +439,7 @@ function mapPgAppUserRow(row) {
     theme: row.theme === "light" ? "light" : "dark",
     active: row.active !== false,
     isDriver: Boolean(row.is_driver),
+    isPicker: Boolean(row.is_picker),
     mustChangePassword: Boolean(row.must_change_password),
     notifyOnNewOrders: Boolean(row.notify_on_new_orders),
     notifyOnDelivery: row.notify_on_delivery !== false,
@@ -411,6 +461,7 @@ function publicUserForAdmin(user, actor = null) {
     id: user.id || "",
     lastLoginAt: user.lastLoginAt || "",
     isDriver: Boolean(user.isDriver),
+    isPicker: Boolean(user.isPicker),
     notifyOnNewOrders: Boolean(user.notifyOnNewOrders),
     notifyOnDelivery: user.notifyOnDelivery !== false,
     notifyAreas: {
@@ -443,6 +494,7 @@ function createSession(user) {
   const payload = JSON.stringify({
     user: safeUser.name,
     role: safeUser.role,
+    isPicker: Boolean(user?.isPicker || user?.is_picker),
     mustChangePassword: Boolean(safeUser.mustChangePassword),
     exp: Date.now() + sessionMaxAgeMs
   });
@@ -467,7 +519,13 @@ function verifySession(tokenValue) {
   try {
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
     if (!payload.user || !payload.exp || Date.now() > payload.exp) return null;
-    return publicUser({ name: payload.user, role: payload.role || "user", active: true, mustChangePassword: Boolean(payload.mustChangePassword) });
+    return publicUser({
+      name: payload.user,
+      role: payload.role || "user",
+      isPicker: Boolean(payload.isPicker),
+      active: true,
+      mustChangePassword: Boolean(payload.mustChangePassword)
+    });
   } catch {
     return null;
   }
@@ -1745,7 +1803,7 @@ async function pgListAppUsers() {
   await ensurePostgresSchemaUpgrades();
   const result = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           is_driver,
+           is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1761,7 +1819,7 @@ async function pgFindAppUserByName(name) {
   if (!normalized) return null;
   const result = await db().query(`
     select id, username, display_name, password_hash, role, theme, active, must_change_password,
-           is_driver,
+           is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1789,17 +1847,18 @@ async function pgCreateAppUser(payload, actorUsername = "") {
   const passwordHash = await bcrypt.hash(password, 10);
   const notifyAreas = payload.notifyAreas || {};
   const wantsDriver = Boolean(payload.isDriver);
+  const wantsPicker = Boolean(payload.isPicker);
   const result = await db().query(`
     insert into app_users (
       username, display_name, password_hash, role, theme, active, must_change_password,
-      is_driver,
+      is_driver, is_picker,
       notify_on_new_orders, notify_on_delivery,
       notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
       source
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'postgres')
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'postgres')
     returning id, username, display_name, role, theme, active, must_change_password,
-              is_driver,
+              is_driver, is_picker,
               notify_on_new_orders, notify_on_delivery,
               notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
               source, last_login_at
@@ -1812,6 +1871,7 @@ async function pgCreateAppUser(payload, actorUsername = "") {
     payload.active !== false,
     Boolean(payload.mustChangePassword),
     wantsDriver,
+    wantsPicker,
     Boolean(payload.notifyOnNewOrders),
     payload.notifyOnDelivery !== false,
     notifyAreas.bar !== false,
@@ -1830,7 +1890,7 @@ async function pgCreateAppUser(payload, actorUsername = "") {
   }
   const refreshed = createdId ? await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           is_driver,
+           is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1857,7 +1917,7 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
   if (!isValidId(recordId)) throw new Error("Invalid app user record.");
   const current = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           is_driver,
+           is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1883,8 +1943,11 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
   const nextIsDriver = Object.prototype.hasOwnProperty.call(payload, "isDriver")
     ? Boolean(payload.isDriver)
     : Boolean(user.is_driver);
+  const nextIsPicker = Object.prototype.hasOwnProperty.call(payload, "isPicker")
+    ? Boolean(payload.isPicker)
+    : Boolean(user.is_picker);
   let passwordSql = "";
-  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextIsDriver, nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral];
+  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextIsDriver, nextIsPicker, nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral];
   if (String(payload.password || "").trim()) {
     const passwordHash = await bcrypt.hash(String(payload.password).trim(), 10);
     values.push(passwordHash);
@@ -1899,17 +1962,18 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
         active = $6,
         must_change_password = $7,
         is_driver = $8,
-        notify_on_new_orders = $9,
-        notify_on_delivery = $10,
-        notify_area_bar = $11,
-        notify_area_foh = $12,
-        notify_area_kitchen = $13,
-        notify_area_general = $14,
+        is_picker = $9,
+        notify_on_new_orders = $10,
+        notify_on_delivery = $11,
+        notify_area_bar = $12,
+        notify_area_foh = $13,
+        notify_area_kitchen = $14,
+        notify_area_general = $15,
         updated_at = now()
         ${passwordSql}
     where id = $1
     returning id, username, display_name, role, theme, active, must_change_password,
-              is_driver,
+              is_driver, is_picker,
               notify_on_new_orders, notify_on_delivery,
               notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
               source, last_login_at
@@ -1925,7 +1989,7 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
   }
   const refreshed = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           is_driver,
+           is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1953,7 +2017,7 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
 async function pgDeleteAppUser(recordId, actorUsername = "") {
   const current = await db().query(`
     select id, username, display_name, role, theme, active, must_change_password,
-           is_driver,
+           is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
            source, last_login_at
@@ -1989,6 +2053,7 @@ async function pgChangeOwnPassword(userName, currentPassword, newPassword, optio
     set password_hash = $2, must_change_password = false, updated_at = now()
     where id = $1
     returning id, username, display_name, role, theme, active, must_change_password,
+              is_driver, is_picker,
               notify_on_new_orders, notify_on_delivery, source, last_login_at
   `, [user.id, passwordHash]);
   const row = result.rows[0];
@@ -2714,6 +2779,367 @@ async function pgCreateRequestsBatch(payload, requestedByOverride = "") {
     });
   }
   return created;
+}
+
+function internalOrderStockUnitsFromItems(quantityItems) {
+  const numeric = Number(quantityItems || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return numeric / 12;
+}
+
+function pgInternalOrderLineFromRow(row) {
+  return {
+    id: row.id,
+    batchId: row.internal_order_batch_id || "",
+    itemId: row.inventory_item_id || "",
+    itemName: row.item_name || "",
+    category: row.category || "",
+    inventoryArea: row.inventory_area || "",
+    storageLocation: row.storage_location || "",
+    shelfCode: row.shelf_code || "",
+    unit: row.unit || "",
+    currentStock: pgNumber(row.current_quantity),
+    currentStockItems: Math.floor((pgNumber(row.current_quantity) || 0) * 12),
+    requestedItemQuantity: pgNumber(row.requested_item_quantity) || 0,
+    pickedItemQuantity: pgNumber(row.picked_item_quantity) || 0,
+    shortageItemQuantity: pgNumber(row.shortage_item_quantity) || 0,
+    shortageRequestId: row.shortage_request_id || "",
+    status: row.status || "requested",
+    notes: row.notes || ""
+  };
+}
+
+function mapInternalOrderBatch(rows = []) {
+  if (!rows.length) return null;
+  const first = rows[0];
+  return {
+    id: first.batch_id,
+    requestedBy: first.requested_by_username || "",
+    requestedAt: first.requested_at || "",
+    status: first.batch_status || "open",
+    notes: first.batch_notes || "",
+    pickerUsername: first.picker_username || "",
+    readyAt: first.ready_at || "",
+    readyBy: first.ready_by_username || "",
+    closedAt: first.closed_at || "",
+    closedBy: first.closed_by_username || "",
+    lines: rows.filter((row) => row.id).map(pgInternalOrderLineFromRow)
+      .sort((left, right) => String(left.itemName || "").localeCompare(String(right.itemName || ""), undefined, { sensitivity: "base", numeric: true }))
+  };
+}
+
+async function pgListInternalOrders(user) {
+  await ensurePostgresSchemaUpgrades();
+  const role = normalizeRole(user?.role);
+  const values = [];
+  let whereSql = `where b.status in ('open', 'ready', 'partial')`;
+  if (role === "staff") {
+    values.push(String(user?.name || "").trim());
+    whereSql += ` and lower(b.requested_by_username) = lower($${values.length})`;
+  }
+  const result = await db().query(`
+    select
+      b.id as batch_id,
+      b.requested_by_username,
+      b.requested_at,
+      b.status as batch_status,
+      b.notes as batch_notes,
+      b.picker_username,
+      b.ready_at,
+      b.ready_by_username,
+      b.closed_at,
+      b.closed_by_username,
+      l.id,
+      l.internal_order_batch_id,
+      l.inventory_item_id,
+      l.requested_item_quantity,
+      l.picked_item_quantity,
+      l.shortage_item_quantity,
+      l.shortage_request_id,
+      l.status,
+      l.notes,
+      i.name as item_name,
+      i.current_quantity,
+      c.name as category,
+      ia.name as inventory_area,
+      sl.name as storage_location,
+      sc.code as shelf_code,
+      u.name as unit
+    from internal_order_batches b
+    join internal_order_lines l on l.internal_order_batch_id = b.id
+    join inventory_items i on i.id = l.inventory_item_id
+    left join categories c on c.id = i.category_id
+    left join inventory_areas ia on ia.id = i.inventory_area_id
+    left join storage_locations sl on sl.id = i.storage_location_id
+    left join shelf_codes sc on sc.id = i.shelf_code_id
+    left join units_of_measure u on u.id = i.unit_of_measure_id
+    ${whereSql}
+    order by b.requested_at desc, lower(b.requested_by_username), c.name nulls last, i.name
+  `, values);
+  const grouped = new Map();
+  for (const row of result.rows) {
+    const key = row.batch_id;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }
+  return [...grouped.values()].map(mapInternalOrderBatch);
+}
+
+async function pgCreateInternalOrder(payload, userName) {
+  await ensurePostgresSchemaUpgrades();
+  const requestedBy = String(userName || payload.requestedBy || "").trim();
+  const rawLines = Array.isArray(payload?.lines) ? payload.lines : [];
+  const lines = rawLines
+    .map((line) => ({
+      itemId: String(line?.itemId || "").trim(),
+      quantityItems: Number(line?.quantityItems || 0)
+    }))
+    .filter((line) => isValidId(line.itemId) && Number.isFinite(line.quantityItems) && line.quantityItems > 0);
+  if (!requestedBy) throw new Error("User name is required.");
+  if (!lines.length) throw new Error("Add at least one internal item.");
+
+  const client = await db().connect();
+  try {
+    await client.query("begin");
+    const userResult = await client.query(`select id from app_users where lower(username) = lower($1) or lower(display_name) = lower($1) limit 1`, [requestedBy]);
+    const userId = userResult.rows[0]?.id || null;
+    const batchResult = await client.query(`
+      insert into internal_order_batches (
+        requested_by_user_id, requested_by_username, status, notes
+      )
+      values ($1, $2, 'open', $3)
+      returning id
+    `, [userId, requestedBy, String(payload.notes || "").trim()]);
+    const batchId = batchResult.rows[0]?.id || "";
+    for (const line of lines) {
+      await client.query(`
+        insert into internal_order_lines (
+          internal_order_batch_id, inventory_item_id, requested_item_quantity, status
+        )
+        values ($1, $2, $3, 'requested')
+      `, [batchId, line.itemId, line.quantityItems]);
+    }
+    await client.query("commit");
+    const orders = await pgListInternalOrders({ name: requestedBy, role: "staff" });
+    const saved = orders.find((entry) => entry.id === batchId) || null;
+    const notifyUsers = await getAppUsers();
+    const pickerUsers = notifyUsers
+      .filter((entry) => entry.active !== false && Boolean(entry.isPicker))
+      .map((entry) => entry.name)
+      .filter(Boolean);
+    if (pickerUsers.length) {
+      const lineNames = saved?.lines?.slice(0, 4).map((line) => line.itemName).filter(Boolean) || [];
+      const remainder = (saved?.lines?.length || 0) > lineNames.length ? ` and ${(saved.lines.length - lineNames.length)} more` : "";
+      await pgCreateNotificationsForUsers(pickerUsers, {
+        type: "internal-order",
+        title: `Internal order by ${presentUserName(requestedBy)}`,
+        body: `${saved?.lines?.length || lines.length} item(s): ${lineNames.join(", ")}${remainder}.`,
+        url: "/picker-sheet.html"
+      });
+    }
+    await pgRecordAuditEntry({
+      actionType: "add",
+      entityType: "internal-order",
+      entityId: batchId,
+      entityName: `Internal order ${requestedBy}`,
+      actorUsername: requestedBy,
+      reasonCode: "internal-order-create",
+      after: saved
+    });
+    return saved;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function pgRefreshInternalOrderBatchStatusTx(client, batchId, userName = "") {
+  const result = await client.query(`
+    select
+      count(*)::int as total,
+      count(*) filter (where status = 'ready')::int as ready_count,
+      count(*) filter (where status = 'partial')::int as partial_count,
+      count(*) filter (where status = 'requested')::int as requested_count
+    from internal_order_lines
+    where internal_order_batch_id = $1
+  `, [batchId]);
+  const row = result.rows[0] || {};
+  const total = Number(row.total || 0);
+  const readyCount = Number(row.ready_count || 0);
+  const partialCount = Number(row.partial_count || 0);
+  const requestedCount = Number(row.requested_count || 0);
+  let status = "open";
+  if (total > 0 && readyCount === total) status = "ready";
+  else if (partialCount > 0 || (readyCount > 0 && requestedCount > 0)) status = "partial";
+  else status = "open";
+  await client.query(`
+    update internal_order_batches
+    set status = $2,
+        ready_at = case when $2 = 'ready' then now() else ready_at end,
+        ready_by_username = case when $2 = 'ready' then $3 else ready_by_username end,
+        updated_at = now()
+    where id = $1
+  `, [batchId, status, String(userName || "").trim()]);
+  return status;
+}
+
+async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
+  await ensurePostgresSchemaUpgrades();
+  if (!isValidId(batchId)) throw new Error("Invalid internal order.");
+  const rawLines = Array.isArray(payload?.lines) ? payload.lines : [];
+  if (!rawLines.length) throw new Error("No picking lines were provided.");
+  const client = await db().connect();
+  try {
+    await client.query("begin");
+    const batchResult = await client.query(`
+      select id, requested_by_username, status
+      from internal_order_batches
+      where id = $1
+      for update
+    `, [batchId]);
+    const batch = batchResult.rows[0];
+    if (!batch) throw new Error("Internal order was not found.");
+
+    for (const rawLine of rawLines) {
+      const lineId = String(rawLine?.lineId || "").trim();
+      if (!isValidId(lineId)) continue;
+      const pickedItemQuantity = Math.max(0, Number(rawLine?.pickedItemQuantity || 0));
+      if (!Number.isFinite(pickedItemQuantity)) continue;
+      const lineResult = await client.query(`
+        select
+          l.id,
+          l.internal_order_batch_id,
+          l.inventory_item_id,
+          l.requested_item_quantity,
+          l.picked_item_quantity,
+          l.shortage_request_id,
+          i.current_quantity,
+          i.name as item_name
+        from internal_order_lines l
+        join inventory_items i on i.id = l.inventory_item_id
+        where l.id = $1 and l.internal_order_batch_id = $2
+        for update
+      `, [lineId, batchId]);
+      const line = lineResult.rows[0];
+      if (!line) continue;
+      const requestedItemQuantity = Number(line.requested_item_quantity || 0);
+      const previousPickedItemQuantity = Number(line.picked_item_quantity || 0);
+      const safePicked = Math.min(requestedItemQuantity, pickedItemQuantity);
+      const shortageItemQuantity = Math.max(0, requestedItemQuantity - safePicked);
+      const pickedStatus = shortageItemQuantity > 0 ? "partial" : "ready";
+      const stockDeltaItems = safePicked - previousPickedItemQuantity;
+
+      if (stockDeltaItems !== 0) {
+        await client.query(`
+          update inventory_items
+          set current_quantity = greatest(0, current_quantity - $2),
+              updated_at = now()
+          where id = $1
+        `, [line.inventory_item_id, internalOrderStockUnitsFromItems(stockDeltaItems)]);
+      }
+
+      let shortageRequestId = line.shortage_request_id || null;
+      if (shortageItemQuantity > 0) {
+        const existingShortageResult = await client.query(`
+          select id
+          from order_requests
+          where id = $1
+        `, [shortageRequestId || null]);
+        if (existingShortageResult.rows[0]?.id) {
+          await client.query(`
+            update order_requests
+            set quantity_needed = $2,
+                order_unit = 'item',
+                status = 'Approved',
+                delivered = false,
+                updated_at = now(),
+                notes = $3
+            where id = $1
+          `, [
+            shortageRequestId,
+            shortageItemQuantity,
+            `Internal order shortage for ${batch.requested_by_username}. Batch ${batchId}.`
+          ]);
+        } else {
+          const shortageInsert = await client.query(`
+            insert into order_requests (
+              inventory_item_id, quantity_needed, order_unit, urgency_level, status, requested_by_username, requested_at, notes
+            )
+            values ($1, $2, 'item', 'High', 'Approved', $3, now(), $4)
+            returning id
+          `, [
+            line.inventory_item_id,
+            shortageItemQuantity,
+            batch.requested_by_username,
+            `Internal order shortage for ${batch.requested_by_username}. Batch ${batchId}.`
+          ]);
+          shortageRequestId = shortageInsert.rows[0]?.id || null;
+        }
+      } else if (shortageRequestId) {
+        await client.query(`delete from driver_sheet_lines where order_request_id = $1`, [shortageRequestId]);
+        await client.query(`delete from order_requests where id = $1`, [shortageRequestId]);
+        shortageRequestId = null;
+      }
+
+      await client.query(`
+        update internal_order_lines
+        set picked_item_quantity = $2,
+            shortage_item_quantity = $3,
+            shortage_request_id = $4,
+            status = $5,
+            notes = $6,
+            updated_at = now()
+        where id = $1
+      `, [
+        lineId,
+        safePicked,
+        shortageItemQuantity,
+        shortageRequestId,
+        pickedStatus,
+        String(rawLine?.notes || "").trim()
+      ]);
+    }
+
+    const status = await pgRefreshInternalOrderBatchStatusTx(client, batchId, userName);
+    await client.query(`
+      update internal_order_batches
+      set picker_username = $2,
+          updated_at = now()
+      where id = $1
+    `, [batchId, String(userName || "").trim()]);
+
+    await client.query("commit");
+    cache.items.expiresAt = 0;
+    cache.requests.expiresAt = 0;
+
+    const batches = await pgListInternalOrders({ name: userName, role: "power-user" });
+    const saved = batches.find((entry) => entry.id === batchId) || null;
+    if (saved?.status === "ready") {
+      await pgCreateNotificationsForUsers([batch.requested_by_username], {
+        type: "internal-ready",
+        title: "Internal order ready",
+        body: `Your internal order is ready in the pickup area.`,
+        url: "/internal-orders.html"
+      });
+    }
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "internal-order",
+      entityId: batchId,
+      entityName: `Internal order ${batch.requested_by_username}`,
+      actorUsername: userName,
+      reasonCode: "internal-order-pick",
+      after: saved || { id: batchId, status }
+    });
+    return saved || { id: batchId, status };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function pgCreateStockCount(payload, userName) {
@@ -3861,7 +4287,15 @@ function appUserFields(payload, schema = null) {
   const fields = {
     Name: name,
     Password: password,
-    Role: role === "god" ? "God" : role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User"
+    Role: role === "god"
+      ? "God"
+      : role === "admin"
+        ? "Admin"
+        : role === "power-user"
+          ? "Power User"
+          : role === "staff"
+            ? "Staff"
+            : "User"
   };
   if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
   if (!schema || schema.appUsers.hasActive) fields.Active = active;
@@ -3880,7 +4314,15 @@ function appUserUpdateFields(payload, currentUser, schema = null) {
   if (!name) throw new Error("User name is required.");
   const fields = {
     Name: name,
-    Role: role === "god" ? "God" : role === "power-user" ? "Power User" : role === "admin" ? "Admin" : "User"
+    Role: role === "god"
+      ? "God"
+      : role === "admin"
+        ? "Admin"
+        : role === "power-user"
+          ? "Power User"
+          : role === "staff"
+            ? "Staff"
+            : "User"
   };
   if (password) fields.Password = password;
   if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
@@ -3907,7 +4349,7 @@ function canDeleteAppUser(actor, target) {
   const targetRole = normalizeRole(target?.role);
   if (actorRole === "god") return true;
   if (actorRole !== "admin") return false;
-  return targetRole === "power-user" || targetRole === "user";
+  return targetRole === "power-user" || targetRole === "staff" || targetRole === "user";
 }
 
 async function findAppUserById(recordId) {
@@ -6773,8 +7215,36 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/requests/batch") {
       const user = requireUser(req, res);
       if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseSupplierOrdering, "This user can only create internal requests.")) return;
       const requests = await createRequestsBatch(await readJson(req), user.name);
       send(res, 201, { requests });
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/api/internal-orders") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canPlaceInternalOrders || candidate.permissions.canPickInternalOrders, "This user cannot open internal requests.")) return;
+      send(res, 200, { internalOrders: await pgListInternalOrders(user) });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/internal-orders") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canPlaceInternalOrders, "This user cannot create internal requests.")) return;
+      const internalOrder = await pgCreateInternalOrder(await readJson(req), user.name);
+      send(res, 201, { internalOrder });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url.startsWith("/api/internal-orders/") && req.url.endsWith("/pick")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canPickInternalOrders, "Only pickers can prepare internal requests.")) return;
+      const batchId = req.url.split("/")[3];
+      const internalOrder = await pgUpdateInternalOrderPicking(batchId, await readJson(req), user.name);
+      send(res, 200, { internalOrder });
       return;
     }
 

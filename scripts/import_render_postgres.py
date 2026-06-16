@@ -39,7 +39,7 @@ def to_num(value, fallback=0):
 
 def role_value(value):
     role = str(value or "user").strip().lower().replace("_", "-").replace(" ", "-")
-    return role if role in {"god", "admin", "power-user", "user"} else "user"
+    return role if role in {"god", "admin", "power-user", "staff", "user"} else "user"
 
 
 def parse_items_json(value):

@@ -4,7 +4,9 @@
 
   const gotoItems = [
     { label: "Front Page", href: "/" },
-    { label: "Ordering", href: "/ordering.html" },
+    { label: "Ordering", href: "/ordering.html", permission: "canUseSupplierOrdering" },
+    { label: "Internal Orders", href: "/internal-orders.html", permission: "canPlaceInternalOrders" },
+    { label: "Picker Board", href: "/picker-sheet.html", permission: "canPickInternalOrders" },
     { label: "Receiving", href: "/receiving-sheet.html" },
     { label: "Driver Sheet", href: "/driver-sheet.html" },
     { label: "Stock Count", href: "/stock-count.html" },
@@ -15,6 +17,7 @@
 
   const backofficeItems = [
     { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
+    { label: "Picker Board", href: "/picker-sheet.html", permission: "canPickInternalOrders" },
     { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
     { label: "Add Item", href: "/inventory-add.html", permission: "canAddInventoryItems" },
     { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },

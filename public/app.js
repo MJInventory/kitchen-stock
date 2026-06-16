@@ -92,6 +92,10 @@ function localDateKey(value) {
 
 function showApp() {
   loginScreen.hidden = true;
+  if (!sessionPermissions.canUseSupplierOrdering && sessionPermissions.canPlaceInternalOrders) {
+    window.location.href = "/internal-orders.html";
+    return;
+  }
   if (currentUser) {
     currentUser.textContent = "";
     currentUser.hidden = true;

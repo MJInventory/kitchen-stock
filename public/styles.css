@@ -2407,6 +2407,26 @@ body.order-app {
   text-align: right;
 }
 
+.order-sheet-item-link {
+  border: 0;
+  border-radius: 8px;
+  background: var(--order-gold);
+  color: #11110f;
+  padding: 8px 12px;
+  font: 13px Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  text-align: left;
+  justify-content: flex-start;
+  box-shadow: none;
+}
+
+.order-sheet-item-link:hover,
+.order-sheet-item-link:focus-visible {
+  background: var(--order-gold-strong);
+  color: #11110f;
+  outline: none;
+}
+
 :root[data-theme="dark"] .sheet-shell .print-sheet,
 :root[data-theme="dark"] .sheet-shell .panel {
   background: #171715;
@@ -2509,6 +2529,36 @@ body.order-app {
   background: #11110f;
   color: #f4efe5;
   border-color: #4a4438;
+}
+
+:root[data-theme="dark"] .order-app .driver-supplier-title {
+  background: #23211d;
+  border-color: #4a4438;
+}
+
+:root[data-theme="dark"] .order-app .driver-supplier-title h3,
+:root[data-theme="dark"] .order-app .driver-supplier-title pre {
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .order-app .driver-supplier table {
+  background: #171715;
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .order-app .driver-supplier th,
+:root[data-theme="dark"] .order-app .driver-supplier td {
+  background: #171715;
+  border-color: #4a4438;
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .order-app .driver-supplier th {
+  background: #23211d;
+}
+
+:root[data-theme="dark"] .order-app .driver-supplier td small {
+  color: #c2b9ab;
 }
 
 

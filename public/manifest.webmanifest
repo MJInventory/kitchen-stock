@@ -9,13 +9,13 @@
   "theme_color": "#0f766e",
   "icons": [
     {
-      "src": "/mjstock-icon-192-v148.png",
+      "src": "/mjstock-icon-192-v160.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/mjstock-icon-512-v148.png",
+      "src": "/mjstock-icon-512-v160.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

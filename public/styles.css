@@ -1078,6 +1078,19 @@ body.order-app {
   color-scheme: dark;
 }
 
+:root[data-theme="dark"] select {
+  color-scheme: light;
+  background: #171715;
+  color: #f4efe5;
+  border-color: #3a352d;
+}
+
+:root[data-theme="dark"] select option,
+:root[data-theme="dark"] select optgroup {
+  background: #171715;
+  color: #f4efe5;
+}
+
 :root[data-theme="light"] .selected-chip,
 :root[data-theme="light"] .save-pill {
   color: #fffdf8;
@@ -2392,6 +2405,110 @@ body.order-app {
   font-size: 10px;
   white-space: pre-wrap;
   text-align: right;
+}
+
+:root[data-theme="dark"] .sheet-shell .print-sheet,
+:root[data-theme="dark"] .sheet-shell .panel {
+  background: #171715;
+  border-color: #32302c;
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .sheet-shell .sheet-header {
+  border-bottom-color: #3a352d;
+}
+
+:root[data-theme="dark"] .sheet-shell .signature-row span {
+  border-bottom-color: #3a352d;
+}
+
+:root[data-theme="dark"] .sheet-shell .supplier-heading,
+:root[data-theme="dark"] .sheet-shell .driver-supplier-title {
+  background: #23211d;
+  border-color: #4a4438;
+}
+
+:root[data-theme="dark"] .sheet-shell .supplier-heading h2,
+:root[data-theme="dark"] .sheet-shell .supplier-heading pre,
+:root[data-theme="dark"] .sheet-shell .sheet-group h2,
+:root[data-theme="dark"] .sheet-shell .driver-supplier-title h3,
+:root[data-theme="dark"] .sheet-shell .driver-supplier-title pre,
+:root[data-theme="dark"] .sheet-shell .sheet-header h1,
+:root[data-theme="dark"] .sheet-shell .sheet-header h2,
+:root[data-theme="dark"] .sheet-shell .sheet-meta,
+:root[data-theme="dark"] .sheet-shell .signature-row,
+:root[data-theme="dark"] .sheet-shell .supplier-note-card label {
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .sheet-shell .supplier-text-trigger:hover,
+:root[data-theme="dark"] .sheet-shell .supplier-text-trigger:focus-visible {
+  background: #2b2823;
+}
+
+:root[data-theme="dark"] .sheet-shell .supplier-note-card {
+  background: #171715;
+  border-color: #4a4438;
+}
+
+:root[data-theme="dark"] .sheet-shell table {
+  background: #171715;
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .sheet-shell th,
+:root[data-theme="dark"] .sheet-shell td {
+  border-color: #4a4438;
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .sheet-shell th {
+  background: #23211d;
+}
+
+:root[data-theme="dark"] .sheet-shell td small {
+  color: #c2b9ab;
+}
+
+:root[data-theme="dark"] .sheet-shell .report-summary article {
+  background: #23211d;
+  border-color: #4a4438;
+}
+
+:root[data-theme="dark"] .sheet-shell .report-summary strong,
+:root[data-theme="dark"] .sheet-shell .report-summary span {
+  color: #f4efe5;
+}
+
+:root[data-theme="dark"] .sheet-shell .report-waiting td {
+  background: rgba(212, 173, 67, 0.12);
+}
+
+:root[data-theme="dark"] .sheet-shell .report-delivered td {
+  background: rgba(15, 118, 110, 0.14);
+}
+
+:root[data-theme="dark"] .sheet-shell .driver-check-button {
+  background: #11110f;
+  color: #f4efe5;
+  border-color: #f4efe5;
+}
+
+:root[data-theme="dark"] .sheet-shell .driver-check-button.checked {
+  background: #d4ad43;
+  color: #11110f;
+  border-color: #d4ad43;
+}
+
+:root[data-theme="dark"] .sheet-shell .driver-supplier-select,
+:root[data-theme="dark"] .sheet-shell .driver-qty-input,
+:root[data-theme="dark"] .sheet-shell .driver-unit-select,
+:root[data-theme="dark"] .sheet-shell .delivery-day-input,
+:root[data-theme="dark"] .sheet-shell .receive-qty-input,
+:root[data-theme="dark"] .sheet-shell .supplier-note-input {
+  background: #11110f;
+  color: #f4efe5;
+  border-color: #4a4438;
 }
 
 

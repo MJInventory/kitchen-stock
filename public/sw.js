@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v2.005";
+const CACHE_NAME = "kitchen-stock-v2.006";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/madame-janette-logo-v162.png",

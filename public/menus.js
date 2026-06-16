@@ -1,8 +1,8 @@
 (function setupGlobalMenus() {
   const currentPath = window.location.pathname || "/";
-  let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-  let storedRole = String(localStorage.getItem("kitchenStockRole") || "").trim().toLowerCase();
-  const sessionToken = localStorage.getItem("kitchenStockToken") || "";
+  let permissions = {};
+  let storedRole = "";
+  let sessionToken = "";
 
   const gotoItems = [
     { label: "Front Page", href: "/" },
@@ -29,6 +29,12 @@
     { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" },
     { label: "Log Out", href: "__logout__" }
   ];
+
+  function syncSessionState() {
+    permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+    storedRole = String(localStorage.getItem("kitchenStockRole") || "").trim().toLowerCase();
+    sessionToken = localStorage.getItem("kitchenStockToken") || "";
+  }
 
   function effectivePermissionSet() {
     if (storedRole === "god" || storedRole === "admin") {
@@ -78,6 +84,7 @@
   }
 
   function mountMenus() {
+    syncSessionState();
     const orderTopbar = document.querySelector(".order-topbar");
     const genericTopbar = document.querySelector(".topbar");
     const topbar = orderTopbar || genericTopbar;
@@ -121,6 +128,7 @@
   }
 
   async function refreshPermissions() {
+    syncSessionState();
     if (!sessionToken) return;
     try {
       const response = await fetch("/api/me", {
@@ -134,6 +142,7 @@
       storedRole = String(data.user.role || storedRole || "").trim().toLowerCase();
       localStorage.setItem("kitchenStockRole", storedRole);
       localStorage.setItem("kitchenStockUser", data.user.name || localStorage.getItem("kitchenStockUser") || "");
+      syncSessionState();
     } catch {
       // Keep cached permissions if the refresh check fails.
     }

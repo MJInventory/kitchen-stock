@@ -192,6 +192,10 @@ button:hover,
   white-space: nowrap;
 }
 
+.user-chip {
+  display: none !important;
+}
+
 .helper-text,
 .item-info {
   margin: 0;

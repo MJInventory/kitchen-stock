@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: kitchen-stock
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATA_BACKEND
+        value: postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_USERS
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: ITEM_CACHE_MS
+        value: "600000"
+      - key: REQUEST_CACHE_MS
+        value: "20000"

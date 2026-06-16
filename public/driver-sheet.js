@@ -469,6 +469,26 @@ async function toggleToDeliver(row, button) {
   }
 }
 
+async function changeDeliveryDay(row, input) {
+  const lineId = row.dataset.lineId;
+  const deliveryDay = String(input.value || "").trim();
+  input.disabled = true;
+  setMessage("Saving delivery day...");
+  try {
+    const { line } = await api(`/api/driver-lines/${lineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ deliveryDay })
+    });
+    updateRequestFromLine(line);
+    renderSheet(currentSheet);
+    setMessage(deliveryDay ? "Delivery day saved." : "Delivery day cleared.");
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    input.disabled = false;
+  }
+}
+
 async function saveDriverAssignment() {
   if (!sessionPermissions.canAdminUsers) {
     setMessage("Only admins can assign a driver.", true);
@@ -619,6 +639,14 @@ sheetList.addEventListener("change", (event) => {
     const row = qtyInput.closest("tr");
     if (!row?.dataset.lineId) return;
     changeQuantity(row, qtyInput);
+    return;
+  }
+
+  const deliveryDayInput = event.target.closest(".delivery-day-input");
+  if (deliveryDayInput) {
+    const row = deliveryDayInput.closest("tr");
+    if (!row?.dataset.lineId) return;
+    changeDeliveryDay(row, deliveryDayInput);
   }
 });
 

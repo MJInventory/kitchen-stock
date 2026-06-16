@@ -205,6 +205,7 @@ async function ensurePostgresSchemaUpgrades() {
         id uuid primary key default gen_random_uuid(),
         requested_by_user_id uuid references app_users(id) on delete set null,
         requested_by_username text not null default '',
+        requested_at timestamptz not null default now(),
         status text not null default 'open' check (status in ('open', 'ready', 'closed', 'partial')),
         notes text not null default '',
         picker_username text not null default '',
@@ -215,6 +216,21 @@ async function ensurePostgresSchemaUpgrades() {
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       )
+    `);
+    await db().query(`
+      alter table internal_order_batches
+        add column if not exists requested_by_user_id uuid references app_users(id) on delete set null,
+        add column if not exists requested_by_username text not null default '',
+        add column if not exists requested_at timestamptz not null default now(),
+        add column if not exists status text not null default 'open',
+        add column if not exists notes text not null default '',
+        add column if not exists picker_username text not null default '',
+        add column if not exists ready_at timestamptz,
+        add column if not exists ready_by_username text not null default '',
+        add column if not exists closed_at timestamptz,
+        add column if not exists closed_by_username text not null default '',
+        add column if not exists created_at timestamptz not null default now(),
+        add column if not exists updated_at timestamptz not null default now()
     `);
     await db().query(`
       create index if not exists idx_internal_order_batches_status_user
@@ -234,6 +250,19 @@ async function ensurePostgresSchemaUpgrades() {
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
       )
+    `);
+    await db().query(`
+      alter table internal_order_lines
+        add column if not exists internal_order_batch_id uuid references internal_order_batches(id) on delete cascade,
+        add column if not exists inventory_item_id uuid references inventory_items(id) on delete restrict,
+        add column if not exists requested_item_quantity numeric not null default 0,
+        add column if not exists picked_item_quantity numeric not null default 0,
+        add column if not exists shortage_item_quantity numeric not null default 0,
+        add column if not exists status text not null default 'requested',
+        add column if not exists shortage_request_id uuid references order_requests(id) on delete set null,
+        add column if not exists notes text not null default '',
+        add column if not exists created_at timestamptz not null default now(),
+        add column if not exists updated_at timestamptz not null default now()
     `);
     await db().query(`
       create index if not exists idx_internal_order_lines_batch_status
@@ -2841,7 +2870,7 @@ async function pgListInternalOrders(user) {
     select
       b.id as batch_id,
       b.requested_by_username,
-      b.requested_at,
+      coalesce(b.requested_at, b.created_at) as requested_at,
       b.status as batch_status,
       b.notes as batch_notes,
       b.picker_username,
@@ -2874,7 +2903,7 @@ async function pgListInternalOrders(user) {
     left join shelf_codes sc on sc.id = i.shelf_code_id
     left join units_of_measure u on u.id = i.unit_of_measure_id
     ${whereSql}
-    order by b.requested_at desc, lower(b.requested_by_username), c.name nulls last, i.name
+    order by coalesce(b.requested_at, b.created_at) desc, lower(b.requested_by_username), c.name nulls last, i.name
   `, values);
   const grouped = new Map();
   for (const row of result.rows) {

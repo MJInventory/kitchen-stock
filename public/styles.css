@@ -1273,6 +1273,7 @@ body.order-app {
 .brand-logo {
   width: 104px;
   height: 58px;
+  object-fit: contain;
 }
 
 .brand-block h1 {
@@ -1796,6 +1797,12 @@ body.order-app {
   min-height: 112px;
   border-color: var(--order-gold);
   background: rgba(212, 173, 67, 0.09);
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-areas:
+    "check main"
+    "controls controls";
+  align-items: start;
+  row-gap: 12px;
 }
 
 .product-check {
@@ -1812,6 +1819,8 @@ body.order-app {
 }
 
 .product-row.selected .product-check {
+  grid-area: check;
+  align-self: start;
   background: var(--order-gold);
   border-color: var(--order-gold);
   color: #130f06;
@@ -1823,10 +1832,18 @@ body.order-app {
   gap: 5px;
 }
 
+.product-row.selected .product-main {
+  grid-area: main;
+  min-width: 0;
+}
+
 .product-main strong {
   color: var(--order-ink);
   font-size: 16px;
-  overflow-wrap: anywhere;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
 }
 
 .product-main span,
@@ -1853,7 +1870,12 @@ body.order-app {
 }
 
 .product-row.selected .product-controls {
-  display: flex;
+  grid-area: controls;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 28px 56px 28px 96px 110px minmax(140px, max-content);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .product-controls button {
@@ -1911,6 +1933,10 @@ body.order-app {
   font-size: 12px;
 }
 
+.product-row.selected .product-controls > * {
+  min-width: 0;
+}
+
 .product-delete-toggle {
   display: inline-flex;
   align-items: center;
@@ -1937,47 +1963,16 @@ body.order-app {
 }
 
 @media (max-width: 1200px) {
-  .order-app .product-row,
-  .order-app .product-row.selected {
-    grid-template-columns: 34px minmax(0, 1fr);
-    grid-template-areas:
-      "check main"
-      "controls controls";
-    align-items: start;
-    row-gap: 12px;
-  }
-
-  .order-app .product-check {
-    grid-area: check;
-    align-self: start;
-  }
-
-  .order-app .product-main {
-    grid-area: main;
-    min-width: 0;
-  }
-
   .order-app .product-main strong {
     font-size: 15px;
-    line-height: 1.25;
-    overflow-wrap: anywhere;
-    word-break: normal;
   }
 
-  .order-app .product-controls {
-    grid-area: controls;
-    display: grid !important;
+  .order-app .product-row.selected .product-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
     padding-left: 0;
   }
 
-  .order-app .product-controls > * {
-    min-width: 0;
-  }
-
-  .order-app .stock-adjust {
+  .order-app .product-row.selected .stock-adjust {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: auto 72px auto;
@@ -1986,16 +1981,16 @@ body.order-app {
     gap: 8px;
   }
 
-  .order-app .qty-minus,
-  .order-app .qty-plus,
-  .order-app .qty-input,
-  .order-app .unit-input,
-  .order-app .urgency-input,
-  .order-app .product-delete-toggle {
+  .order-app .product-row.selected .qty-minus,
+  .order-app .product-row.selected .qty-plus,
+  .order-app .product-row.selected .qty-input,
+  .order-app .product-row.selected .unit-input,
+  .order-app .product-row.selected .urgency-input,
+  .order-app .product-row.selected .product-delete-toggle {
     width: 100%;
   }
 
-  .order-app .product-delete-toggle {
+  .order-app .product-row.selected .product-delete-toggle {
     justify-content: flex-start;
     min-height: 40px;
   }
@@ -2875,8 +2870,8 @@ body.order-app {
     position: static;
     width: auto;
     display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
+    flex-direction: row;
+    justify-content: flex-end;
     align-items: flex-end;
     gap: 6px;
     align-self: start;
@@ -3051,22 +3046,22 @@ body.order-app {
     padding: 4px 8px;
   }
 
-  .order-app .product-controls {
+  .order-app .product-row.selected .product-controls {
     grid-template-columns: 1fr;
   }
 
-  .order-app .stock-adjust {
+  .order-app .product-row.selected .stock-adjust {
     grid-template-columns: 1fr;
   }
 
-  .order-app .stock-adjust input,
-  .order-app .stock-adjust button,
-  .order-app .qty-minus,
-  .order-app .qty-plus,
-  .order-app .qty-input,
-  .order-app .unit-input,
-  .order-app .urgency-input,
-  .order-app .product-delete-toggle {
+  .order-app .product-row.selected .stock-adjust input,
+  .order-app .product-row.selected .stock-adjust button,
+  .order-app .product-row.selected .qty-minus,
+  .order-app .product-row.selected .qty-plus,
+  .order-app .product-row.selected .qty-input,
+  .order-app .product-row.selected .unit-input,
+  .order-app .product-row.selected .urgency-input,
+  .order-app .product-row.selected .product-delete-toggle {
     width: 100%;
   }
 

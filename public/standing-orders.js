@@ -19,6 +19,7 @@ let items = [];
 let suppliers = [];
 let selectedItems = [];
 const requestedOrderId = new URLSearchParams(window.location.search).get("orderId") || "";
+let expandedOrderId = requestedOrderId || "";
 
 function esc(value) {
   return String(value ?? "")
@@ -201,29 +202,40 @@ function collectOrderItems(row) {
 function renderStandingOrders(orders) {
   const showDelete = canAdminStandingOrders();
   standingList.innerHTML = orders.map((order) => `
-    <article class="setting-row standing-order-row" data-order-id="${esc(order.id)}">
-      <div>
-        <strong>${esc(order.name || order.supplierName || "Standing order")}</strong>
-        <span>${esc(order.supplierName || "No supplier")} / ${esc(order.schedule)} / next ${esc(order.expectedDate || "not set")} / ${order.active ? "active" : "inactive"}</span>
-      </div>
-      <label>Name <input class="standing-name" type="text" value="${esc(order.name || "")}"></label>
-      <label>Supplier <select class="standing-supplier">${optionsForSuppliers(order.supplierName)}</select></label>
-      <label>Delivery date <input class="standing-date" type="date" value="${esc(order.expectedDate || todayLocal())}"></label>
-      <label>Schedule <select class="standing-schedule">${scheduleOptions(order.schedule)}</select></label>
-      <label>Other <input class="standing-other" type="text" value="${esc(order.otherSchedule || "")}"></label>
-      <label class="check-label"><input class="standing-active" type="checkbox" ${order.active ? "checked" : ""}> Active</label>
-      <div class="wide-field standing-items">${renderOrderItems(order)}</div>
-      <div class="wide-field standing-edit-adder">
-        <label class="wide-field">Add item search
-          <input class="standing-add-search" type="search" placeholder="Search inventory items to add">
-        </label>
-        <label>Qty <input class="standing-add-qty" type="number" min="1" step="1" value="1"></label>
-        <div class="standing-add-results search-pick-list"><p class="empty-sheet">Type to search inventory items.</p></div>
-      </div>
-      <label class="wide-field">Notes <textarea class="standing-notes" rows="2">${esc(order.notes || "")}</textarea></label>
-      <div class="standing-row-actions wide-field">
-        <button class="save-standing" type="button">Save</button>
-        ${showDelete ? '<button class="delete-standing danger" type="button">Delete</button>' : ""}
+    <article class="setting-row standing-order-row${expandedOrderId === order.id ? " expanded" : ""}" data-order-id="${esc(order.id)}">
+      <button class="standing-order-summary" type="button" aria-expanded="${expandedOrderId === order.id ? "true" : "false"}">
+        <span class="standing-summary-main">
+          <strong>${esc(order.name || order.supplierName || "Standing order")}</strong>
+          <span>${esc(order.supplierName || "No supplier")}</span>
+        </span>
+        <span class="standing-summary-meta">
+          <span><b>Frequency</b> ${esc(order.schedule || "Other")}</span>
+          <span><b>Expected</b> ${esc(order.expectedDate || "not set")}</span>
+          <span><b>Status</b> ${order.active ? "Active" : "Inactive"}</span>
+        </span>
+      </button>
+      <div class="standing-order-body">
+        <div class="standing-order-grid">
+          <label>Name <input class="standing-name" type="text" value="${esc(order.name || "")}"></label>
+          <label>Supplier <select class="standing-supplier">${optionsForSuppliers(order.supplierName)}</select></label>
+          <label>Delivery date <input class="standing-date" type="date" value="${esc(order.expectedDate || todayLocal())}"></label>
+          <label>Schedule <select class="standing-schedule">${scheduleOptions(order.schedule)}</select></label>
+          <label>Other <input class="standing-other" type="text" value="${esc(order.otherSchedule || "")}"></label>
+          <label class="check-label"><input class="standing-active" type="checkbox" ${order.active ? "checked" : ""}> Active</label>
+          <div class="wide-field standing-items">${renderOrderItems(order)}</div>
+          <div class="wide-field standing-edit-adder">
+            <label class="wide-field">Add item search
+              <input class="standing-add-search" type="search" placeholder="Search inventory items to add">
+            </label>
+            <label>Qty <input class="standing-add-qty" type="number" min="1" step="1" value="1"></label>
+            <div class="standing-add-results search-pick-list"><p class="empty-sheet">Type to search inventory items.</p></div>
+          </div>
+          <label class="wide-field">Notes <textarea class="standing-notes" rows="2">${esc(order.notes || "")}</textarea></label>
+          <div class="standing-row-actions wide-field">
+            <button class="save-standing" type="button">Save</button>
+            ${showDelete ? '<button class="delete-standing danger" type="button">Delete</button>' : ""}
+          </div>
+        </div>
       </div>
     </article>
   `).join("");
@@ -235,6 +247,7 @@ function renderStandingOrders(orders) {
   if (requestedOrderId) {
     const row = standingList.querySelector(`.standing-order-row[data-order-id="${CSS.escape(requestedOrderId)}"]`);
     if (row) {
+      expandedOrderId = requestedOrderId;
       row.classList.add("jump-highlight");
       row.scrollIntoView({ behavior: "smooth", block: "center" });
       window.setTimeout(() => row.classList.remove("jump-highlight"), 2600);
@@ -363,6 +376,15 @@ standingList.addEventListener("input", (event) => {
 });
 
 standingList.addEventListener("click", (event) => {
+  const summaryButton = event.target.closest(".standing-order-summary");
+  if (summaryButton) {
+    const row = summaryButton.closest(".standing-order-row");
+    const orderId = row?.dataset.orderId || "";
+    expandedOrderId = expandedOrderId === orderId ? "" : orderId;
+    loadStandingOrders().catch((error) => setMessage(error.message, true));
+    return;
+  }
+
   const addButton = event.target.closest(".search-pick-option");
   if (addButton) {
     const row = addButton.closest(".standing-order-row");

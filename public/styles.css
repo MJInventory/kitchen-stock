@@ -1936,6 +1936,24 @@ body.order-app {
   color: inherit;
 }
 
+@media (max-width: 860px) {
+  .order-app .product-row,
+  .order-app .product-row.selected {
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .order-app .product-main {
+    grid-column: 2;
+  }
+
+  .order-app .product-controls {
+    grid-column: 1 / -1;
+    padding-left: 42px;
+    flex-wrap: wrap;
+  }
+}
+
 .stock-count-toolbar {
   width: min(860px, calc(100% - 32px));
   margin: 28px auto 18px;

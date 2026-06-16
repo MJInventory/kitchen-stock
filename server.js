@@ -2975,7 +2975,7 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
   if (!isValidId(recordId)) throw new Error("Invalid driver line record.");
   const currentResult = await db().query(`
     select d.id, d.sheet_date::text as sheet_date, d.order_request_id, r.inventory_item_id,
-           r.standing_order_run_line_id, sp.id as current_supplier_id
+           r.standing_order_run_line_id, sp.id as current_supplier_id, d.to_deliver
     from driver_sheet_lines d
     join order_requests r on r.id = d.order_request_id
     left join suppliers sp on sp.id = d.supplier_id
@@ -3004,6 +3004,21 @@ async function pgUpdateDriverLine(recordId, payload, userName) {
     requestValues.push(toDeliver, day);
     requestFields.push(`to_deliver = $${requestValues.length - 1}`, `delivery_day = $${requestValues.length}::date`);
     if (toDeliver && !Object.prototype.hasOwnProperty.call(payload, "ordered")) {
+      values.push(true, new Date().toISOString(), userName);
+      fields.push(`ordered = $${values.length - 2}`, `ordered_at = $${values.length - 1}`, `ordered_by_username = $${values.length}`);
+      requestValues.push(true, new Date().toISOString(), userName);
+      requestFields.push(`ordered = $${requestValues.length - 2}`, `ordered_at = $${requestValues.length - 1}`, `ordered_by_username = $${requestValues.length}`);
+    }
+  }
+  if (!Object.prototype.hasOwnProperty.call(payload, "toDeliver") && Object.prototype.hasOwnProperty.call(payload, "deliveryDay")) {
+    const rawDay = String(payload.deliveryDay || "").trim();
+    const hasValidDay = /^\d{4}-\d{2}-\d{2}$/.test(rawDay);
+    const toDeliver = hasValidDay ? true : false;
+    values.push(toDeliver, hasValidDay ? rawDay : null);
+    fields.push(`to_deliver = $${values.length - 1}`, `delivery_day = $${values.length}`);
+    requestValues.push(toDeliver, hasValidDay ? rawDay : null);
+    requestFields.push(`to_deliver = $${requestValues.length - 1}`, `delivery_day = $${requestValues.length}::date`);
+    if (toDeliver && !current.to_deliver) {
       values.push(true, new Date().toISOString(), userName);
       fields.push(`ordered = $${values.length - 2}`, `ordered_at = $${values.length - 1}`, `ordered_by_username = $${values.length}`);
       requestValues.push(true, new Date().toISOString(), userName);

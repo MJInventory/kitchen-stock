@@ -31,6 +31,7 @@ let allItems = [];
 let internalOrders = [];
 let selected = new Map();
 let activeCategory = "";
+let internalDrafts = new Map();
 
 function formatUserDisplay(value) {
   const raw = String(value || "").trim();
@@ -238,11 +239,43 @@ function renderInternalOrders() {
       </div>
       <div class="daily-order-group-list">
         ${orders.map((order) => `
-          <article class="daily-order-row internal-order-row">
-            <div>
-              <strong>${escapeHtml(`${order.lines.length} item(s) / ${order.status}`)}</strong>
-              <span>${escapeHtml(order.requestedAt ? new Date(order.requestedAt).toLocaleString() : "")}</span>
-              <small>${escapeHtml(order.lines.map((line) => `${line.itemName} (${line.requestedItemQuantity})`).join(", "))}</small>
+          <article class="daily-order-row internal-order-row editable" data-batch-id="${escapeHtml(order.id)}">
+            <div class="internal-order-header">
+              <div>
+                <strong>${escapeHtml(`${order.lines.length} item(s) / ${order.status}`)}</strong>
+                <span>${escapeHtml(order.requestedAt ? new Date(order.requestedAt).toLocaleString() : "")}</span>
+              </div>
+              <div class="status-chip-row">
+                <span class="status-chip ${order.status === "ready" ? "today" : order.status === "partial" ? "high" : "older"}">${escapeHtml(order.status)}</span>
+              </div>
+            </div>
+            <div class="internal-order-lines">
+              ${order.lines.map((line) => {
+                const savedDraft = internalDrafts.get(order.id)?.get(line.id) || {};
+                const quantity = savedDraft.quantityItems ?? line.requestedItemQuantity;
+                const removeRequested = Boolean(savedDraft.removeRequested);
+                return `
+                  <div class="internal-order-line${removeRequested ? " remove-requested" : ""}" data-line-id="${escapeHtml(line.id)}">
+                    <div class="internal-order-line-main">
+                      <strong>${escapeHtml(line.itemName)}</strong>
+                      <span>${escapeHtml([line.category, line.inventoryArea, line.storageLocation, line.shelfCode].filter(Boolean).join(" / "))}</span>
+                      <small>Requested ${escapeHtml(quantity)} item(s) / picked ${escapeHtml(line.pickedItemQuantity)} / current about ${escapeHtml(line.currentStockItems)} item(s)</small>
+                    </div>
+                    <label class="internal-order-line-qty">
+                      Qty
+                      <input class="internal-line-qty-input" type="number" min="1" step="1" value="${escapeHtml(quantity)}">
+                    </label>
+                    <label class="check-label internal-order-line-remove">
+                      <input class="internal-line-remove-input" type="checkbox" ${removeRequested ? "checked" : ""}>
+                      Remove line
+                    </label>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+            <div class="daily-order-actions internal-order-actions">
+              <button class="deliver-order-button save-internal-order" type="button">Save changes</button>
+              <button class="delete-order-button remove-internal-order" type="button">Remove order</button>
             </div>
           </article>
         `).join("")}
@@ -300,9 +333,48 @@ async function loadData() {
   ]);
   allItems = itemsData.items || [];
   internalOrders = internalData.internalOrders || [];
+  internalDrafts = new Map();
   populateFilters();
   render();
   setMessage("");
+}
+
+function updateInternalDraft(batchId, lineId, patch) {
+  const batchDraft = internalDrafts.get(batchId) || new Map();
+  const lineDraft = batchDraft.get(lineId) || {};
+  batchDraft.set(lineId, { ...lineDraft, ...patch });
+  internalDrafts.set(batchId, batchDraft);
+}
+
+function buildInternalPayload(article) {
+  return {
+    lines: [...article.querySelectorAll(".internal-order-line")].map((row) => ({
+      lineId: row.dataset.lineId,
+      quantityItems: Number(row.querySelector(".internal-line-qty-input")?.value || 0),
+      removeRequested: row.querySelector(".internal-line-remove-input")?.checked || false
+    }))
+  };
+}
+
+async function saveInternalOrder(article, removeAll = false) {
+  const batchId = article.dataset.batchId;
+  const payload = removeAll
+    ? {
+      lines: [...article.querySelectorAll(".internal-order-line")].map((row) => ({
+        lineId: row.dataset.lineId,
+        removeRequested: true
+      }))
+    }
+    : buildInternalPayload(article);
+  if (removeAll) {
+    if (!window.confirm("Remove this internal order?")) return;
+  }
+  await api(`/api/internal-orders/${batchId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+  await loadData();
+  setMessage(removeAll ? "Internal order removed." : "Internal order updated.");
 }
 
 async function submitInternalOrder() {
@@ -406,6 +478,51 @@ selectedChips.addEventListener("click", (event) => {
   if (!chip) return;
   selected.delete(chip.dataset.removeId || "");
   render();
+});
+
+internalOrderList.addEventListener("change", (event) => {
+  const qtyInput = event.target.closest(".internal-line-qty-input");
+  if (qtyInput) {
+    const row = qtyInput.closest(".internal-order-line");
+    const article = qtyInput.closest(".internal-order-row");
+    if (!row || !article) return;
+    updateInternalDraft(article.dataset.batchId, row.dataset.lineId, {
+      quantityItems: Math.max(1, Math.round(Number(qtyInput.value || 1)))
+    });
+    return;
+  }
+  const removeInput = event.target.closest(".internal-line-remove-input");
+  if (removeInput) {
+    const row = removeInput.closest(".internal-order-line");
+    const article = removeInput.closest(".internal-order-row");
+    if (!row || !article) return;
+    row.classList.toggle("remove-requested", removeInput.checked);
+    updateInternalDraft(article.dataset.batchId, row.dataset.lineId, {
+      removeRequested: removeInput.checked
+    });
+  }
+});
+
+internalOrderList.addEventListener("click", (event) => {
+  const saveButton = event.target.closest(".save-internal-order");
+  if (saveButton) {
+    const article = saveButton.closest(".internal-order-row");
+    if (!article) return;
+    saveButton.disabled = true;
+    saveInternalOrder(article, false)
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => { saveButton.disabled = false; });
+    return;
+  }
+  const removeButton = event.target.closest(".remove-internal-order");
+  if (removeButton) {
+    const article = removeButton.closest(".internal-order-row");
+    if (!article) return;
+    removeButton.disabled = true;
+    saveInternalOrder(article, true)
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => { removeButton.disabled = false; });
+  }
 });
 
 if (sessionToken && sessionUser) {

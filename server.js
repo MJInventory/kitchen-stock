@@ -3297,6 +3297,199 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
   }
 }
 
+async function pgUpdateInternalOrderRequest(batchId, payload, user) {
+  await ensurePostgresSchemaUpgrades();
+  if (!isValidId(batchId)) throw new Error("Invalid internal order.");
+  const rawLines = Array.isArray(payload?.lines) ? payload.lines : [];
+  if (!rawLines.length) throw new Error("No internal-order changes were provided.");
+  const actorName = String(user?.name || "").trim();
+  const actorRole = normalizeRole(user?.role);
+  const client = await db().connect();
+  try {
+    await client.query("begin");
+    const batchResult = await client.query(`
+      select id, requested_by_username, status
+      from internal_order_batches
+      where id = $1
+      for update
+    `, [batchId]);
+    const batch = batchResult.rows[0];
+    if (!batch) throw new Error("Internal order was not found.");
+    const ownsBatch = normalize(batch.requested_by_username) === normalize(actorName);
+    const canManageOthers = actorRole === "power-user" || actorRole === "admin" || actorRole === "god";
+    if (!ownsBatch && !canManageOthers) {
+      throw new Error("You can only change your own internal orders.");
+    }
+
+    for (const rawLine of rawLines) {
+      const lineId = String(rawLine?.lineId || "").trim();
+      if (!isValidId(lineId)) continue;
+      const requestedItemQuantity = Math.max(0, Math.round(Number(rawLine?.quantityItems || 0)));
+      if (!Number.isFinite(requestedItemQuantity) && !rawLine?.removeRequested) continue;
+      const lineResult = await client.query(`
+        select
+          l.id,
+          l.internal_order_batch_id,
+          l.inventory_item_id,
+          l.requested_item_quantity,
+          l.picked_item_quantity,
+          l.shortage_request_id,
+          l.auto_min_request_id,
+          i.current_quantity,
+          i.minimum_threshold,
+          i.name as item_name,
+          u.name as unit
+        from internal_order_lines l
+        join inventory_items i on i.id = l.inventory_item_id
+        left join units_of_measure u on u.id = i.unit_of_measure_id
+        where l.id = $1 and l.internal_order_batch_id = $2
+        for update of l, i
+      `, [lineId, batchId]);
+      const line = lineResult.rows[0];
+      if (!line) continue;
+
+      const previousRequestedItemQuantity = Number(line.requested_item_quantity || 0);
+      const previousPickedItemQuantity = Number(line.picked_item_quantity || 0);
+
+      if (rawLine?.removeRequested || requestedItemQuantity <= 0) {
+        const restoreUnits = internalOrderStockUnitsFromItems(previousPickedItemQuantity);
+        const currentQuantityAfterRestore = Number(line.current_quantity || 0) + restoreUnits;
+        if (restoreUnits > 0) {
+          await client.query(`
+            update inventory_items
+            set current_quantity = current_quantity + $2,
+                updated_at = now()
+            where id = $1
+          `, [line.inventory_item_id, restoreUnits]);
+        }
+        if (line.shortage_request_id) {
+          await client.query(`delete from driver_sheet_lines where order_request_id = $1`, [line.shortage_request_id]);
+          await client.query(`delete from order_requests where id = $1`, [line.shortage_request_id]);
+        }
+        if (line.auto_min_request_id) {
+          await client.query(`delete from driver_sheet_lines where order_request_id = $1`, [line.auto_min_request_id]);
+          await client.query(`delete from order_requests where id = $1`, [line.auto_min_request_id]);
+        }
+        await pgUpsertAutoMinimumRequestTx(client, {
+          ...line,
+          auto_min_request_id: null,
+          current_quantity: currentQuantityAfterRestore
+        }, batch, batchId);
+        await client.query(`delete from internal_order_lines where id = $1`, [lineId]);
+        continue;
+      }
+
+      const safePicked = Math.min(previousPickedItemQuantity, requestedItemQuantity);
+      const restoreItems = Math.max(0, previousPickedItemQuantity - safePicked);
+      const restoreUnits = internalOrderStockUnitsFromItems(restoreItems);
+      const currentQuantityAfterEdit = Number(line.current_quantity || 0) + restoreUnits;
+      if (restoreUnits > 0) {
+        await client.query(`
+          update inventory_items
+          set current_quantity = current_quantity + $2,
+              updated_at = now()
+          where id = $1
+        `, [line.inventory_item_id, restoreUnits]);
+      }
+
+      const shortageItemQuantity = Math.max(0, requestedItemQuantity - safePicked);
+      let shortageRequestId = line.shortage_request_id || null;
+      let autoMinRequestId = line.auto_min_request_id || null;
+
+      if (shortageItemQuantity > 0) {
+        const shortageNote = `Internal order shortage updated for ${batch.requested_by_username}. Batch ${batchId}.`;
+        const existingShortageResult = await client.query(`
+          select id
+          from order_requests
+          where id = $1
+        `, [shortageRequestId || null]);
+        if (existingShortageResult.rows[0]?.id) {
+          await client.query(`
+            update order_requests
+            set quantity_needed = $2,
+                order_unit = 'item',
+                status = 'Approved',
+                delivered = false,
+                updated_at = now(),
+                notes = $3
+            where id = $1
+          `, [shortageRequestId, shortageItemQuantity, shortageNote]);
+        } else {
+          const shortageInsert = await client.query(`
+            insert into order_requests (
+              inventory_item_id, quantity_needed, order_unit, urgency_level, status, requested_by_username, requested_at, notes
+            )
+            values ($1, $2, 'item', 'High', 'Approved', $3, now(), $4)
+            returning id
+          `, [
+            line.inventory_item_id,
+            shortageItemQuantity,
+            batch.requested_by_username,
+            shortageNote
+          ]);
+          shortageRequestId = shortageInsert.rows[0]?.id || null;
+        }
+      } else if (shortageRequestId) {
+        await client.query(`delete from driver_sheet_lines where order_request_id = $1`, [shortageRequestId]);
+        await client.query(`delete from order_requests where id = $1`, [shortageRequestId]);
+        shortageRequestId = null;
+      }
+
+      autoMinRequestId = await pgUpsertAutoMinimumRequestTx(client, {
+        ...line,
+        auto_min_request_id: autoMinRequestId,
+        current_quantity: currentQuantityAfterEdit
+      }, batch, batchId);
+
+      let nextStatus = "requested";
+      if (safePicked > 0 && shortageItemQuantity > 0) nextStatus = "partial";
+      else if (safePicked > 0 && shortageItemQuantity === 0) nextStatus = "ready";
+
+      await client.query(`
+        update internal_order_lines
+        set requested_item_quantity = $2,
+            picked_item_quantity = $3,
+            shortage_item_quantity = $4,
+            shortage_request_id = $5,
+            auto_min_request_id = $6,
+            status = $7,
+            updated_at = now()
+        where id = $1
+      `, [
+        lineId,
+        requestedItemQuantity,
+        safePicked,
+        shortageItemQuantity,
+        shortageRequestId,
+        autoMinRequestId,
+        nextStatus
+      ]);
+    }
+
+    await pgRefreshInternalOrderBatchStatusTx(client, batchId, actorName);
+    await client.query("commit");
+    cache.items.expiresAt = 0;
+    cache.requests.expiresAt = 0;
+    const batches = await pgListInternalOrders({ name: ownsBatch ? batch.requested_by_username : actorName, role: ownsBatch ? "staff" : actorRole });
+    const saved = batches.find((entry) => entry.id === batchId) || null;
+    await pgRecordAuditEntry({
+      actionType: "change",
+      entityType: "internal-order",
+      entityId: batchId,
+      entityName: `Internal order ${batch.requested_by_username}`,
+      actorUsername: actorName || batch.requested_by_username,
+      reasonCode: "internal-order-update",
+      after: saved
+    });
+    return saved;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function pgCreateStockCount(payload, userName) {
   const itemId = String(payload.itemId || "").trim();
   const countedQuantity = Number(payload.countedQuantity);
@@ -7390,6 +7583,16 @@ const server = http.createServer(async (req, res) => {
       if (!requireRole(user, res, (candidate) => candidate.permissions.canPlaceInternalOrders, "This user cannot create internal requests.")) return;
       const internalOrder = await pgCreateInternalOrder(await readJson(req), user.name);
       send(res, 201, { internalOrder });
+      return;
+    }
+
+    if (req.method === "PATCH" && /^\/api\/internal-orders\/[0-9a-f-]+$/i.test(req.url || "")) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!requireRole(user, res, (candidate) => candidate.permissions.canPlaceInternalOrders, "This user cannot change internal requests.")) return;
+      const batchId = req.url.split("/")[3];
+      const internalOrder = await pgUpdateInternalOrderRequest(batchId, await readJson(req), user);
+      send(res, 200, { internalOrder });
       return;
     }
 

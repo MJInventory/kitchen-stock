@@ -2604,6 +2604,69 @@ body.order-app {
   align-items: center;
 }
 
+.internal-order-row.editable {
+  display: grid;
+  gap: 14px;
+}
+
+.internal-order-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.internal-order-lines {
+  display: grid;
+  gap: 10px;
+}
+
+.internal-order-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 140px;
+  gap: 12px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--ink) 8%);
+}
+
+.internal-order-line.remove-requested {
+  opacity: 0.72;
+  border-color: rgba(255, 139, 127, 0.45);
+}
+
+.internal-order-line-main strong,
+.internal-order-line-main span,
+.internal-order-line-main small {
+  display: block;
+}
+
+.internal-order-line-main strong {
+  color: var(--order-ink);
+  font-size: 15px;
+}
+
+.internal-order-line-main span,
+.internal-order-line-main small {
+  color: var(--order-muted);
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+.internal-order-line-qty {
+  min-width: 0;
+}
+
+.internal-order-line-remove {
+  align-self: center;
+}
+
+.internal-order-actions {
+  justify-content: flex-end;
+}
+
 .choice-dialog {
   border: 0;
   padding: 0;
@@ -3340,6 +3403,15 @@ body.order-app {
   .daily-order-actions {
     justify-self: start;
     flex-wrap: wrap;
+  }
+
+  .internal-order-line {
+    grid-template-columns: 1fr;
+  }
+
+  .internal-order-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .choice-dialog-card {

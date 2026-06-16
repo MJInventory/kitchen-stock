@@ -1957,6 +1957,13 @@ body.order-app {
     min-width: 0;
   }
 
+  .order-app .product-main strong {
+    font-size: 15px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
   .order-app .product-controls {
     grid-area: controls;
     display: grid !important;
@@ -1991,13 +1998,6 @@ body.order-app {
   .order-app .product-delete-toggle {
     justify-content: flex-start;
     min-height: 40px;
-  }
-
-  .order-app .product-main strong {
-    font-size: 15px;
-    line-height: 1.25;
-    overflow-wrap: anywhere;
-    word-break: normal;
   }
 }
 
@@ -2967,20 +2967,7 @@ body.order-app {
   }
 
   .order-app .user-chip {
-    position: fixed !important;
-    right: 12px !important;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
-    left: auto !important;
-    top: auto !important;
-    z-index: 32 !important;
-    max-width: calc(100vw - 24px);
-    font-size: 11px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--order-line);
-    background: rgba(15, 15, 15, 0.88);
-    color: var(--order-ink);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    display: none !important;
   }
 
   .order-app .icon-button,
@@ -3055,15 +3042,53 @@ body.order-app {
     justify-self: start;
   }
 
-  .product-row,
-  .product-row.selected {
+  .order-app .product-row,
+  .order-app .product-row.selected {
     grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-areas:
+      "check main"
+      "controls controls";
     align-items: start;
+    row-gap: 12px;
   }
 
-  .product-controls {
-    grid-column: 2;
-    flex-wrap: wrap;
+  .order-app .product-check {
+    grid-area: check;
+    align-self: start;
+  }
+
+  .order-app .product-main {
+    grid-area: main;
+    min-width: 0;
+  }
+
+  .order-app .product-main strong {
+    font-size: 15px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .order-app .product-controls {
+    grid-area: controls;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    padding-left: 0;
+  }
+
+  .order-app .product-controls > * {
+    min-width: 0;
+  }
+
+  .order-app .stock-adjust {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto 72px auto;
+    align-items: center;
+    justify-content: start;
+    gap: 8px;
   }
 
   .status-chip-row {
@@ -3075,13 +3100,23 @@ body.order-app {
     padding: 4px 8px;
   }
 
-  .product-controls select {
-    width: 112px;
+  .order-app .qty-minus,
+  .order-app .qty-plus,
+  .order-app .qty-input,
+  .order-app .unit-input,
+  .order-app .urgency-input,
+  .order-app .product-delete-toggle {
+    width: 100%;
   }
 
-  .product-delete-toggle {
+  .order-app .product-controls select {
+    width: 100%;
+  }
+
+  .order-app .product-delete-toggle {
     width: 100%;
     justify-content: flex-start;
+    min-height: 40px;
   }
 
   .stock-count-heading {

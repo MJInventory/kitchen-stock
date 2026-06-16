@@ -11,11 +11,18 @@ const featureMenu = document.querySelector("#featureMenu");
 const searchInput = document.querySelector("#searchInput");
 const areaFilter = document.querySelector("#areaFilter");
 const locationFilter = document.querySelector("#locationFilter");
+const selectedChips = document.querySelector("#selectedChips");
 const message = document.querySelector("#message");
 const catalogCount = document.querySelector("#catalogCount");
 const catalogList = document.querySelector("#catalogList");
 const internalCount = document.querySelector("#internalCount");
 const internalOrderList = document.querySelector("#internalOrderList");
+const categoryView = document.querySelector("#categoryView");
+const categoryGrid = document.querySelector("#categoryGrid");
+const productView = document.querySelector("#productView");
+const categoryTitle = document.querySelector("#categoryTitle");
+const categoryMeta = document.querySelector("#categoryMeta");
+const backButton = document.querySelector("#backButton");
 
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
@@ -23,6 +30,7 @@ let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermission
 let allItems = [];
 let internalOrders = [];
 let selected = new Map();
+let activeCategory = "";
 
 function formatUserDisplay(value) {
   const raw = String(value || "").trim();
@@ -95,8 +103,16 @@ function itemMeta(item) {
   return [item.inventoryArea, item.storageLocation, item.shelfCode].filter(Boolean).join(" / ");
 }
 
+function itemCategory(item) {
+  return String(item?.category || "").trim() || "Uncategorized";
+}
+
 function itemStockItems(item) {
   return Math.floor((Number(item.quantity || 0) || 0) * 12);
+}
+
+function hasSearchTerm() {
+  return Boolean(String(searchInput?.value || "").trim());
 }
 
 function populateFilters() {
@@ -118,7 +134,7 @@ function filterItems() {
       return normalize([item.name, item.category, item.inventoryArea, item.storageLocation, item.shelfCode].join(" ")).includes(term);
     })
     .sort((a, b) => {
-      const category = String(a.category || "").localeCompare(String(b.category || ""));
+      const category = itemCategory(a).localeCompare(itemCategory(b), undefined, { sensitivity: "base" });
       if (category) return category;
       return String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
     });
@@ -130,9 +146,51 @@ function updateSaveButton() {
   submitButton.disabled = selected.size === 0;
 }
 
-function renderCatalog() {
+function renderSelectedChips() {
+  selectedChips.innerHTML = [...selected.values()]
+    .slice(0, 12)
+    .map((entry) => `
+      <button class="selected-chip" type="button" data-remove-id="${escapeHtml(entry.item.id)}">
+        <span>${escapeHtml(entry.item.name)}</span>
+        <small>${escapeHtml(entry.quantityItems)} items</small>
+      </button>
+    `)
+    .join("");
+}
+
+function renderCategories() {
   const items = filterItems();
-  catalogCount.textContent = `${items.length} items`;
+  const groups = new Map();
+  for (const item of items) {
+    const category = itemCategory(item);
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(item);
+  }
+
+  categoryGrid.innerHTML = [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .map(([category, groupItems]) => {
+      const selectedCount = groupItems.filter((item) => selected.has(item.id)).length;
+      return `
+        <button class="category-card" type="button" data-category="${escapeHtml(category)}">
+          <span class="category-open">Open</span>
+          <strong>${escapeHtml(category)}</strong>
+          <small>${escapeHtml(`${groupItems.length} products${selectedCount ? ` / ${selectedCount} selected` : ""}`)}</small>
+        </button>
+      `;
+    })
+    .join("");
+
+  if (!categoryGrid.innerHTML) {
+    categoryGrid.innerHTML = '<p class="empty-sheet">No products match this search.</p>';
+  }
+}
+
+function renderCatalog() {
+  const items = filterItems().filter((item) => !activeCategory || itemCategory(item) === activeCategory);
+  categoryTitle.textContent = hasSearchTerm() ? "Search Results" : (activeCategory || "Pick From Inventory");
+  categoryMeta.textContent = `${items.length} item${items.length === 1 ? "" : "s"}${selected.size ? ` / ${selected.size} selected` : ""}`;
+  backButton.hidden = hasSearchTerm();
   catalogList.innerHTML = items.map((item) => {
     const entry = selected.get(item.id);
     const chosen = Boolean(entry);
@@ -142,8 +200,8 @@ function renderCatalog() {
         <button class="product-check" type="button" aria-label="Select ${escapeHtml(item.name)}">${chosen ? "&#10003;" : ""}</button>
         <div class="product-main">
           <strong>${escapeHtml(item.name)}</strong>
-          <span>${escapeHtml(itemMeta(item) || item.category || "")}</span>
-          <small>Current stock about ${escapeHtml(itemStockItems(item))} item(s) / ${escapeHtml(item.quantity ?? 0)} ${escapeHtml(item.unit || "box")}</small>
+          <span>${escapeHtml([itemCategory(item), itemMeta(item)].filter(Boolean).join(" / "))}</span>
+          <small>Current stock about ${escapeHtml(itemStockItems(item))} item(s) / ${escapeHtml(item.quantity ?? 0)} ${escapeHtml(item.unit || "box")} / min ${escapeHtml(item.minimum ?? 0)}</small>
         </div>
         <div class="product-controls internal-order-controls">
           <label class="stock-adjust">
@@ -166,19 +224,45 @@ function renderInternalOrders() {
     internalOrderList.innerHTML = '<p class="empty-sheet">No internal requests open.</p>';
     return;
   }
-  internalOrderList.innerHTML = internalOrders.map((order) => `
-    <article class="daily-order-row internal-order-row">
-      <div>
-        <strong>${escapeHtml(formatUserDisplay(order.requestedBy))}</strong>
-        <span>${escapeHtml(`${order.lines.length} item(s) / ${order.status}`)}</span>
-        <small>${escapeHtml(order.lines.map((line) => `${line.itemName} (${line.requestedItemQuantity})`).join(", "))}</small>
+  const groups = new Map();
+  for (const order of internalOrders) {
+    const key = formatUserDisplay(order.requestedBy || "Team");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(order);
+  }
+  internalOrderList.innerHTML = [...groups.entries()].map(([requester, orders]) => `
+    <section class="daily-order-group">
+      <div class="daily-order-group-heading">
+        <h3>${escapeHtml(requester)}</h3>
+        <span>${escapeHtml(`${orders.length} order${orders.length === 1 ? "" : "s"}`)}</span>
       </div>
-    </article>
+      <div class="daily-order-group-list">
+        ${orders.map((order) => `
+          <article class="daily-order-row internal-order-row">
+            <div>
+              <strong>${escapeHtml(`${order.lines.length} item(s) / ${order.status}`)}</strong>
+              <span>${escapeHtml(order.requestedAt ? new Date(order.requestedAt).toLocaleString() : "")}</span>
+              <small>${escapeHtml(order.lines.map((line) => `${line.itemName} (${line.requestedItemQuantity})`).join(", "))}</small>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
   `).join("");
 }
 
 function render() {
-  renderCatalog();
+  if (hasSearchTerm()) {
+    activeCategory = "";
+    categoryView.hidden = true;
+    productView.hidden = false;
+    renderCatalog();
+  } else if (productView.hidden) {
+    renderCategories();
+  } else {
+    renderCatalog();
+  }
+  renderSelectedChips();
   renderInternalOrders();
   updateSaveButton();
 }
@@ -281,9 +365,23 @@ loginForm.addEventListener("submit", async (event) => {
 logoutButton.addEventListener("click", showLogin);
 refreshButton.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
 submitButton.addEventListener("click", () => submitInternalOrder().catch((error) => setMessage(error.message, true)));
-searchInput.addEventListener("input", renderCatalog);
-areaFilter.addEventListener("change", renderCatalog);
-locationFilter.addEventListener("change", renderCatalog);
+searchInput.addEventListener("input", render);
+areaFilter.addEventListener("change", render);
+locationFilter.addEventListener("change", render);
+categoryGrid.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category]");
+  if (!button) return;
+  activeCategory = button.dataset.category || "";
+  categoryView.hidden = true;
+  productView.hidden = false;
+  renderCatalog();
+});
+backButton.addEventListener("click", () => {
+  activeCategory = "";
+  productView.hidden = true;
+  categoryView.hidden = false;
+  render();
+});
 
 catalogList.addEventListener("click", (event) => {
   const toggle = event.target.closest(".product-check");
@@ -301,6 +399,13 @@ catalogList.addEventListener("change", (event) => {
   if (!selected.has(row.dataset.itemId)) return;
   syncRow(row);
   updateSaveButton();
+});
+
+selectedChips.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-remove-id]");
+  if (!chip) return;
+  selected.delete(chip.dataset.removeId || "");
+  render();
 });
 
 if (sessionToken && sessionUser) {

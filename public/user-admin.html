@@ -73,6 +73,36 @@
         <p id="adminMessage" role="status"></p>
       </section>
 
+      <section class="panel user-admin-toolbar">
+        <h2>Find And Manage Users</h2>
+        <div class="user-admin-toolbar-grid">
+          <label>Search
+            <input id="userSearch" type="search" placeholder="Search by name, role or note">
+          </label>
+          <label>Role
+            <select id="roleFilter">
+              <option value="all">All roles</option>
+              <option value="god">God</option>
+              <option value="admin">Admin</option>
+              <option value="power-user">Power User</option>
+              <option value="staff">Staff</option>
+              <option value="user">User</option>
+            </select>
+          </label>
+          <label>Status
+            <select id="statusFilter">
+              <option value="all">All users</option>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+              <option value="must-change">Password change required</option>
+              <option value="drivers">Dedicated drivers</option>
+              <option value="pickers">Pickers</option>
+            </select>
+          </label>
+        </div>
+        <p id="userCount" class="toolbar-summary"></p>
+      </section>
+
       <section id="userList" class="settings-list"></section>
     </main>
 

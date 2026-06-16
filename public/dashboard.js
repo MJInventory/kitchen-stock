@@ -298,6 +298,7 @@ function requestStatusChips(request, today = todayLocal()) {
   else chips.push(["Today", "today"]);
   chips.push([sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`, sameUser(requestUser(request), sessionUser) ? "mine" : "team"]);
   if (isInternalShortageRequest(request)) chips.push(["Shortage", "critical"]);
+  if (isAutoMinimumRequest(request)) chips.push(["Auto minimum", "deliver"]);
   if (request.toDeliver) chips.push(["2Deliver", "deliver"]);
   if (String(request.urgency || "").toLowerCase() === "high") chips.push(["High", "high"]);
   if (String(request.urgency || "").toLowerCase() === "critical") chips.push(["Critical", "critical"]);
@@ -310,6 +311,11 @@ function renderStatusChips(chips = []) {
 
 function isInternalShortageRequest(request) {
   return String(request?.notes || "").toLowerCase().includes("internal order shortage");
+}
+
+function isAutoMinimumRequest(request) {
+  return String(request?.requestedBy || "").trim().toLowerCase() === "auto minimum"
+    || String(request?.notes || "").toLowerCase().includes("automatic minimum restock");
 }
 
 function formatNotificationDate(value) {

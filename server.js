@@ -246,6 +246,7 @@ async function ensurePostgresSchemaUpgrades() {
         shortage_item_quantity numeric not null default 0,
         status text not null default 'requested' check (status in ('requested', 'partial', 'ready', 'closed', 'cancelled')),
         shortage_request_id uuid references order_requests(id) on delete set null,
+        auto_min_request_id uuid references order_requests(id) on delete set null,
         notes text not null default '',
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
@@ -260,6 +261,7 @@ async function ensurePostgresSchemaUpgrades() {
         add column if not exists shortage_item_quantity numeric not null default 0,
         add column if not exists status text not null default 'requested',
         add column if not exists shortage_request_id uuid references order_requests(id) on delete set null,
+        add column if not exists auto_min_request_id uuid references order_requests(id) on delete set null,
         add column if not exists notes text not null default '',
         add column if not exists created_at timestamptz not null default now(),
         add column if not exists updated_at timestamptz not null default now()
@@ -2816,6 +2818,13 @@ function internalOrderStockUnitsFromItems(quantityItems) {
   return numeric / 12;
 }
 
+function normalizePositiveQuantity(value, decimals = 2) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  const factor = 10 ** decimals;
+  return Math.round(numeric * factor) / factor;
+}
+
 function pgInternalOrderLineFromRow(row) {
   return {
     id: row.id,
@@ -2829,10 +2838,12 @@ function pgInternalOrderLineFromRow(row) {
     unit: row.unit || "",
     currentStock: pgNumber(row.current_quantity),
     currentStockItems: Math.floor((pgNumber(row.current_quantity) || 0) * 12),
+    minimumThreshold: pgNumber(row.minimum_threshold) || 0,
     requestedItemQuantity: pgNumber(row.requested_item_quantity) || 0,
     pickedItemQuantity: pgNumber(row.picked_item_quantity) || 0,
     shortageItemQuantity: pgNumber(row.shortage_item_quantity) || 0,
     shortageRequestId: row.shortage_request_id || "",
+    autoMinRequestId: row.auto_min_request_id || "",
     status: row.status || "requested",
     notes: row.notes || ""
   };
@@ -2885,10 +2896,12 @@ async function pgListInternalOrders(user) {
       l.picked_item_quantity,
       l.shortage_item_quantity,
       l.shortage_request_id,
+      l.auto_min_request_id,
       l.status,
       l.notes,
       i.name as item_name,
       i.current_quantity,
+      i.minimum_threshold,
       c.name as category,
       ia.name as inventory_area,
       sl.name as storage_location,
@@ -3000,7 +3013,8 @@ async function pgRefreshInternalOrderBatchStatusTx(client, batchId, userName = "
   const partialCount = Number(row.partial_count || 0);
   const requestedCount = Number(row.requested_count || 0);
   let status = "open";
-  if (total > 0 && readyCount === total) status = "ready";
+  if (total === 0) status = "closed";
+  else if (readyCount === total) status = "ready";
   else if (partialCount > 0 || (readyCount > 0 && requestedCount > 0)) status = "partial";
   else status = "open";
   await client.query(`
@@ -3012,6 +3026,77 @@ async function pgRefreshInternalOrderBatchStatusTx(client, batchId, userName = "
     where id = $1
   `, [batchId, status, String(userName || "").trim()]);
   return status;
+}
+
+async function pgUpsertAutoMinimumRequestTx(client, line, batch, batchId) {
+  const currentQuantity = Number(line.current_quantity || 0);
+  const minimumThreshold = Number(line.minimum_threshold || 0);
+  const quantityNeeded = normalizePositiveQuantity(minimumThreshold - currentQuantity, 2);
+  const autoNote = `Automatic minimum restock after internal pick for ${batch.requested_by_username}. Batch ${batchId}.`;
+  const requestedBy = "Auto Minimum";
+  const linkedRequestId = line.auto_min_request_id || null;
+
+  if (quantityNeeded <= 0) {
+    const existingAuto = await client.query(`
+      select id
+      from order_requests
+      where inventory_item_id = $1
+        and delivered = false
+        and lower(requested_by_username) = lower($2)
+        and status in ('Pending', 'Approved')
+      order by case when id = $3 then 0 else 1 end,
+               updated_at desc nulls last,
+               requested_at desc nulls last
+      limit 1
+    `, [line.inventory_item_id, requestedBy, linkedRequestId]);
+    const removableId = existingAuto.rows[0]?.id || linkedRequestId;
+    if (removableId) {
+      await client.query(`delete from driver_sheet_lines where order_request_id = $1`, [removableId]);
+      await client.query(`delete from order_requests where id = $1`, [removableId]);
+    }
+    return null;
+  }
+
+  const requestUnit = String(line.unit || "").trim() || "item";
+  const existingAuto = await client.query(`
+    select id
+    from order_requests
+    where inventory_item_id = $1
+      and delivered = false
+      and lower(requested_by_username) = lower($2)
+      and status in ('Pending', 'Approved')
+    order by case when id = $3 then 0 else 1 end,
+             updated_at desc nulls last,
+             requested_at desc nulls last
+    limit 1
+  `, [line.inventory_item_id, requestedBy, linkedRequestId]);
+  const requestId = existingAuto.rows[0]?.id || null;
+
+  if (requestId) {
+    await client.query(`
+      update order_requests
+      set quantity_needed = $2,
+          order_unit = $3,
+          urgency_level = 'High',
+          status = 'Approved',
+          delivered = false,
+          delivered_at = null,
+          delivered_by_username = '',
+          notes = $4,
+          updated_at = now()
+      where id = $1
+    `, [requestId, quantityNeeded, requestUnit, autoNote]);
+    return requestId;
+  }
+
+  const inserted = await client.query(`
+    insert into order_requests (
+      inventory_item_id, quantity_needed, order_unit, urgency_level, status, requested_by_username, requested_at, notes
+    )
+    values ($1, $2, $3, 'High', 'Approved', $4, now(), $5)
+    returning id
+  `, [line.inventory_item_id, quantityNeeded, requestUnit, requestedBy, autoNote]);
+  return inserted.rows[0]?.id || null;
 }
 
 async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
@@ -3044,12 +3129,16 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
           l.requested_item_quantity,
           l.picked_item_quantity,
           l.shortage_request_id,
+          l.auto_min_request_id,
           i.current_quantity,
+          i.minimum_threshold,
           i.name as item_name,
-          ia.name as inventory_area
+          ia.name as inventory_area,
+          u.name as unit
         from internal_order_lines l
         join inventory_items i on i.id = l.inventory_item_id
         left join inventory_areas ia on ia.id = i.inventory_area_id
+        left join units_of_measure u on u.id = i.unit_of_measure_id
         where l.id = $1 and l.internal_order_batch_id = $2
         for update
       `, [lineId, batchId]);
@@ -3057,10 +3146,35 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
       if (!line) continue;
       const requestedItemQuantity = Number(line.requested_item_quantity || 0);
       const previousPickedItemQuantity = Number(line.picked_item_quantity || 0);
+
+      if (rawLine?.removeRequested) {
+        const restoreUnits = internalOrderStockUnitsFromItems(previousPickedItemQuantity);
+        const currentQuantityAfterRestore = Number(line.current_quantity || 0) + restoreUnits;
+        if (restoreUnits > 0) {
+          await client.query(`
+            update inventory_items
+            set current_quantity = current_quantity + $2,
+                updated_at = now()
+            where id = $1
+          `, [line.inventory_item_id, restoreUnits]);
+        }
+        if (line.shortage_request_id) {
+          await client.query(`delete from driver_sheet_lines where order_request_id = $1`, [line.shortage_request_id]);
+          await client.query(`delete from order_requests where id = $1`, [line.shortage_request_id]);
+        }
+        await pgUpsertAutoMinimumRequestTx(client, {
+          ...line,
+          current_quantity: currentQuantityAfterRestore
+        }, batch, batchId);
+        await client.query(`delete from internal_order_lines where id = $1`, [lineId]);
+        continue;
+      }
+
       const safePicked = Math.min(requestedItemQuantity, pickedItemQuantity);
       const shortageItemQuantity = Math.max(0, requestedItemQuantity - safePicked);
       const pickedStatus = shortageItemQuantity > 0 ? "partial" : "ready";
       const stockDeltaItems = safePicked - previousPickedItemQuantity;
+      const currentQuantityAfterPick = Number(line.current_quantity || 0) - internalOrderStockUnitsFromItems(stockDeltaItems);
 
       if (stockDeltaItems !== 0) {
         await client.query(`
@@ -3072,6 +3186,7 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
       }
 
       let shortageRequestId = line.shortage_request_id || null;
+      let autoMinRequestId = line.auto_min_request_id || null;
       if (shortageItemQuantity > 0) {
         const existingShortageResult = await client.query(`
           select id
@@ -3114,13 +3229,20 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
         shortageRequestId = null;
       }
 
+      autoMinRequestId = await pgUpsertAutoMinimumRequestTx(client, {
+        ...line,
+        auto_min_request_id: autoMinRequestId,
+        current_quantity: currentQuantityAfterPick
+      }, batch, batchId);
+
       await client.query(`
         update internal_order_lines
         set picked_item_quantity = $2,
             shortage_item_quantity = $3,
             shortage_request_id = $4,
-            status = $5,
-            notes = $6,
+            auto_min_request_id = $5,
+            status = $6,
+            notes = $7,
             updated_at = now()
         where id = $1
       `, [
@@ -3128,6 +3250,7 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
         safePicked,
         shortageItemQuantity,
         shortageRequestId,
+        autoMinRequestId,
         pickedStatus,
         String(rawLine?.notes || "").trim()
       ]);

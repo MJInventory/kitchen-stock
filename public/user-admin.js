@@ -8,10 +8,15 @@ const logoutButton = document.querySelector("#logoutButton");
 const userList = document.querySelector("#userList");
 const newUserForm = document.querySelector("#newUserForm");
 const adminMessage = document.querySelector("#adminMessage");
+const userSearch = document.querySelector("#userSearch");
+const roleFilter = document.querySelector("#roleFilter");
+const statusFilter = document.querySelector("#statusFilter");
+const userCount = document.querySelector("#userCount");
 
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+let allUsers = [];
 
 function formatUserDisplay(value) {
   const raw = String(value || "").trim();
@@ -53,6 +58,67 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
+function roleLabel(role) {
+  return role === "god" ? "God"
+    : role === "admin" ? "Admin"
+    : role === "power-user" ? "Power User"
+    : role === "staff" ? "Staff"
+    : "User";
+}
+
+function matchesSearch(user, term) {
+  if (!term) return true;
+  const haystack = [
+    user.name,
+    roleLabel(user.role),
+    user.isDriver ? "driver" : "",
+    user.isPicker ? "picker" : "",
+    user.active ? "active" : "inactive",
+    user.mustChangePassword ? "password change" : "",
+    user.notifyOnNewOrders ? "new orders" : "",
+    user.notifyOnDelivery ? "delivery" : ""
+  ].join(" ").toLowerCase();
+  return haystack.includes(term);
+}
+
+function filterUsers(users) {
+  const term = (userSearch?.value || "").trim().toLowerCase();
+  const wantedRole = roleFilter?.value || "all";
+  const wantedStatus = statusFilter?.value || "all";
+  return users.filter((user) => {
+    if (wantedRole !== "all" && user.role !== wantedRole) return false;
+    if (wantedStatus === "active" && !user.active) return false;
+    if (wantedStatus === "inactive" && user.active) return false;
+    if (wantedStatus === "must-change" && !user.mustChangePassword) return false;
+    if (wantedStatus === "drivers" && !user.isDriver) return false;
+    if (wantedStatus === "pickers" && !user.isPicker) return false;
+    return matchesSearch(user, term);
+  });
+}
+
+function updateUserCount(filtered, total) {
+  if (!userCount) return;
+  if (!total) {
+    userCount.textContent = "No users found yet.";
+    return;
+  }
+  userCount.textContent = filtered === total
+    ? `${total} user${total === 1 ? "" : "s"} shown.`
+    : `${filtered} of ${total} user${total === 1 ? "" : "s"} shown.`;
+}
+
+function userMetaBadges(user) {
+  return [
+    `<span class="user-meta-pill role">${escapeHtml(roleLabel(user.role))}</span>`,
+    user.active ? `<span class="user-meta-pill ok">Active</span>` : `<span class="user-meta-pill muted">Inactive</span>`,
+    user.mustChangePassword ? `<span class="user-meta-pill warn">Change password</span>` : "",
+    user.isDriver ? `<span class="user-meta-pill accent">Driver</span>` : "",
+    user.isPicker ? `<span class="user-meta-pill accent">Picker</span>` : "",
+    user.notifyOnNewOrders ? `<span class="user-meta-pill info">Order alerts</span>` : "",
+    user.notifyOnDelivery ? `<span class="user-meta-pill info">Delivery alerts</span>` : ""
+  ].filter(Boolean).join("");
+}
+
 function saveSession(data) {
   sessionToken = data.token;
   sessionUser = data.user.name;
@@ -69,8 +135,7 @@ function saveSession(data) {
 function showApp() {
   loginScreen.hidden = true;
   const role = localStorage.getItem("kitchenStockRole") || "user";
-  const roleLabel = role === "god" ? "God" : role === "admin" ? "Admin" : role === "power-user" ? "Power User" : role === "staff" ? "Staff" : "User";
-  currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
+  currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel(role)}` : "";
   window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-god-only]").forEach((option) => {
     option.hidden = !permissions.canManageAdminRoles;
@@ -104,45 +169,80 @@ async function api(path, options = {}) {
 }
 
 function renderUsers(users) {
-  userList.innerHTML = users.map((user) => `
-    <article class="setting-row user-admin-row" data-user-id="${escapeHtml(user.id)}">
-      <div>
-        <strong>${escapeHtml(user.name)}</strong>
-        <span>${user.editable ? "Online user" : "Render user - move to App Users to edit"}</span>
-        <span>${escapeHtml(formatLastLogin(user.lastLoginAt))}</span>
-        <div class="notify-area-grid compact">
-          <label class="check-label"><input class="user-notify-area-bar" type="checkbox" ${user.notifyAreas?.bar !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Bar</label>
-          <label class="check-label"><input class="user-notify-area-foh" type="checkbox" ${user.notifyAreas?.foh !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> FOH</label>
-          <label class="check-label"><input class="user-notify-area-kitchen" type="checkbox" ${user.notifyAreas?.kitchen !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Kitchen</label>
-          <label class="check-label"><input class="user-notify-area-general" type="checkbox" ${user.notifyAreas?.general !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> General</label>
+  const filteredUsers = filterUsers(users);
+  updateUserCount(filteredUsers.length, users.length);
+  if (!filteredUsers.length) {
+    userList.innerHTML = `<article class="panel empty-state-panel"><p>No users match the current filters.</p></article>`;
+    return;
+  }
+  userList.innerHTML = filteredUsers.map((user) => `
+    <article class="user-admin-card" data-user-id="${escapeHtml(user.id)}" data-user-name="${escapeHtml(user.name)}">
+      <button class="user-admin-summary" type="button" aria-expanded="false">
+        <div class="user-admin-summary-main">
+          <strong>${escapeHtml(user.name)}</strong>
+          <span>${user.editable ? "Online user" : "Render user - move to App Users to edit"}</span>
+          <span>${escapeHtml(formatLastLogin(user.lastLoginAt))}</span>
+        </div>
+        <div class="user-admin-summary-side">
+          <div class="user-admin-pill-row">${userMetaBadges(user)}</div>
+          <span class="user-admin-open-text">Open details</span>
+        </div>
+      </button>
+      <div class="user-admin-body">
+        <div class="user-admin-sections">
+          <section class="user-admin-section">
+            <h3>Access</h3>
+            <div class="user-admin-fields">
+              <label>Role
+                <select class="user-role" ${user.editable && user.canEditRole ? "" : "disabled"}>
+                  <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
+                  <option value="staff"${user.role === "staff" ? " selected" : ""}>Staff</option>
+                  <option value="power-user"${user.role === "power-user" ? " selected" : ""}>Power User</option>
+                  <option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>
+                  <option value="god"${user.role === "god" ? " selected" : ""}>God</option>
+                </select>
+              </label>
+              <label>Theme
+                <select class="user-theme" ${user.editable ? "" : "disabled"}>
+                  <option value="dark"${user.theme !== "light" ? " selected" : ""}>Dark</option>
+                  <option value="light"${user.theme === "light" ? " selected" : ""}>Light</option>
+                </select>
+              </label>
+              <label>New password
+                <input class="user-password" type="text" placeholder="Leave blank to keep current" ${user.editable && user.canSave ? "" : "disabled"}>
+              </label>
+            </div>
+            <div class="user-admin-toggle-row">
+              <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
+              <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
+            </div>
+          </section>
+
+          <section class="user-admin-section">
+            <h3>Work Flow</h3>
+            <div class="user-admin-toggle-row">
+              <label class="check-label"><input class="user-is-driver" type="checkbox" ${user.isDriver ? "checked" : ""} ${user.editable ? "" : "disabled"}> Dedicated driver</label>
+              <label class="check-label"><input class="user-is-picker" type="checkbox" ${user.isPicker ? "checked" : ""} ${user.editable ? "" : "disabled"}> Picker</label>
+              <label class="check-label"><input class="user-notify-orders" type="checkbox" ${user.notifyOnNewOrders ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on new orders</label>
+              <label class="check-label"><input class="user-notify-delivery" type="checkbox" ${user.notifyOnDelivery ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on delivered items</label>
+            </div>
+          </section>
+
+          <section class="user-admin-section user-admin-section-wide">
+            <h3>Notify For Area Orders</h3>
+            <div class="notify-area-grid compact">
+              <label class="check-label"><input class="user-notify-area-bar" type="checkbox" ${user.notifyAreas?.bar !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Bar</label>
+              <label class="check-label"><input class="user-notify-area-foh" type="checkbox" ${user.notifyAreas?.foh !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> FOH</label>
+              <label class="check-label"><input class="user-notify-area-kitchen" type="checkbox" ${user.notifyAreas?.kitchen !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Kitchen</label>
+              <label class="check-label"><input class="user-notify-area-general" type="checkbox" ${user.notifyAreas?.general !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> General</label>
+            </div>
+          </section>
+        </div>
+        <div class="user-admin-actions">
+          <label class="check-label delete-check"><input class="user-delete" type="checkbox" ${user.editable && user.canDelete ? "" : "disabled"}> Delete user</label>
+          <button class="save-user" type="button" ${user.canSave || user.canDelete ? "" : "disabled"}>Save Changes</button>
         </div>
       </div>
-      <label>New password
-        <input class="user-password" type="text" placeholder="Leave blank to keep current" ${user.editable && user.canSave ? "" : "disabled"}>
-      </label>
-      <label>Role
-        <select class="user-role" ${user.editable && user.canEditRole ? "" : "disabled"}>
-          <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
-          <option value="staff"${user.role === "staff" ? " selected" : ""}>Staff</option>
-          <option value="power-user"${user.role === "power-user" ? " selected" : ""}>Power User</option>
-          <option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>
-          <option value="god"${user.role === "god" ? " selected" : ""}>God</option>
-        </select>
-      </label>
-      <label>Theme
-        <select class="user-theme" ${user.editable ? "" : "disabled"}>
-          <option value="dark"${user.theme !== "light" ? " selected" : ""}>Dark</option>
-          <option value="light"${user.theme === "light" ? " selected" : ""}>Light</option>
-        </select>
-      </label>
-      <label class="check-label"><input class="user-is-driver" type="checkbox" ${user.isDriver ? "checked" : ""} ${user.editable ? "" : "disabled"}> Dedicated driver</label>
-      <label class="check-label"><input class="user-is-picker" type="checkbox" ${user.isPicker ? "checked" : ""} ${user.editable ? "" : "disabled"}> Picker</label>
-      <label class="check-label"><input class="user-notify-orders" type="checkbox" ${user.notifyOnNewOrders ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on new orders</label>
-      <label class="check-label"><input class="user-notify-delivery" type="checkbox" ${user.notifyOnDelivery ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on delivered items</label>
-      <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
-      <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
-      <label class="check-label delete-check"><input class="user-delete" type="checkbox" ${user.editable && user.canDelete ? "" : "disabled"}> Delete user</label>
-      <button class="save-user" type="button" ${user.canSave || user.canDelete ? "" : "disabled"}>Save</button>
     </article>
   `).join("");
 }
@@ -153,7 +253,8 @@ async function loadUsers() {
   if (!permissions.canAdminUsers) throw new Error("Only admins can open user administration.");
   setMessage("Loading users...");
   const data = await api("/api/app-users");
-  renderUsers(data.users);
+  allUsers = data.users;
+  renderUsers(allUsers);
   setMessage("");
 }
 
@@ -251,14 +352,28 @@ newUserForm.addEventListener("submit", async (event) => {
 });
 
 userList.addEventListener("click", (event) => {
+  const summary = event.target.closest(".user-admin-summary");
+  if (summary) {
+    const card = summary.closest(".user-admin-card");
+    const expanded = card.classList.toggle("expanded");
+    summary.setAttribute("aria-expanded", expanded ? "true" : "false");
+    const hint = summary.querySelector(".user-admin-open-text");
+    if (hint) hint.textContent = expanded ? "Hide details" : "Open details";
+    return;
+  }
   const button = event.target.closest(".save-user");
   if (!button) return;
-  const row = button.closest(".user-admin-row");
+  const row = button.closest(".user-admin-card");
   button.disabled = true;
   saveUser(row)
     .then((result) => loadUsers().then(() => setMessage(result?.deleted ? "User deleted." : "User saved.")))
     .catch((error) => setMessage(error.message, true))
     .finally(() => { button.disabled = false; });
+});
+
+[userSearch, roleFilter, statusFilter].forEach((control) => {
+  control?.addEventListener("input", () => renderUsers(allUsers));
+  control?.addEventListener("change", () => renderUsers(allUsers));
 });
 
 logoutButton.addEventListener("click", showLogin);

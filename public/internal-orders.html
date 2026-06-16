@@ -70,13 +70,22 @@
             <option value="">All Locations</option>
           </select>
         </div>
+        <div id="selectedChips" class="selected-chips"></div>
         <p id="message" class="order-message" role="status"></p>
       </section>
 
-      <section class="daily-order-panel">
-        <div class="daily-order-heading">
-          <h2>Pick From Inventory</h2>
-          <span id="catalogCount"></span>
+      <section id="categoryView" class="category-view">
+        <div class="order-divider"><span>All Categories</span></div>
+        <div id="categoryGrid" class="category-grid"></div>
+      </section>
+
+      <section id="productView" class="product-view" hidden>
+        <div class="product-heading">
+          <button id="backButton" class="back-button" type="button">Back Home</button>
+          <div>
+            <h2 id="categoryTitle">Products</h2>
+            <p id="categoryMeta"></p>
+          </div>
         </div>
         <div id="catalogList" class="product-list"></div>
       </section>

@@ -3140,7 +3140,7 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
         left join inventory_areas ia on ia.id = i.inventory_area_id
         left join units_of_measure u on u.id = i.unit_of_measure_id
         where l.id = $1 and l.internal_order_batch_id = $2
-        for update
+        for update of l, i
       `, [lineId, batchId]);
       const line = lineResult.rows[0];
       if (!line) continue;

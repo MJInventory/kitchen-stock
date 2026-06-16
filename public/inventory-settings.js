@@ -206,12 +206,18 @@ function renderItems() {
   itemSettingsList.innerHTML = filtered
     .map((item) => `
       <article class="settings-item${dirtyIds.has(item.id) ? " dirty" : ""}" data-item-id="${item.id}">
-        <div>
-          <strong>${escapeHtml(item.name)}</strong>
-          <span>Supplier: ${escapeHtml(item.supplierName || "Unassigned Supplier")}</span>
-          <span>${escapeHtml([item.inventoryArea, item.storageLocation].filter(Boolean).join(" / "))}</span>
-          <span>${escapeHtml([item.category, item.shelfCode ? `Shelf ${item.storageLocation ? `${item.storageLocation} / ${item.shelfCode}` : item.shelfCode}` : ""].filter(Boolean).join(" / "))}</span>
-          <span>Current: ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
+        <div class="settings-item-header">
+          <div class="settings-item-heading">
+            <strong>${escapeHtml(item.name)}</strong>
+            <span>${escapeHtml(item.supplierName || "Unassigned Supplier")}</span>
+          </div>
+          <div class="settings-item-meta-row">
+            <span class="settings-item-meta-chip">${escapeHtml(item.inventoryArea || "No area")}</span>
+            <span class="settings-item-meta-chip">${escapeHtml(item.storageLocation || "No location")}</span>
+            <span class="settings-item-meta-chip">${escapeHtml(item.category || "No category")}</span>
+            <span class="settings-item-meta-chip">${escapeHtml(item.shelfCode ? `Shelf ${item.shelfCode}` : "No shelf")}</span>
+            <span class="settings-item-meta-chip">Current ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
+          </div>
         </div>
         <label>
           Item name

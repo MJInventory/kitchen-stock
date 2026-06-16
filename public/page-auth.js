@@ -51,12 +51,19 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
 
   function showApp() {
     if (loginScreen) loginScreen.hidden = true;
-    if (currentUser) currentUser.textContent = formatUserDisplay(sessionUser);
+    if (currentUser) {
+      currentUser.textContent = "";
+      currentUser.hidden = true;
+    }
     window.refreshKitchenMenus?.();
   }
 
   function showLogin() {
     if (loginScreen) loginScreen.hidden = false;
+    if (currentUser) {
+      currentUser.textContent = "";
+      currentUser.hidden = true;
+    }
     sessionToken = "";
     sessionUser = "";
     localStorage.removeItem("kitchenStockToken");

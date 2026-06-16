@@ -1,5 +1,5 @@
 ﻿(function () {
-  const APP_VERSION = "v157";
+  const APP_VERSION = "v158";
 
   function applyTheme(theme) {
     const normalized = theme === "light" ? "light" : "dark";
@@ -15,6 +15,7 @@
     if (!("serviceWorker" in navigator)) return;
 
     let refreshing = false;
+    let updatePromptShownFor = "";
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (refreshing) return;
       refreshing = true;
@@ -28,28 +29,29 @@
         }
       }
 
+      function maybePromptForRefresh(worker) {
+        if (!worker || worker.state !== "installed" || !navigator.serviceWorker.controller) return;
+        if (updatePromptShownFor === APP_VERSION) return;
+        updatePromptShownFor = APP_VERSION;
+        if (window.confirm("A new version is ready. Refresh now?")) {
+          activateWaitingWorker();
+        }
+      }
+
       registration.addEventListener("updatefound", () => {
         const worker = registration.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
-          if (worker.state === "installed" && navigator.serviceWorker.controller) {
-            activateWaitingWorker();
-          }
+          maybePromptForRefresh(worker);
         });
       });
 
       if (registration.waiting) {
-        activateWaitingWorker();
+        maybePromptForRefresh(registration.waiting);
       }
 
       const checkForUpdates = () => registration.update().catch(() => {});
       checkForUpdates();
-      window.setInterval(checkForUpdates, 60000);
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") {
-          checkForUpdates();
-        }
-      });
     }).catch(() => {});
   }
 
@@ -57,6 +59,7 @@
   applyTheme(localStorage.getItem("kitchenStockTheme") || "dark");
   registerUpdater();
 }());
+
 
 
 

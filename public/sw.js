@@ -1,63 +1,27 @@
-﻿const CACHE_NAME = "kitchen-stock-v159";
-const APP_SHELL = [
-  "/",
-  "/index.html",
-  "/ordering.html",
-  "/driver-sheet.html",
-  "/receiving-sheet.html",
-  "/order-report.html",
-  "/change-password.html",
-  "/user-admin.html",
-  "/inventory-add.html",
-  "/categories.html",
-  "/suppliers.html",
-  "/storage-locations.html",
-  "/shelf-codes.html",
-  "/standing-orders.html",
-  "/inventory-settings.html",
-  "/stock-count.html",
-  "/invoice-capture.html",
-  "/styles.css",
-  "/app.js",
-  "/dashboard.js",
-  "/menus.js",
-  "/push.js",
-  "/theme.js",
-  "/driver-sheet.js",
-  "/receiving-sheet.js",
-  "/order-report.js",
-  "/change-password.js",
-  "/user-admin.js",
-  "/inventory-add.js",
-  "/categories.js",
-  "/suppliers.js",
-  "/storage-locations.js",
-  "/shelf-codes.js",
-  "/standing-orders.js",
-  "/page-auth.js",
-  "/inventory-settings.js",
-  "/stock-count.js",
-  "/invoice-capture.js",
+const CACHE_NAME = "kitchen-stock-v160";
+const STATIC_ASSETS = [
   "/manifest.webmanifest",
-  "/madame-janette-logo-v148.png",
-  "/mjstock-icon-192-v148.png",
-  "/mjstock-icon-512-v148.png",
-  "/mjstock-apple-touch-v148.png",
+  "/madame-janette-logo-v160.png",
+  "/mjstock-icon-192-v160.png",
+  "/mjstock-icon-512-v160.png",
+  "/mjstock-apple-touch-v160.png",
   "/icon.svg"
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(STATIC_ASSETS);
+  })());
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("message", (event) => {
@@ -69,45 +33,29 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  if (event.request.method !== "GET") {
-    return;
-  }
-
+  if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(event.request));
     return;
   }
+  if (url.origin !== self.location.origin) return;
 
-  if (url.origin !== self.location.origin) {
+  const isStaticAsset = STATIC_ASSETS.includes(url.pathname);
+  if (!isStaticAsset) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;
   }
 
-  const isAppShellRequest = event.request.mode === "navigate"
-    || url.pathname === "/"
-    || url.pathname.endsWith(".html")
-    || url.pathname.endsWith(".js")
-    || url.pathname.endsWith(".css")
-    || url.pathname.endsWith(".webmanifest");
-
-  if (isAppShellRequest) {
-    event.respondWith((async () => {
-      const cache = await caches.open(CACHE_NAME);
-      try {
-        const fresh = await fetch(event.request, { cache: "no-store" });
-        if (fresh && fresh.ok) {
-          cache.put(event.request, fresh.clone());
-        }
-        return fresh;
-      } catch {
-        const cached = await cache.match(event.request);
-        if (cached) return cached;
-        throw new Error("Network unavailable");
-      }
-    })());
-    return;
-  }
-
-  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(event.request);
+    if (cached) return cached;
+    const fresh = await fetch(event.request, { cache: "no-store" });
+    if (fresh?.ok) {
+      cache.put(event.request, fresh.clone());
+    }
+    return fresh;
+  })());
 });
 
 self.addEventListener("push", (event) => {
@@ -122,8 +70,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "MJ Stock Magic";
   const options = {
     body: payload.body || "",
-    icon: "/mjstock-icon-192-v148.png",
-    badge: "/mjstock-icon-192-v148.png",
+    icon: "/mjstock-icon-192-v160.png",
+    badge: "/mjstock-icon-192-v160.png",
     tag: payload.tag || "mj-stock-magic",
     data: payload.data || { url: payload.url || "/" }
   };
@@ -147,43 +95,3 @@ self.addEventListener("notificationclick", (event) => {
     await clients.openWindow(targetUrl);
   })());
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

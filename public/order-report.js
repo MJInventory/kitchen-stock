@@ -17,6 +17,7 @@ const guestNotesInput = document.querySelector("#guestNotesInput");
 const printDate = document.querySelector("#printDate");
 const reportSummary = document.querySelector("#reportSummary");
 const reportList = document.querySelector("#reportList");
+const standingReportSummaryList = document.querySelector("#standingReportSummaryList");
 const standingReportList = document.querySelector("#standingReportList");
 const activitySummary = document.querySelector("#activitySummary");
 const activityReportList = document.querySelector("#activityReportList");
@@ -156,9 +157,32 @@ function renderSummary(summary) {
 
 function renderStandingOrders(orders) {
   if (!orders.length) {
+    standingReportSummaryList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     standingReportList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     return;
   }
+
+  standingReportSummaryList.innerHTML = orders
+    .map((order) => {
+      const items = Array.isArray(order.items) && order.items.length
+        ? order.items
+        : [{ itemName: order.itemName, quantity: order.quantity }];
+      return `
+        <article class="standing-report-summary-row">
+          <div>
+            <strong>${escapeHtml(order.name || order.supplierName || "Standing Order")}</strong>
+            <span>${escapeHtml(order.supplierName || "No supplier")}</span>
+          </div>
+          <div class="standing-report-summary-meta">
+            <span><b>Expected</b> ${escapeHtml(order.expectedDate || "not set")}</span>
+            <span><b>Schedule</b> ${escapeHtml(order.schedule || "Other")}</span>
+            <span><b>Items</b> ${escapeHtml(items.length)}</span>
+            <span><b>Status</b> ${escapeHtml(order.active ? "Scheduled" : "Inactive")}</span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
 
   standingReportList.innerHTML = orders
     .map((order) => {

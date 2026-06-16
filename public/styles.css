@@ -1936,7 +1936,7 @@ body.order-app {
   color: inherit;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1200px) {
   .order-app .product-row,
   .order-app .product-row.selected {
     grid-template-columns: 34px minmax(0, 1fr);
@@ -3042,55 +3042,6 @@ body.order-app {
     justify-self: start;
   }
 
-  .order-app .product-row,
-  .order-app .product-row.selected {
-    grid-template-columns: 34px minmax(0, 1fr);
-    grid-template-areas:
-      "check main"
-      "controls controls";
-    align-items: start;
-    row-gap: 12px;
-  }
-
-  .order-app .product-check {
-    grid-area: check;
-    align-self: start;
-  }
-
-  .order-app .product-main {
-    grid-area: main;
-    min-width: 0;
-  }
-
-  .order-app .product-main strong {
-    font-size: 15px;
-    line-height: 1.25;
-    overflow-wrap: anywhere;
-    word-break: normal;
-  }
-
-  .order-app .product-controls {
-    grid-area: controls;
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-    padding-left: 0;
-  }
-
-  .order-app .product-controls > * {
-    min-width: 0;
-  }
-
-  .order-app .stock-adjust {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: auto 72px auto;
-    align-items: center;
-    justify-content: start;
-    gap: 8px;
-  }
-
   .status-chip-row {
     gap: 5px;
   }
@@ -3100,6 +3051,16 @@ body.order-app {
     padding: 4px 8px;
   }
 
+  .order-app .product-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .order-app .stock-adjust {
+    grid-template-columns: 1fr;
+  }
+
+  .order-app .stock-adjust input,
+  .order-app .stock-adjust button,
   .order-app .qty-minus,
   .order-app .qty-plus,
   .order-app .qty-input,
@@ -3107,16 +3068,6 @@ body.order-app {
   .order-app .urgency-input,
   .order-app .product-delete-toggle {
     width: 100%;
-  }
-
-  .order-app .product-controls select {
-    width: 100%;
-  }
-
-  .order-app .product-delete-toggle {
-    width: 100%;
-    justify-content: flex-start;
-    min-height: 40px;
   }
 
   .stock-count-heading {

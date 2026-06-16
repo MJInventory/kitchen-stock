@@ -1,5 +1,5 @@
-﻿(function () {
-  const APP_VERSION = "v159";
+(function () {
+  const APP_VERSION = "v160";
 
   function applyTheme(theme) {
     const normalized = theme === "light" ? "light" : "dark";
@@ -13,45 +13,20 @@
 
   function registerUpdater() {
     if (!("serviceWorker" in navigator)) return;
-
-    let refreshing = false;
-    let updatePromptShownFor = "";
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-
-    navigator.serviceWorker.register(`/sw.js?${APP_VERSION}`, { updateViaCache: "none" }).then((registration) => {
-      function activateWaitingWorker() {
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
+    navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`, { updateViaCache: "none" }).then((registration) => {
+      registration.update().catch(() => {});
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
       }
-
-      function maybePromptForRefresh(worker) {
-        if (!worker || worker.state !== "installed" || !navigator.serviceWorker.controller) return;
-        if (updatePromptShownFor === APP_VERSION) return;
-        updatePromptShownFor = APP_VERSION;
-        if (window.confirm("A new version is ready. Refresh now?")) {
-          activateWaitingWorker();
-        }
-      }
-
       registration.addEventListener("updatefound", () => {
         const worker = registration.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
-          maybePromptForRefresh(worker);
+          if (worker.state === "installed" && registration.waiting) {
+            registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          }
         });
       });
-
-      if (registration.waiting) {
-        maybePromptForRefresh(registration.waiting);
-      }
-
-      const checkForUpdates = () => registration.update().catch(() => {});
-      checkForUpdates();
     }).catch(() => {});
   }
 
@@ -59,15 +34,3 @@
   applyTheme(localStorage.getItem("kitchenStockTheme") || "dark");
   registerUpdater();
 }());
-
-
-
-
-
-
-
-
-
-
-
-

@@ -3045,9 +3045,11 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
           l.picked_item_quantity,
           l.shortage_request_id,
           i.current_quantity,
-          i.name as item_name
+          i.name as item_name,
+          ia.name as inventory_area
         from internal_order_lines l
         join inventory_items i on i.id = l.inventory_item_id
+        left join inventory_areas ia on ia.id = i.inventory_area_id
         where l.id = $1 and l.internal_order_batch_id = $2
         for update
       `, [lineId, batchId]);
@@ -3142,6 +3144,7 @@ async function pgUpdateInternalOrderPicking(batchId, payload, userName) {
     await client.query("commit");
     cache.items.expiresAt = 0;
     cache.requests.expiresAt = 0;
+    await pgEnsureDriverSheetLines(todayIso());
 
     const batches = await pgListInternalOrders({ name: userName, role: "power-user" });
     const saved = batches.find((entry) => entry.id === batchId) || null;

@@ -147,12 +147,19 @@ async function saveBatch(card) {
   }));
   setMessage("Saving picked items...");
   try {
-    await api(`/api/internal-orders/${batchId}/pick`, {
+    const result = await api(`/api/internal-orders/${batchId}/pick`, {
       method: "PATCH",
       body: JSON.stringify({ lines })
     });
     await loadData();
-    setMessage("Picker batch saved. Stock and shortage orders updated.");
+    const shortageCount = (result?.internalOrder?.lines || [])
+      .filter((line) => Number(line.shortageItemQuantity || 0) > 0)
+      .length;
+    if (shortageCount > 0) {
+      setMessage(`Picker batch saved. ${shortageCount} shortage item(s) added to the normal order flow.`);
+    } else {
+      setMessage("Picker batch saved. Stock updated.");
+    }
   } catch (error) {
     setMessage(error.message, true);
   }

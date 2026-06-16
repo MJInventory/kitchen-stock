@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "MJ Stock Magic",
   "short_name": "MJ Stock Magic",
   "description": "Inventory counting, ordering, receiving, and driver sheets.",
@@ -9,13 +9,13 @@
   "theme_color": "#0f766e",
   "icons": [
     {
-      "src": "/mjstock-icon-192-v161.png",
+      "src": "/mjstock-icon-192-v162.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/mjstock-icon-512-v161.png",
+      "src": "/mjstock-icon-512-v162.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

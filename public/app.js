@@ -266,6 +266,7 @@ function requestStatusChips(request, today = todayLocal()) {
     sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`,
     sameUser(requestUser(request), sessionUser) ? "mine" : "team"
   ]);
+  if (isInternalShortageRequest(request)) chips.push(["Shortage", "critical"]);
   if (request.toDeliver) chips.push(["2Deliver", "deliver"]);
   if (String(request.urgency || "").toLowerCase() === "high") chips.push(["High", "high"]);
   if (String(request.urgency || "").toLowerCase() === "critical") chips.push(["Critical", "critical"]);
@@ -275,6 +276,10 @@ function requestStatusChips(request, today = todayLocal()) {
 function renderStatusChips(chips = []) {
   if (!chips.length) return "";
   return `<div class="status-chip-row">${chips.map(([label, tone]) => `<span class="status-chip ${tone}">${escapeHtml(label)}</span>`).join("")}</div>`;
+}
+
+function isInternalShortageRequest(request) {
+  return String(request?.notes || "").toLowerCase().includes("internal order shortage");
 }
 
 function renderOrderingSummary() {

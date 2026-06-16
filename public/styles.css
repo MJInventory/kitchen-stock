@@ -1940,17 +1940,64 @@ body.order-app {
   .order-app .product-row,
   .order-app .product-row.selected {
     grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-areas:
+      "check main"
+      "controls controls";
     align-items: start;
+    row-gap: 12px;
+  }
+
+  .order-app .product-check {
+    grid-area: check;
+    align-self: start;
   }
 
   .order-app .product-main {
-    grid-column: 2;
+    grid-area: main;
+    min-width: 0;
   }
 
   .order-app .product-controls {
+    grid-area: controls;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    padding-left: 0;
+  }
+
+  .order-app .product-controls > * {
+    min-width: 0;
+  }
+
+  .order-app .stock-adjust {
     grid-column: 1 / -1;
-    padding-left: 42px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto 72px auto;
+    align-items: center;
+    justify-content: start;
+    gap: 8px;
+  }
+
+  .order-app .qty-minus,
+  .order-app .qty-plus,
+  .order-app .qty-input,
+  .order-app .unit-input,
+  .order-app .urgency-input,
+  .order-app .product-delete-toggle {
+    width: 100%;
+  }
+
+  .order-app .product-delete-toggle {
+    justify-content: flex-start;
+    min-height: 40px;
+  }
+
+  .order-app .product-main strong {
+    font-size: 15px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
 }
 

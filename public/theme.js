@@ -1,5 +1,5 @@
 ﻿(function () {
-  const APP_VERSION = "v156";
+  const APP_VERSION = "v157";
 
   function applyTheme(theme) {
     const normalized = theme === "light" ? "light" : "dark";
@@ -57,6 +57,7 @@
   applyTheme(localStorage.getItem("kitchenStockTheme") || "dark");
   registerUpdater();
 }());
+
 
 
 

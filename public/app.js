@@ -92,8 +92,10 @@ function localDateKey(value) {
 
 function showApp() {
   loginScreen.hidden = true;
-  const roleLabel = sessionRole === "god" ? "God" : sessionRole === "admin" ? "Admin" : sessionRole === "power-user" ? "Power User" : "User";
-  currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel}` : "";
+  if (currentUser) {
+    currentUser.textContent = "";
+    currentUser.hidden = true;
+  }
   window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-permission]").forEach((element) => {
     element.hidden = !sessionPermissions[element.dataset.permission];
@@ -122,7 +124,10 @@ function saveSession(data) {
 
 function showLogin() {
   loginScreen.hidden = false;
-  currentUser.textContent = "";
+  if (currentUser) {
+    currentUser.textContent = "";
+    currentUser.hidden = true;
+  }
   sessionToken = "";
   sessionUser = "";
   localStorage.removeItem("kitchenStockToken");

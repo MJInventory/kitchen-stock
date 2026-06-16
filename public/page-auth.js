@@ -52,8 +52,8 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
   function showApp() {
     if (loginScreen) loginScreen.hidden = true;
     if (currentUser) {
-      currentUser.textContent = "";
-      currentUser.hidden = true;
+      currentUser.textContent = formatUserDisplay(sessionUser);
+      currentUser.hidden = false;
     }
     window.refreshKitchenMenus?.();
   }

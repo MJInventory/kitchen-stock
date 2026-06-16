@@ -1,6 +1,8 @@
 (function setupGlobalMenus() {
   const currentPath = window.location.pathname || "/";
-  const permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  let storedRole = String(localStorage.getItem("kitchenStockRole") || "").trim().toLowerCase();
+  const sessionToken = localStorage.getItem("kitchenStockToken") || "";
 
   const gotoItems = [
     { label: "Front Page", href: "/" },
@@ -28,8 +30,24 @@
     { label: "Log Out", href: "__logout__" }
   ];
 
+  function effectivePermissionSet() {
+    if (storedRole === "god" || storedRole === "admin") {
+      return {
+        ...permissions,
+        canAdminUsers: true,
+        canAddInventoryItems: true,
+        canUseInvoices: true,
+        canUseSupplierOrdering: true,
+        canPlaceInternalOrders: true,
+        canPickInternalOrders: true
+      };
+    }
+    return permissions;
+  }
+
   function allowed(item) {
-    return !item.permission || Boolean(permissions[item.permission]);
+    const currentPermissions = effectivePermissionSet();
+    return !item.permission || Boolean(currentPermissions[item.permission]);
   }
 
   function renderSelect(label, selectId, items) {
@@ -102,11 +120,39 @@
     if (logoutButton) logoutButton.hidden = true;
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mountMenus, { once: true });
-  } else {
-    mountMenus();
+  async function refreshPermissions() {
+    if (!sessionToken) return;
+    try {
+      const response = await fetch("/api/me", {
+        headers: { Authorization: `Bearer ${sessionToken}` }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data?.user) return;
+      permissions = data.user.permissions || permissions;
+      localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
+      storedRole = String(data.user.role || storedRole || "").trim().toLowerCase();
+      localStorage.setItem("kitchenStockRole", storedRole);
+      localStorage.setItem("kitchenStockUser", data.user.name || localStorage.getItem("kitchenStockUser") || "");
+    } catch {
+      // Keep cached permissions if the refresh check fails.
+    }
   }
 
-  window.refreshKitchenMenus = mountMenus;
+  const boot = async () => {
+    await refreshPermissions();
+    mountMenus();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      boot().catch(() => mountMenus());
+    }, { once: true });
+  } else {
+    boot().catch(() => mountMenus());
+  }
+
+  window.refreshKitchenMenus = () => {
+    boot().catch(() => mountMenus());
+  };
 }());

@@ -186,14 +186,19 @@ button:hover,
 }
 
 .user-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
   color: #344054;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.1;
   white-space: nowrap;
-}
-
-.user-chip {
-  display: none !important;
 }
 
 .helper-text,
@@ -988,6 +993,22 @@ button:hover,
   margin-top: 20px;
 }
 
+.sheet-group tbody tr.receiving-origin-standing td {
+  background: #e7f2ff;
+}
+
+.sheet-group tbody tr.receiving-origin-automatic td {
+  background: #fff6cc;
+}
+
+.sheet-group tbody tr.receiving-origin-user td {
+  background: #eaf8e6;
+}
+
+.sheet-group tbody tr.receiving-origin-partial td {
+  background: #fde7e7;
+}
+
 .sheet-group h2 {
   margin: 0 0 8px;
   font-size: 18px;
@@ -1489,6 +1510,7 @@ body.order-app {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .dashboard-cards {
@@ -1668,6 +1690,8 @@ body.order-app {
 
 .order-app .user-chip {
   color: var(--order-muted);
+  background: rgba(255, 253, 248, 0.92);
+  border-color: rgba(212, 173, 67, 0.28);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
 }
@@ -2945,6 +2969,22 @@ body.order-app {
   color: #f4efe5;
 }
 
+:root[data-theme="dark"] .sheet-shell .sheet-group tbody tr.receiving-origin-standing td {
+  background: rgba(96, 165, 250, 0.18);
+}
+
+:root[data-theme="dark"] .sheet-shell .sheet-group tbody tr.receiving-origin-automatic td {
+  background: rgba(250, 204, 21, 0.16);
+}
+
+:root[data-theme="dark"] .sheet-shell .sheet-group tbody tr.receiving-origin-user td {
+  background: rgba(74, 222, 128, 0.14);
+}
+
+:root[data-theme="dark"] .sheet-shell .sheet-group tbody tr.receiving-origin-partial td {
+  background: rgba(248, 113, 113, 0.16);
+}
+
 :root[data-theme="dark"] .sheet-shell .report-waiting td {
   background: rgba(212, 173, 67, 0.12);
 }
@@ -3254,7 +3294,10 @@ body.order-app {
   }
 
   .order-app .user-chip {
-    display: none !important;
+    justify-self: end;
+    max-width: 132px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .order-app .icon-button,

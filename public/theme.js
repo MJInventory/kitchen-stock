@@ -1,5 +1,5 @@
 (function () {
-  const APP_VERSION = "v162";
+  const APP_VERSION = "2.005";
 
   function applyTheme(theme) {
     const normalized = theme === "light" ? "light" : "dark";

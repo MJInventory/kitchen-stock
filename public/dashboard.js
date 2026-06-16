@@ -111,8 +111,8 @@ function saveSession(data) {
 function showApp() {
   loginScreen.hidden = true;
   if (currentUser) {
-    currentUser.textContent = "";
-    currentUser.hidden = true;
+    currentUser.textContent = formatUserDisplay(sessionUser);
+    currentUser.hidden = false;
   }
   window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-permission]").forEach((element) => {
@@ -600,7 +600,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
-refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
+refreshButton?.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
 dailyScopeFilter?.addEventListener("change", () => {
   if (dailyScopeFilter.value === "__mine__") {
     dailyUserFilter.value = "__mine__";

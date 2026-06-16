@@ -295,7 +295,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
-refreshButton.addEventListener("click", () => loadItems().catch((error) => message(countMessage, error.message, true)));
+refreshButton?.addEventListener("click", () => loadItems().catch((error) => message(countMessage, error.message, true)));
 saveAllButton.addEventListener("click", saveAllCounts);
 backToTopButton.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 

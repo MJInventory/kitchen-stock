@@ -121,6 +121,10 @@ async function ensurePostgresSchemaUpgrades() {
         add column if not exists order_unit text not null default ''
     `);
     await db().query(`
+      alter table order_requests
+        add column if not exists partial_receipt boolean not null default false
+    `);
+    await db().query(`
       create table if not exists app_notifications (
         id uuid primary key default gen_random_uuid(),
         user_id uuid not null references app_users(id) on delete cascade,
@@ -775,6 +779,12 @@ function pgRequestFromRow(row) {
   const notes = row.notes || "";
   const standingRunId = row.standing_order_run_id || standingRunIdFromNotes(notes);
   const standingRunLineId = row.standing_order_run_line_id || standingRunLineIdFromNotes(notes);
+  const requestedBy = row.requested_by || row.requested_by_username || "";
+  const partialReceipt = Boolean(row.partial_receipt);
+  let originType = "user";
+  if (partialReceipt) originType = "partial";
+  else if (standingRunLineId) originType = "standing";
+  else if (String(requestedBy || "").trim().toLowerCase() === "auto minimum" || String(notes).toLowerCase().includes("automatic minimum")) originType = "automatic";
   return {
     id: row.id,
     requestId: row.request_number ?? row.request_id ?? null,
@@ -786,7 +796,7 @@ function pgRequestFromRow(row) {
     inventoryArea: row.inventory_area || "",
     inventorySubgroup: row.category || "",
     shelfCode: row.shelf_code || "",
-    requestedBy: row.requested_by || row.requested_by_username || "",
+    requestedBy,
     status: row.status || "",
     received: Boolean(row.received ?? row.delivered),
     receivedAt: row.received_at || row.delivered_at || "",
@@ -808,7 +818,9 @@ function pgRequestFromRow(row) {
     deliveredAt: row.delivered_at || row.received_at || "",
     deliveredBy: row.delivered_by || row.received_by || "",
     standingRunId: standingRunId || "",
-    standingRunLineId: standingRunLineId || ""
+    standingRunLineId: standingRunLineId || "",
+    partialReceipt,
+    originType
   };
 }
 
@@ -1168,6 +1180,7 @@ async function pgListOpenRequests() {
       r.to_deliver,
       r.delivery_day,
       r.notes,
+      r.partial_receipt,
       r.standing_order_run_id,
       r.standing_order_run_line_id,
       i.name as item_name,
@@ -3630,6 +3643,7 @@ async function pgDeliverRequest(recordId, userName, options = {}) {
         set delivered = true,
             delivered_at = now(),
             delivered_by_username = $2,
+            partial_receipt = false,
             status = 'Fulfilled',
             updated_at = now()
         where id = $1
@@ -3654,6 +3668,7 @@ async function pgDeliverRequest(recordId, userName, options = {}) {
             delivered = false,
             delivered_at = null,
             delivered_by_username = '',
+            partial_receipt = true,
             status = 'Approved',
             updated_at = now()
         where id = $1

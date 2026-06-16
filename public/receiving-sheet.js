@@ -107,6 +107,19 @@ function logicalRequestCompare(a, b) {
   return String(a.itemName || "").localeCompare(String(b.itemName || ""));
 }
 
+function receivingOriginClass(request) {
+  switch (String(request.originType || "").trim()) {
+    case "standing":
+      return "receiving-origin-standing";
+    case "automatic":
+      return "receiving-origin-automatic";
+    case "partial":
+      return "receiving-origin-partial";
+    default:
+      return "receiving-origin-user";
+  }
+}
+
 function supplierOptions(selectedSupplier) {
   const selected = selectedSupplier || "";
   const known = currentSheet.suppliers || [];
@@ -171,7 +184,7 @@ function renderSheet(data) {
             ${requests
               .sort(logicalRequestCompare)
               .map((request) => `
-                <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
+                <tr class="${receivingOriginClass(request)}" data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                   <td>
                     <button class="driver-check-button${request.delivered ? " checked" : ""}" type="button" data-action="received" ${request.driverLineId ? "" : "disabled"} aria-label="Mark received">
                       ${request.delivered ? "&#10003;" : ""}

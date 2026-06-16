@@ -97,8 +97,8 @@ function showApp() {
     return;
   }
   if (currentUser) {
-    currentUser.textContent = "";
-    currentUser.hidden = true;
+    currentUser.textContent = formatUserDisplay(sessionUser);
+    currentUser.hidden = false;
   }
   window.refreshKitchenMenus?.();
   document.querySelectorAll("[data-permission]").forEach((element) => {
@@ -1043,7 +1043,7 @@ logoutButton.addEventListener("click", showLogin);
 [featureMenu, backofficeMenu].forEach((menu) => menu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 }));
-refreshButton.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
+refreshButton?.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
 submitButton.addEventListener("click", () => submitSelected());
 
 categoryGrid.addEventListener("click", (event) => {

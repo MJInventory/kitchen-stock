@@ -62,8 +62,8 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   if (currentUser) {
-    currentUser.textContent = "";
-    currentUser.hidden = true;
+    currentUser.textContent = formatUserDisplay(sessionUser);
+    currentUser.hidden = false;
   }
   window.refreshKitchenMenus?.();
   if (featureMenu) featureMenu.value = "/internal-orders.html";
@@ -435,7 +435,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
-refreshButton.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
+refreshButton?.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
 submitButton.addEventListener("click", () => submitInternalOrder().catch((error) => setMessage(error.message, true)));
 searchInput.addEventListener("input", render);
 areaFilter.addEventListener("change", render);

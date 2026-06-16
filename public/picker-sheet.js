@@ -43,8 +43,8 @@ function setLoginMessage(text, isError = false) {
 function showApp() {
   loginScreen.hidden = true;
   if (currentUser) {
-    currentUser.textContent = "";
-    currentUser.hidden = true;
+    currentUser.textContent = formatUserDisplay(sessionUser);
+    currentUser.hidden = false;
   }
   window.refreshKitchenMenus?.();
 }
@@ -242,7 +242,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", showLogin);
-refreshButton.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
+refreshButton?.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
 
 if (sessionToken && sessionUser) {
   showApp();

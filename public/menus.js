@@ -12,21 +12,17 @@
     { label: "Receiving", href: "/receiving-sheet.html" },
     { label: "Driver Sheet", href: "/driver-sheet.html" },
     { label: "Stock Count", href: "/stock-count.html" },
-    { label: "Reports", href: "/order-report.html" },
-    { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
-    { label: "Invoices", href: "/invoice-capture.html", permission: "canUseInvoices" }
+    { label: "Reports", href: "/order-report.html" }
   ];
 
   const backofficeItems = [
     { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
-    { label: "Picker Board", href: "/picker-sheet.html", permission: "canPickInternalOrders" },
     { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
-    { label: "Add Item", href: "/inventory-add.html", permission: "canAddInventoryItems" },
     { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },
     { label: "Categories", href: "/categories.html", permission: "canAddInventoryItems" },
     { label: "Storage & Shelves", href: "/shelf-codes.html", permission: "canAddInventoryItems" },
-    { label: "Invoices", href: "/invoice-capture.html", permission: "canUseInvoices" },
     { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" },
+    { label: "Change Password", href: "/change-password.html" },
     { label: "Log Out", href: "__logout__" }
   ];
 

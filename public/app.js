@@ -98,6 +98,7 @@ import {
   showOrderingApp,
   showOrderingLogin
 } from "./ordering/controller-session.js";
+import { createOrderingRuntime } from "./ordering/controller-runtime.js";
 import { attachOrderingInteractions } from "./ordering/interactions.js";
 
 const loginScreen = document.querySelector("#loginScreen");
@@ -150,86 +151,41 @@ const bootstrapCacheKey = "kitchenStockOrderingBootstrap";
 let pendingJumpItemId = String(pageParams.get("itemId") || "").trim();
 let pendingJumpCategory = String(pageParams.get("category") || "").trim();
 
-function setMessage(text, isError = false) {
-  setUiMessage(message, text, isError);
-}
-
-function setLoginMessage(text, isError = false) {
-  setUiMessage(loginMessage, text, isError);
-}
-
-function showApp() {
-  showOrderingApp({
-    loginScreen,
-    sessionPermissions,
-    currentUser,
-    sessionUser,
-    featureMenu,
-    backofficeMenu,
-    formatUserDisplay,
-    windowObject: window,
-    documentObject: document
-  });
-}
-
-function saveSession(data) {
-  const nextSession = saveOrderingSession(data, {
-    sessionToken,
-    localStorageObject: localStorage,
-    applyTheme: window.applyKitchenTheme,
-    setupPush: window.setupKitchenPush
-  });
-  sessionToken = nextSession.token;
-  sessionUser = nextSession.user;
-  sessionRole = nextSession.role;
-  sessionPermissions = nextSession.permissions;
-}
-
-function showLogin() {
-  showOrderingLogin({
-    loginScreen,
-    currentUser,
-    localStorageObject: localStorage
-  });
-  sessionToken = "";
-  sessionUser = "";
-}
-
-async function api(path, options) {
-  const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-    },
-    ...options
-  });
-  const data = await response.json();
-  if (response.status === 401) showLogin();
-  if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") {
-    window.location.href = "/change-password.html";
+const {
+  setMessage,
+  setLoginMessage,
+  showApp,
+  saveSession,
+  showLogin,
+  api,
+  queueApi,
+  refreshSession
+} = createOrderingRuntime({
+  loginScreen,
+  currentUser,
+  featureMenu,
+  backofficeMenu,
+  loginMessage,
+  message,
+  formatUserDisplay,
+  setUiMessage,
+  showOrderingApp,
+  saveOrderingSession,
+  showOrderingLogin,
+  refreshOrderingSession,
+  localStorageObject: localStorage,
+  windowObject: window,
+  documentObject: document,
+  getSessionToken: () => sessionToken,
+  getSessionUser: () => sessionUser,
+  getSessionPermissions: () => sessionPermissions,
+  setSessionState: (nextSession) => {
+    sessionToken = nextSession.token || "";
+    sessionUser = nextSession.user || "";
+    sessionRole = nextSession.role || "user";
+    sessionPermissions = nextSession.permissions || {};
   }
-  if (!response.ok) throw new Error(data.error || "Something went wrong.");
-  return data;
-}
-
-async function queueApi(path, options = {}, meta = {}) {
-  if (!window.kitchenOfflineQueue?.request) return api(path, options);
-  return window.kitchenOfflineQueue.request(path, options, {
-    allowQueue: true,
-    token: sessionToken,
-    ...meta
-  });
-}
-
-async function refreshSession() {
-  return refreshOrderingSession({
-    api,
-    sessionToken,
-    saveSession,
-    showApp,
-    windowObject: window
-  });
-}
+});
 
 function hasSearchTerm() {
   return hasSearchTermValue(searchInput.value);

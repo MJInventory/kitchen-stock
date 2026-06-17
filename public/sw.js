@@ -1,11 +1,11 @@
-const CACHE_NAME = "kitchen-stock-v2.012";
+const CACHE_NAME = "kitchen-stock-v2.013";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/offline-queue.js",
   "/madame-janette-logo-v162.png",
-  "/mjstock-icon-192-v2011.png",
-  "/mjstock-icon-512-v2011.png",
-  "/mjstock-apple-touch-v2011.png",
+  "/mjordering-icon-192.png",
+  "/mjordering-icon-512.png",
+  "/mjordering-apple-touch-icon.png",
   "/icon.svg"
 ];
 
@@ -71,8 +71,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "MJ Stock Magic";
   const options = {
     body: payload.body || "",
-    icon: "/mjstock-icon-192-v2011.png",
-    badge: "/mjstock-icon-192-v2011.png",
+    icon: "/mjordering-icon-192.png",
+    badge: "/mjordering-icon-192.png",
     tag: payload.tag || "mj-stock-magic",
     data: payload.data || { url: payload.url || "/" }
   };

@@ -71,6 +71,20 @@ body {
   margin-bottom: 18px;
 }
 
+.page-intro {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 18px;
+}
+
+.page-intro .eyebrow {
+  margin-bottom: 0;
+}
+
+.page-intro h1 {
+  margin: 0;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--muted);
@@ -267,6 +281,14 @@ button:hover,
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.settings-actions-row .button,
+.settings-actions-row button {
+  width: auto;
+  min-width: 140px;
+  max-width: 100%;
 }
 
 .received-text {
@@ -1560,16 +1582,23 @@ body.order-app {
 
 .dashboard-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
   gap: 12px;
 }
 
 .dashboard-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  align-items: start;
+  justify-items: start;
+  gap: 8px;
+  min-height: 0;
   border: 1px solid var(--order-line);
   border-radius: 20px;
   padding: 16px 18px;
   background: var(--order-panel);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  text-align: left;
 }
 
 .dashboard-filter-card {
@@ -1595,27 +1624,38 @@ body.order-app {
 
 .dashboard-card strong {
   display: block;
+  width: 100%;
+  max-width: 100%;
   color: var(--order-ink);
   font-size: 26px;
   line-height: 1;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-card span {
   display: block;
-  margin-top: 10px;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0;
   color: var(--order-gold);
   font: 12px Arial, Helvetica, sans-serif;
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-card small {
   display: block;
-  margin-top: 8px;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0;
   color: var(--order-muted);
   font: 12px Arial, Helvetica, sans-serif;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-panel {

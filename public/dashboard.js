@@ -1,3 +1,26 @@
+import {
+  formatUserDisplay,
+  sameUser,
+  todayLocal
+} from "./ordering/shared.js";
+import { logicalRequestCompare } from "./ordering/request-grouping.js";
+import {
+  isOlderOpenRequest,
+  isStandingOrder as isStandingOrderRequest,
+  requestArea as resolveRequestArea,
+  requestDay,
+  requestLocation as resolveRequestLocation,
+  requestStatusChips,
+  requestUser
+} from "./ordering/request-status.js";
+import {
+  renderDailyOrder,
+  renderDashboardCards,
+  renderNotifications,
+  renderOpenOrders,
+  renderStandingOrders
+} from "./dashboard-render.js";
+
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -34,28 +57,22 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+let dashboardFilter = "all";
 
-function buildOrderJumpHref(request) {
-  const item = itemForRequest(request);
-  const params = new URLSearchParams();
-  if (request?.itemId) params.set("itemId", String(request.itemId));
-  if (item?.category || requestCategory(request)) params.set("category", item?.category || requestCategory(request));
-  return `/ordering.html?${params.toString()}`;
+function itemForRequest(request) {
+  return allItems.find((item) => item.id === request?.itemId) || null;
 }
 
-function todayLocal() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset();
-  return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
+function requestCategory(request) {
+  return itemForRequest(request)?.category || request?.category || "";
 }
 
-function localDateKey(value) {
-  const stamp = String(value || "").trim();
-  if (!stamp) return "";
-  const parsed = new Date(stamp);
-  if (Number.isNaN(parsed.getTime())) return stamp.slice(0, 10);
-  const offset = parsed.getTimezoneOffset();
-  return new Date(parsed.getTime() - offset * 60000).toISOString().slice(0, 10);
+function requestArea(request) {
+  return resolveRequestArea(request, allItems);
+}
+
+function requestLocation(request) {
+  return resolveRequestLocation(request, allItems);
 }
 
 function setMessage(text, isError = false) {
@@ -66,32 +83,6 @@ function setMessage(text, isError = false) {
 function setLoginMessage(text, isError = false) {
   loginMessage.textContent = text;
   loginMessage.classList.toggle("error", isError);
-}
-
-function formatUserDisplay(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (raw !== raw.toLowerCase()) return raw;
-  return raw
-    .split(/\s+/)
-    .map((part) => part
-      .split("-")
-      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
-      .join("-"))
-    .join(" ");
-}
-
-function sameUser(left, right) {
-  return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 function saveSession(data) {
@@ -156,49 +147,6 @@ async function api(path, options) {
   return data;
 }
 
-function itemNameFromRequest(request) {
-  return allItems.find((item) => item.id === request.itemId)?.name || "Requested item";
-}
-
-function itemForRequest(request) {
-  return allItems.find((item) => item.id === request.itemId) || null;
-}
-
-function requestArea(request) {
-  return request.inventoryArea || itemForRequest(request)?.inventoryArea || "";
-}
-
-function requestCategory(request) {
-  return itemForRequest(request)?.category || request.category || "";
-}
-
-function requestLocation(request) {
-  return request.storageLocation || itemForRequest(request)?.storageLocation || "";
-}
-
-function requestDay(request) {
-  const stamp = String(request.requestedAt || "").trim();
-  return stamp ? localDateKey(stamp) : "";
-}
-
-function scheduledDeliveryDay(request) {
-  return String(request?.deliveryDay || "").trim();
-}
-
-function hasFutureScheduledDelivery(request, today = todayLocal()) {
-  const deliveryDay = scheduledDeliveryDay(request);
-  return Boolean(deliveryDay) && deliveryDay > today;
-}
-
-function isOlderOpenRequest(request, today = todayLocal()) {
-  const day = requestDay(request);
-  return Boolean(day) && day < today && !isStandingOrderRequest(request) && !hasFutureScheduledDelivery(request, today);
-}
-
-function requestUser(request) {
-  return String(request.requestedBy || "").trim();
-}
-
 function isOperationalRole() {
   return Boolean(sessionPermissions.canAddInventoryItems || sessionPermissions.canAdminUsers);
 }
@@ -222,49 +170,18 @@ function selectedDailyUser() {
   return String(dailyUserFilter?.value || "").trim();
 }
 
-function isStandingOrderRequest(request) {
-  return Boolean(String(request?.standingRunId || "").trim())
-    || String(request?.requestedBy || "").toLowerCase().includes("standing order")
-    || String(request?.notes || "").toLowerCase().includes("standing order");
-}
-
-function requestSortValue(request) {
+function buildOrderJumpHref(request) {
   const item = itemForRequest(request);
-  return {
-    supplier: item?.supplierName || request.supplierName || "",
-    category: item?.category || requestCategory(request),
-    name: item?.name || "Requested item"
-  };
-}
-
-function logicalRequestCompare(a, b) {
-  const left = requestSortValue(a);
-  const right = requestSortValue(b);
-  const supplier = left.supplier.localeCompare(right.supplier);
-  if (supplier) return supplier;
-  const category = left.category.localeCompare(right.category);
-  if (category) return category;
-  return left.name.localeCompare(right.name);
-}
-
-function groupRequestsByCategory(requests) {
-  const groups = new Map();
-  for (const request of requests) {
-    const category = requestCategory(request) || "Uncategorized";
-    if (!groups.has(category)) groups.set(category, []);
-    groups.get(category).push(request);
-  }
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const params = new URLSearchParams();
+  if (request?.itemId) params.set("itemId", String(request.itemId));
+  if (item?.category || requestCategory(request)) params.set("category", item?.category || requestCategory(request));
+  return `/ordering.html?${params.toString()}`;
 }
 
 function populateDailyAreaFilter() {
   if (!dailyAreaFilter) return;
-  const areas = [...new Set(
-    recentRequests
-      .map((request) => requestArea(request))
-      .filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b));
-
+  const areas = [...new Set(recentRequests.map((request) => requestArea(request)).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right));
   const selected = selectedDailyArea();
   dailyAreaFilter.innerHTML = [
     '<option value="">All Areas</option>',
@@ -275,12 +192,8 @@ function populateDailyAreaFilter() {
 
 function populateDailyUserFilter() {
   if (!dailyUserFilter) return;
-  const users = [...new Set(
-    recentRequests
-      .map((request) => requestUser(request))
-      .filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-
+  const users = [...new Set(recentRequests.map((request) => requestUser(request)).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
   const selected = selectedDailyUser();
   const defaultSelection = !selected && !isOperationalRole() ? "__mine__" : selected;
   dailyUserFilter.innerHTML = [
@@ -293,122 +206,25 @@ function populateDailyUserFilter() {
 
 function requesterMatches(request) {
   const scope = selectedDailyScope();
-  if (scope === "__mine__") {
-    return sameUser(requestUser(request), sessionUser);
-  }
-  if (scope === "__team__") {
-    return !sameUser(requestUser(request), sessionUser);
-  }
+  if (scope === "__mine__") return sameUser(requestUser(request), sessionUser);
+  if (scope === "__team__") return !sameUser(requestUser(request), sessionUser);
   const selectedUser = selectedDailyUser();
   if (!selectedUser) return true;
   if (selectedUser === "__mine__") return sameUser(requestUser(request), sessionUser);
   return sameUser(requestUser(request), selectedUser);
 }
 
-function requestStatusChips(request, today = todayLocal()) {
-  const chips = [];
-  if (hasFutureScheduledDelivery(request, today)) chips.push(["Scheduled", "deliver"]);
-  else if (isOlderOpenRequest(request, today)) chips.push(["Older open", "older"]);
-  else chips.push(["Today", "today"]);
-  chips.push([sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`, sameUser(requestUser(request), sessionUser) ? "mine" : "team"]);
-  if (isInternalShortageRequest(request)) chips.push(["Shortage", "critical"]);
-  if (isAutoMinimumRequest(request)) chips.push(["Auto minimum", "deliver"]);
-  if (request.toDeliver) chips.push(["2Deliver", "deliver"]);
-  if (String(request.urgency || "").toLowerCase() === "high") chips.push(["High", "high"]);
-  if (String(request.urgency || "").toLowerCase() === "critical") chips.push(["Critical", "critical"]);
-  return chips;
-}
-
-function renderStatusChips(chips = []) {
-  return `<div class="status-chip-row">${chips.map(([label, tone]) => `<span class="status-chip ${tone}">${escapeHtml(label)}</span>`).join("")}</div>`;
-}
-
-function isInternalShortageRequest(request) {
-  return String(request?.notes || "").toLowerCase().includes("internal order shortage");
-}
-
-function isAutoMinimumRequest(request) {
-  return String(request?.requestedBy || "").trim().toLowerCase() === "auto minimum"
-    || String(request?.notes || "").toLowerCase().includes("automatic minimum restock");
-}
-
-function formatNotificationDate(value) {
-  const date = new Date(value || "");
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function renderNotifications() {
-  if (!notificationList || !notificationCount) return;
-  const unread = notifications.filter((note) => !note.isRead);
-  if (notificationPanel) notificationPanel.hidden = unread.length === 0;
-  notificationCount.textContent = `${unread.length} unread`;
-  if (readAllNotificationsButton) readAllNotificationsButton.disabled = unread.length === 0;
-  if (!unread.length) {
-    notificationList.innerHTML = "";
-    renderDashboardCards();
-    return;
+function requestMatchesDashboardFilter(request, today = todayLocal()) {
+  if (dashboardFilter === "all") return true;
+  if (dashboardFilter === "today") return requestDay(request) === today && !isStandingOrderRequest(request);
+  if (dashboardFilter === "mine") return sameUser(requestUser(request), sessionUser);
+  if (dashboardFilter === "older") return isOlderOpenRequest(request, today);
+  if (dashboardFilter === "below") {
+    const item = itemForRequest(request);
+    return item ? Number(item.quantity || 0) < Number(item.minimum || 0) : false;
   }
-  notificationList.innerHTML = unread
-    .slice(0, 20)
-    .map((note) => `
-      <article class="notification-row" data-notification-id="${escapeHtml(note.id)}">
-        <div>
-          <strong>${escapeHtml(note.title || "Notification")}</strong>
-          <span>${escapeHtml(note.body || "")}</span>
-          <small>${escapeHtml(formatNotificationDate(note.createdAt))}</small>
-        </div>
-        <button class="icon-button mark-notification-read" type="button">Mark read</button>
-      </article>
-    `)
-    .join("");
-  renderDashboardCards();
-}
-
-function renderDashboardCards() {
-  if (!dashboardCards || !dashboardMode) return;
-  dashboardMode.textContent = displayRoleMode();
-  const today = todayLocal();
-  const unresolved = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
-  const myOpen = unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
-  const teamToday = unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
-  const olderOpen = unresolved.filter((request) => isOlderOpenRequest(request, today)).length;
-  const belowMin = allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
-  const standingDue = standingOrders.filter((order) => {
-    const expected = String(order.expectedDate || "").trim();
-    return expected && expected <= today;
-  }).length;
-  const unread = notifications.filter((note) => !note.isRead).length;
-
-  const cards = isOperationalRole()
-    ? [
-      ["Today active", teamToday, "Open order lines still waiting today"],
-      ["My open", myOpen, "Items with your name still open"],
-      ["Older open", olderOpen, "Still waiting from previous days"],
-      ["Below minimum", belowMin, "Inventory items currently under minimum"],
-      ["Standing due", standingDue, "Standing orders due now or overdue"],
-      ["Unread", unread, "Notifications waiting for action"]
-    ]
-    : [
-      ["My open", myOpen, "Items you still have open"],
-      ["Today active", teamToday, "Open order lines still waiting today"],
-      ["Older open", olderOpen, "Still waiting from previous days"],
-      ["Unread", unread, "Notifications waiting for you"]
-    ];
-
-  dashboardCards.innerHTML = cards
-    .filter(([, value]) => Number(value || 0) > 0)
-    .map(([label, value, hint]) => `
-    <article class="dashboard-card">
-      <strong>${escapeHtml(value)}</strong>
-      <span>${escapeHtml(label)}</span>
-      <small>${escapeHtml(hint)}</small>
-    </article>
-  `).join("");
-
-  if (!dashboardCards.innerHTML) {
-    dashboardCards.innerHTML = '<p class="empty-sheet">Nothing needs attention right now.</p>';
-  }
+  if (dashboardFilter === "standing" || dashboardFilter === "unread") return false;
+  return true;
 }
 
 function renderPushStatus(detail = {}) {
@@ -420,136 +236,81 @@ function renderPushStatus(detail = {}) {
   const shouldShow = supported && enabled && (!subscribed || permission !== "granted");
   enablePushButton.hidden = !shouldShow;
   enablePushButton.disabled = permission === "denied";
-  if (permission === "denied") {
-    enablePushButton.textContent = "Notifications blocked in browser";
-  } else if (subscribed) {
-    enablePushButton.textContent = "Phone notifications enabled";
-  } else {
-    enablePushButton.textContent = "Enable phone notifications";
-  }
+  if (permission === "denied") enablePushButton.textContent = "Notifications blocked in browser";
+  else if (subscribed) enablePushButton.textContent = "Phone notifications enabled";
+  else enablePushButton.textContent = "Enable phone notifications";
 }
 
-function renderDailyOrder() {
-  const selectedDay = todayLocal();
-  const selectedArea = selectedDailyArea();
-  const activeRequests = recentRequests
-    .filter((request) => !request.received && request.status !== "Fulfilled")
-    .filter((request) => !isStandingOrderRequest(request))
-    .filter((request) => !selectedArea || requestArea(request) === selectedArea)
-    .filter(requesterMatches)
-    .filter((request) => requestDay(request) === selectedDay)
-    .sort(logicalRequestCompare);
-  dailyOrderCount.textContent = `${activeRequests.length} active`;
-  const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
-  dailyOrderList.innerHTML = grouped
-    .map(([category, requests]) => `
-      <section class="daily-order-group">
-        <div class="daily-order-group-heading">
-          <h3>${escapeHtml(category)}</h3>
-          <span>${requests.length} item${requests.length === 1 ? "" : "s"}</span>
-        </div>
-        <div class="daily-order-group-list">
-          ${requests
-            .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
-            .map((request) => `
-            <a class="daily-order-row daily-order-link" href="${escapeHtml(buildOrderJumpHref(request))}">
-              <div>
-                <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
-                <span>${escapeHtml([
-                  request.quantity,
-                  requestCategory(request),
-                  requestArea(request),
-                  requestLocation(request)
-                ].filter(Boolean).join(" / "))}</span>
-                ${renderStatusChips(requestStatusChips(request, selectedDay))}
-              </div>
-            </a>
-          `).join("")}
-        </div>
-      </section>
-    `)
-    .join("");
-
-  if (!dailyOrderList.innerHTML) {
-    dailyOrderList.innerHTML = '<p class="empty-sheet">No active orders yet.</p>';
-  }
-}
-
-function renderOpenOrders() {
-  const selectedDay = todayLocal();
-  const selectedArea = selectedDailyArea();
-  const openRequests = recentRequests
-    .filter((request) => !request.received && request.status !== "Fulfilled")
-    .filter((request) => !selectedArea || requestArea(request) === selectedArea)
-    .filter(requesterMatches)
-    .filter((request) => isOlderOpenRequest(request, selectedDay))
-    .sort(logicalRequestCompare);
-
-  openOrderCount.textContent = `${openRequests.length} open`;
-  const grouped = groupRequestsByCategory(openRequests.slice(0, 100));
-  openOrderList.innerHTML = grouped
-    .map(([category, requests]) => `
-      <section class="daily-order-group">
-        <div class="daily-order-group-heading">
-          <h3>${escapeHtml(category)}</h3>
-          <span>${requests.length} item${requests.length === 1 ? "" : "s"}</span>
-        </div>
-        <div class="daily-order-group-list">
-          ${requests
-            .sort((a, b) => itemNameFromRequest(a).localeCompare(itemNameFromRequest(b), undefined, { numeric: true }))
-            .map((request) => `
-              <a class="daily-order-row daily-order-link" href="${escapeHtml(buildOrderJumpHref(request))}">
-                <div>
-                  <strong>${escapeHtml(itemNameFromRequest(request))}</strong>
-                  <span>${escapeHtml([
-                    request.quantity,
-                    requestCategory(request),
-                    requestArea(request),
-                    requestLocation(request),
-                    requestDay(request) ? `Requested ${requestDay(request)}` : ""
-                  ].filter(Boolean).join(" / "))}</span>
-                  ${renderStatusChips(requestStatusChips(request, selectedDay))}
-                </div>
-              </a>
-            `).join("")}
-        </div>
-      </section>
-    `)
-    .join("");
-
-  if (!openOrderList.innerHTML) {
-    openOrderList.innerHTML = '<p class="empty-sheet">No older open orders.</p>';
-  }
-}
-
-function renderStandingOrders() {
-  const visibleOrders = isOperationalRole() ? standingOrders : standingOrders.slice(0, 6);
-  standingOrderCount.textContent = `${standingOrders.length} scheduled`;
-  if (!visibleOrders.length) {
-    standingOrderList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
-    return;
-  }
-  standingOrderList.innerHTML = visibleOrders
-    .slice(0, 100)
-    .map((order) => {
-      return `
-      <a class="daily-order-row daily-order-link" href="/standing-orders.html?orderId=${encodeURIComponent(order.id)}">
-        <div>
-          <strong>${escapeHtml(order.supplierName || order.name || "Standing Order")}</strong>
-          <span>${escapeHtml([
-            order.expectedDate ? `Delivery ${order.expectedDate}` : "",
-            order.schedule || "",
-            order.items?.length ? `${order.items.length} item(s)` : ""
-          ].filter(Boolean).join(" / "))}</span>
-          ${renderStatusChips([
-            ["Standing", "standing"],
-            [String(order.expectedDate || "") <= todayLocal() ? "Due now" : "Scheduled", String(order.expectedDate || "") <= todayLocal() ? "high" : "today"]
-          ])}
-        </div>
-      </a>
-    `;
-    })
-    .join("");
+function renderAll() {
+  const today = todayLocal();
+  renderNotifications({
+    notificationList,
+    notificationCount,
+    notificationPanel,
+    readAllNotificationsButton,
+    notifications
+  });
+  renderDashboardCards({
+    dashboardCards,
+    dashboardMode,
+    displayRoleMode,
+    isOperationalRole,
+    recentRequests,
+    requestUser,
+    sameUser,
+    sessionUser,
+    requestDay,
+    today,
+    isStandingOrderRequest,
+    isOlderOpenRequest,
+    allItems,
+    standingOrders,
+    notifications,
+    dashboardFilter
+  });
+  renderDailyOrder({
+    dailyOrderCount,
+    dailyOrderList,
+    recentRequests,
+    selectedArea: selectedDailyArea(),
+    requestArea,
+    requesterMatches,
+    requestDay,
+    today,
+    requestMatchesDashboardFilter,
+    logicalRequestCompare: (left, right) => logicalRequestCompare(left, right, allItems),
+    allItems,
+    requestCategory,
+    requestLocation,
+    requestStatusChips: (request, currentToday) => requestStatusChips(request, sessionUser, currentToday),
+    buildOrderJumpHref
+  });
+  renderOpenOrders({
+    openOrderCount,
+    openOrderList,
+    recentRequests,
+    selectedArea: selectedDailyArea(),
+    requestArea,
+    requesterMatches,
+    isOlderOpenRequest,
+    today,
+    requestMatchesDashboardFilter,
+    logicalRequestCompare: (left, right) => logicalRequestCompare(left, right, allItems),
+    allItems,
+    requestDay,
+    requestCategory,
+    requestLocation,
+    requestStatusChips: (request, currentToday) => requestStatusChips(request, sessionUser, currentToday),
+    buildOrderJumpHref
+  });
+  renderStandingOrders({
+    standingOrderCount,
+    standingOrderList,
+    standingOrders,
+    isOperationalRole: isOperationalRole(),
+    dashboardFilter,
+    today
+  });
 }
 
 async function refresh() {
@@ -561,11 +322,7 @@ async function refresh() {
   notifications = data.notifications || [];
   populateDailyAreaFilter();
   populateDailyUserFilter();
-  renderDashboardCards();
-  renderDailyOrder();
-  renderOpenOrders();
-  renderStandingOrders();
-  renderNotifications();
+  renderAll();
   setMessage("");
 }
 
@@ -575,7 +332,7 @@ async function markNotificationsRead(ids = []) {
     body: JSON.stringify({ ids })
   });
   notifications = data.notifications || [];
-  renderNotifications();
+  renderAll();
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -606,25 +363,25 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-logoutButton.addEventListener("click", showLogin);
+dashboardCards?.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-dashboard-filter]");
+  if (!card?.dataset.dashboardFilter) return;
+  dashboardFilter = card.dataset.dashboardFilter;
+  renderAll();
+  if (dashboardFilter === "unread" && notificationPanel) {
+    notificationPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
+
+logoutButton?.addEventListener("click", showLogin);
 refreshButton?.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
 dailyScopeFilter?.addEventListener("change", () => {
-  if (dailyScopeFilter.value === "__mine__") {
-    dailyUserFilter.value = "__mine__";
-  } else if (dailyScopeFilter.value === "__team__" && dailyUserFilter.value === "__mine__") {
-    dailyUserFilter.value = "";
-  }
-  renderDailyOrder();
-  renderOpenOrders();
+  if (dailyScopeFilter.value === "__mine__") dailyUserFilter.value = "__mine__";
+  else if (dailyScopeFilter.value === "__team__" && dailyUserFilter.value === "__mine__") dailyUserFilter.value = "";
+  renderAll();
 });
-dailyAreaFilter?.addEventListener("change", () => {
-  renderDailyOrder();
-  renderOpenOrders();
-});
-dailyUserFilter?.addEventListener("change", () => {
-  renderDailyOrder();
-  renderOpenOrders();
-});
+dailyAreaFilter?.addEventListener("change", renderAll);
+dailyUserFilter?.addEventListener("change", renderAll);
 [featureMenu, backofficeMenu].forEach((menu) => menu?.addEventListener("change", (event) => {
   if (event.target.value) window.location.href = event.target.value;
 }));

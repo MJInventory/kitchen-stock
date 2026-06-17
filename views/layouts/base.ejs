@@ -6,19 +6,19 @@
   <body<% if (bodyClass) { %> class="<%= bodyClass %>"<% } %>>
     <%- beforeMain %>
     <main class="<%= contentClass %>">
-      <header class="<%= topbarMenus ? "order-topbar" : "topbar" %><% if (topbarClass) { %> <%= topbarClass %><% } %>">
-        <% if (topbarMenus) { %>
-          <%- include("../partials/brand") %>
-        <% } else { %>
-          <div>
-            <p class="eyebrow"><%= pageEyebrow %></p>
-            <h1><%= pageTitle %></h1>
-          </div>
-        <% } %>
+      <header class="order-topbar<% if (topbarClass) { %> <%= topbarClass %><% } %>">
+        <%- include("../partials/brand") %>
         <div class="top-actions">
           <%- topbarActions %>
         </div>
       </header>
+
+      <% if (showPageIntro) { %>
+        <section class="page-intro">
+          <p class="eyebrow"><%= pageEyebrow %></p>
+          <h1><%= pageTitle %></h1>
+        </section>
+      <% } %>
 
       <%- body %>
     </main>

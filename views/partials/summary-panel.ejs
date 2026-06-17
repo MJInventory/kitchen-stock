@@ -1,0 +1,10 @@
+<section class="<%= typeof panelClass !== 'undefined' && panelClass ? panelClass : 'daily-order-panel' %>">
+  <div class="daily-order-heading">
+    <h2><%= title %></h2>
+    <span id="<%= modeId %>"><%= typeof modeText !== 'undefined' ? modeText : '' %></span>
+  </div>
+  <% if (typeof helperText !== 'undefined' && helperText) { %>
+    <p class="section-helper"><%= helperText %></p>
+  <% } %>
+  <div id="<%= cardsId %>" class="<%= typeof cardsClass !== 'undefined' && cardsClass ? cardsClass : 'dashboard-cards' %>"></div>
+</section>

@@ -1,22 +1,18 @@
-<section class="daily-order-panel notification-panel">
-  <div class="daily-order-heading">
-    <h2>Notifications</h2>
-    <span id="notificationCount"></span>
-  </div>
-  <div class="notification-actions">
-    <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
-  </div>
-  <div id="notificationList" class="notification-list"></div>
-</section>
+<%- include("../partials/notifications-panel", {
+  panelClass: "daily-order-panel notification-panel",
+  listClass: "notification-list",
+  showPushButton: false
+}) %>
 
-<section class="daily-order-panel ordering-summary-panel">
-  <div class="daily-order-heading">
-    <h2>Ordering Snapshot</h2>
-    <span id="orderingMode">Team view</span>
-  </div>
-  <p class="section-helper">What is saved, already open, or below minimum right now.</p>
-  <div id="orderingSummaryCards" class="dashboard-cards ordering-summary-cards"></div>
-</section>
+<%- include("../partials/summary-panel", {
+  panelClass: "daily-order-panel ordering-summary-panel",
+  title: "Ordering Snapshot",
+  modeId: "orderingMode",
+  modeText: "Team view",
+  helperText: "What is saved, already open, or below minimum right now.",
+  cardsId: "orderingSummaryCards",
+  cardsClass: "dashboard-cards ordering-summary-cards"
+}) %>
 
 <section class="order-search-band">
   <label class="search-box">

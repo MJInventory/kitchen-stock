@@ -3,47 +3,54 @@ import http from "node:http";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
-import ejs from "ejs";
 import webpush from "web-push";
-import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  accountingInbox,
+  allowedUnits,
+  appTimeZone,
+  appUsersTableIdFromEnv,
+  appVersion,
+  authSecret,
+  backofficeMenuOptions,
+  baseId,
+  brevoApiKey,
+  editableUserSources,
+  gotoMenuOptions,
+  inventoryTableId,
+  invoiceOcrRulesTableId,
+  isRender,
+  itemCacheMs,
+  lookupConfigs,
+  mailFrom,
+  mimeTypes,
+  ocrSpaceApiKey,
+  port,
+  requestCacheMs,
+  requestsTableId,
+  sessionMaxAgeMs,
+  smtpHost,
+  smtpPass,
+  smtpPort,
+  smtpSecure,
+  smtpUser,
+  suppliersTableId,
+  token,
+  userConfig,
+  vapidPrivateKey,
+  vapidPublicKey,
+  vapidSubject
+} from "./lib/app-config.js";
 import { getPool, postgresEnabled } from "./lib/postgres.js";
+import { ensurePostgresSchemaUpgrades as applyPostgresSchemaUpgrades } from "./lib/postgres-schema.js";
+import { createViewHelpers } from "./lib/view-helpers.js";
+import { createPageRouteBuilder } from "./lib/page-routes.js";
+import { createRenderer } from "./lib/rendering.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
 const viewsDir = join(__dirname, "views");
-const appVersion = "2.012";
-
-const baseId = "appAFvMwWZb2PPWUz";
-const inventoryTableId = "tblEuIXG6gxEiD5oU";
-const requestsTableId = "tblUHh1jWhqMFEfjd";
-const suppliersTableId = "tbl2YP7EpUpk3Ug6f";
-const invoiceOcrRulesTableId = process.env.INVOICE_OCR_RULES_TABLE_ID || "tblW611UMHnm9LUeb";
-const appUsersTableIdFromEnv = process.env.APP_USERS_TABLE_ID || "";
-const token = process.env.AIRTABLE_TOKEN;
-const port = Number(process.env.PORT || 3000);
-const itemCacheMs = Number(process.env.ITEM_CACHE_MS || 10 * 60 * 1000);
-const requestCacheMs = Number(process.env.REQUEST_CACHE_MS || 20 * 1000);
-const authSecret = process.env.AUTH_SECRET || "change-this-secret-in-render";
-const sessionMaxAgeMs = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
-const userConfig = process.env.APP_USERS || "";
-const allowedUnits = new Set(["box", "bag", "item", "bottle"]);
-const editableUserSources = new Set(["postgres"]);
-const accountingInbox = process.env.ACCOUNTING_INBOX || "bills.madameja.23d9599b@billfiles.com";
-const smtpHost = process.env.SMTP_HOST || "";
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
-const smtpUser = process.env.SMTP_USER || "";
-const smtpPass = process.env.SMTP_PASS || "";
-const mailFrom = process.env.MAIL_FROM || smtpUser;
-const brevoApiKey = process.env.BREVO_API_KEY || "";
-const ocrSpaceApiKey = process.env.OCR_SPACE_API_KEY || "helloworld";
-const isRender = Boolean(process.env.RENDER);
-const appTimeZone = process.env.APP_TIMEZONE || "America/La_Paz";
-const vapidSubject = process.env.WEB_PUSH_SUBJECT || "mailto:admin@madamejanette.com";
-const vapidPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || "";
-const vapidPrivateKey = process.env.WEB_PUSH_PRIVATE_KEY || "";
 
 const pushEnabled = Boolean(vapidPublicKey && vapidPrivateKey);
 if (pushEnabled) {
@@ -64,22 +71,6 @@ const metrics = {
   cacheHits: { items: 0, requests: 0, suppliers: 0, lookups: 0, schema: 0 }
 };
 
-const lookupConfigs = {
-  categories: { tableName: "Categories", primaryField: "Category" },
-  storageLocations: { tableName: "Storage Locations", primaryField: "Storage Location" },
-  inventorySubgroups: { tableName: "Inventory Subgroups", primaryField: "Inventory Subgroup" },
-  shelfCodes: { tableName: "Shelf Codes", primaryField: "Shelf Code" },
-  inventoryAreas: { tableName: "Inventory Areas", primaryField: "Inventory Area" },
-  unitOfMeasurement: { tableName: "Unit Of Measurement", primaryField: "Unit" }
-};
-
-const mimeTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml"
-};
 
 function db() {
   return getPool();
@@ -94,29 +85,6 @@ function normalizeNotificationAreaName(value) {
   if (raw === "general") return "general";
   return "";
 }
-
-const gotoMenuOptions = [
-  "/",
-  "/ordering.html",
-  "/internal-orders.html",
-  "/picker-sheet.html",
-  "/receiving-sheet.html",
-  "/driver-sheet.html",
-  "/stock-count.html",
-  "/order-report.html"
-];
-
-const backofficeMenuOptions = [
-  "/settings.html",
-  "/standing-orders.html",
-  "/inventory-settings.html",
-  "/suppliers.html",
-  "/categories.html",
-  "/shelf-codes.html",
-  "/user-admin.html",
-  "/change-password.html",
-  "__logout__"
-];
 
 function clampOpenOrderDays(value) {
   const parsed = Number.parseInt(String(value ?? "").trim(), 10);
@@ -139,199 +107,8 @@ function hasPostgres() {
   return postgresEnabled();
 }
 
-let postgresSchemaReady = null;
-
 async function ensurePostgresSchemaUpgrades() {
-  if (!hasPostgres()) return;
-  if (postgresSchemaReady) return postgresSchemaReady;
-  postgresSchemaReady = (async () => {
-    await db().query(`
-      alter table app_users
-        add column if not exists notify_on_new_orders boolean not null default false,
-        add column if not exists notify_on_delivery boolean not null default true,
-        add column if not exists notify_area_bar boolean not null default true,
-        add column if not exists notify_area_foh boolean not null default true,
-        add column if not exists notify_area_kitchen boolean not null default true,
-        add column if not exists notify_area_general boolean not null default true,
-        add column if not exists is_driver boolean not null default false,
-        add column if not exists is_picker boolean not null default false,
-        add column if not exists open_order_days integer not null default 7,
-        add column if not exists hidden_goto_menu jsonb not null default '[]'::jsonb,
-        add column if not exists hidden_backoffice_menu jsonb not null default '[]'::jsonb
-    `);
-    await db().query(`
-      alter table standing_orders
-        add column if not exists deleted boolean not null default false
-    `);
-    await db().query(`
-      alter table order_requests
-        add column if not exists order_unit text not null default ''
-    `);
-    await db().query(`
-      alter table order_requests
-        add column if not exists partial_receipt boolean not null default false
-    `);
-    await db().query(`
-      create table if not exists app_notifications (
-        id uuid primary key default gen_random_uuid(),
-        user_id uuid not null references app_users(id) on delete cascade,
-        notification_type text not null default 'info',
-        title text not null default '',
-        body text not null default '',
-        related_request_id uuid references order_requests(id) on delete set null,
-        related_standing_order_id uuid references standing_orders(id) on delete set null,
-        related_standing_order_run_id uuid references standing_order_runs(id) on delete set null,
-        is_read boolean not null default false,
-        created_at timestamptz not null default now(),
-        read_at timestamptz
-      )
-    `);
-    await db().query(`
-      create index if not exists idx_app_notifications_user_read_created
-        on app_notifications (user_id, is_read, created_at desc)
-    `);
-    await db().query(`
-      create table if not exists push_subscriptions (
-        id uuid primary key default gen_random_uuid(),
-        user_id uuid not null references app_users(id) on delete cascade,
-        endpoint text not null unique,
-        p256dh text not null,
-        auth text not null,
-        user_agent text not null default '',
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `);
-    await db().query(`
-      create index if not exists idx_push_subscriptions_user
-        on push_subscriptions (user_id, updated_at desc)
-    `);
-    await db().query(`
-      create table if not exists driver_sheet_assignments (
-        sheet_date date primary key,
-        driver_username text not null,
-        assigned_by_username text not null default '',
-        assigned_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `);
-    await db().query(`
-      create table if not exists supplier_delivery_notes (
-        id uuid primary key default gen_random_uuid(),
-        delivery_date date not null,
-        supplier_name text not null,
-        memo text not null default '',
-        entered_by_username text not null default '',
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now(),
-        unique (delivery_date, supplier_name)
-      )
-    `);
-    await db().query(`
-      create index if not exists idx_supplier_delivery_notes_date_supplier
-        on supplier_delivery_notes (delivery_date, supplier_name)
-    `);
-    await db().query(`
-      create table if not exists audit_log_entries (
-        id uuid primary key default gen_random_uuid(),
-        action_date date not null default current_date,
-        action_type text not null check (action_type in ('add', 'change', 'delete')),
-        entity_type text not null,
-        entity_id text not null default '',
-        entity_name text not null default '',
-        actor_username text not null default '',
-        reason_code text not null default '',
-        note text not null default '',
-        before_json jsonb,
-        after_json jsonb,
-        created_at timestamptz not null default now()
-      )
-    `);
-    await db().query(`
-      create index if not exists idx_audit_log_entries_date_created
-        on audit_log_entries (action_date desc, created_at desc)
-    `);
-    await db().query(`
-      update app_users
-      set source = 'postgres',
-          updated_at = now()
-      where coalesce(source, '') <> 'postgres'
-    `);
-    await db().query(`
-      create table if not exists internal_order_batches (
-        id uuid primary key default gen_random_uuid(),
-        requested_by_user_id uuid references app_users(id) on delete set null,
-        requested_by_username text not null default '',
-        requested_at timestamptz not null default now(),
-        status text not null default 'open' check (status in ('open', 'ready', 'closed', 'partial')),
-        notes text not null default '',
-        picker_username text not null default '',
-        ready_at timestamptz,
-        ready_by_username text not null default '',
-        closed_at timestamptz,
-        closed_by_username text not null default '',
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `);
-    await db().query(`
-      alter table internal_order_batches
-        add column if not exists requested_by_user_id uuid references app_users(id) on delete set null,
-        add column if not exists requested_by_username text not null default '',
-        add column if not exists requested_at timestamptz not null default now(),
-        add column if not exists status text not null default 'open',
-        add column if not exists notes text not null default '',
-        add column if not exists picker_username text not null default '',
-        add column if not exists ready_at timestamptz,
-        add column if not exists ready_by_username text not null default '',
-        add column if not exists closed_at timestamptz,
-        add column if not exists closed_by_username text not null default '',
-        add column if not exists created_at timestamptz not null default now(),
-        add column if not exists updated_at timestamptz not null default now()
-    `);
-    await db().query(`
-      create index if not exists idx_internal_order_batches_status_user
-        on internal_order_batches (status, requested_by_username, created_at desc)
-    `);
-    await db().query(`
-      create table if not exists internal_order_lines (
-        id uuid primary key default gen_random_uuid(),
-        internal_order_batch_id uuid not null references internal_order_batches(id) on delete cascade,
-        inventory_item_id uuid not null references inventory_items(id) on delete restrict,
-        requested_item_quantity numeric not null default 0,
-        picked_item_quantity numeric not null default 0,
-        shortage_item_quantity numeric not null default 0,
-        status text not null default 'requested' check (status in ('requested', 'partial', 'ready', 'closed', 'cancelled')),
-        shortage_request_id uuid references order_requests(id) on delete set null,
-        auto_min_request_id uuid references order_requests(id) on delete set null,
-        notes text not null default '',
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `);
-    await db().query(`
-      alter table internal_order_lines
-        add column if not exists internal_order_batch_id uuid references internal_order_batches(id) on delete cascade,
-        add column if not exists inventory_item_id uuid references inventory_items(id) on delete restrict,
-        add column if not exists requested_item_quantity numeric not null default 0,
-        add column if not exists picked_item_quantity numeric not null default 0,
-        add column if not exists shortage_item_quantity numeric not null default 0,
-        add column if not exists status text not null default 'requested',
-        add column if not exists shortage_request_id uuid references order_requests(id) on delete set null,
-        add column if not exists auto_min_request_id uuid references order_requests(id) on delete set null,
-        add column if not exists notes text not null default '',
-        add column if not exists created_at timestamptz not null default now(),
-        add column if not exists updated_at timestamptz not null default now()
-    `);
-    await db().query(`
-      create index if not exists idx_internal_order_lines_batch_status
-        on internal_order_lines (internal_order_batch_id, status, created_at)
-    `);
-  })().catch((error) => {
-    postgresSchemaReady = null;
-    throw error;
-  });
-  return postgresSchemaReady;
+  return applyPostgresSchemaUpgrades({ hasPostgres, db });
 }
 
 function isValidId(value) {
@@ -6881,385 +6658,15 @@ async function canDeleteRequest(recordId, user) {
   return requestedBy && requestedBy === String(user.name || "").trim().toLowerCase();
 }
 
-async function serveStatic(req, res) {
-  const url = new URL(req.url, "http://localhost");
-  const rawPath = url.pathname === "/" ? "/index.html" : url.pathname;
-  const filePath = normalize(join(publicDir, rawPath));
-
-  if (!filePath.startsWith(publicDir)) {
-    send(res, 403, "Forbidden", "text/plain; charset=utf-8");
-    return;
-  }
-
-  try {
-    const file = await readFile(filePath);
-    send(res, 200, file, mimeTypes[extname(filePath)] || "application/octet-stream");
-  } catch {
-    send(res, 404, "Not found", "text/plain; charset=utf-8");
-  }
-}
-
-async function renderView(res, viewName, data = {}, status = 200) {
-  const viewData = {
-    appVersion,
-    bodyClass: "",
-    pageTitle: "MJ Stock Magic",
-    pageEyebrow: "Inventory",
-    brandTitle: "MJ Stock Magic",
-    brandSubtitle: "MADAME JANETTE",
-    themeColor: "#0f766e",
-    headExtras: "",
-    contentClass: "shell setup-shell",
-    beforeMain: "",
-    topbarMenus: false,
-    topbarClass: "",
-    topbarActions: "",
-    footerScripts: [],
-    ...data
-  };
-  const body = await ejs.renderFile(join(viewsDir, `${viewName}.ejs`), viewData, { views: [viewsDir] });
-  const html = await ejs.renderFile(
-    join(viewsDir, "layouts", "base.ejs"),
-    {
-      ...viewData,
-      body
-    },
-    { views: [viewsDir] }
-  );
-  send(res, status, html, "text/html; charset=utf-8");
-}
-
-async function renderPartial(partialName, data = {}) {
-  return ejs.renderFile(join(viewsDir, "partials", `${partialName}.ejs`), data, { views: [viewsDir] });
-}
-
-function pageScripts(moduleSrc, { offline = false } = {}) {
-  const scripts = ["/menus.js", "/push.js", "/theme.js"];
-  if (offline) scripts.push("/offline-queue.js");
-  if (moduleSrc) scripts.push({ src: moduleSrc, type: "module" });
-  return scripts;
-}
-
-async function loginPartial(title, eyebrow = "Inventory", { numericPassword = false } = {}) {
-  return renderPartial("login-screen", {
-    eyebrow,
-    title,
-    ...(numericPassword ? { passwordInputMode: "numeric" } : {})
-  });
-}
-
-function actionButton(href, label) {
-  return `<a class="button secondary" href="${href}">${label}</a>`;
-}
-
-function actionLogout({ compact = false } = {}) {
-  return compact
-    ? '<button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>'
-    : '<button id="logoutButton" class="secondary" type="button">Log Out</button>';
-}
-
-function actionUserChip() {
-  return '<a id="currentUser" class="user-chip" href="/settings.html" hidden></a>';
-}
-
-function joinActions(actions) {
-  return actions.filter(Boolean).join("\n");
-}
-
-function adminActions({ includeSetup = false } = {}) {
-  return joinActions([
-    actionUserChip(),
-    includeSetup ? actionButton("/inventory-settings.html", "Setup") : "",
-    actionButton("/", "Main Menu"),
-    actionLogout()
-  ]);
-}
-
-function sheetActions(links = []) {
-  return joinActions([
-    actionUserChip(),
-    ...links.map((link) => actionButton(link.href, link.label)),
-    actionLogout()
-  ]);
-}
-
-function orderShellActions({ saveButtonId = "", saveButtonLabel = "", logoutCompact = true } = {}) {
-  return joinActions([
-    actionUserChip(),
-    saveButtonId ? `<button id="${saveButtonId}" class="save-pill" type="button">${saveButtonLabel}</button>` : "",
-    actionLogout({ compact: logoutCompact })
-  ]);
-}
-
-async function buildPageRoute(url) {
-  const pathname = new URL(url, "http://localhost").pathname;
-  switch (pathname) {
-    case "/":
-    case "/index.html":
-      return {
-        view: "pages/index",
-        options: {
-          pageTitle: "MJ Stock Magic Home",
-          bodyClass: "order-app",
-          contentClass: "order-shell",
-          beforeMain: await loginPartial("MJ Stock Magic", "Inventory", { numericPassword: true }),
-          topbarMenus: true,
-          brandTitle: "MJ Stock Magic",
-          brandSubtitle: "MADAME JANETTE",
-          topbarActions: orderShellActions(),
-          footerScripts: pageScripts("/dashboard.js")
-        }
-      };
-    case "/phase1-preview":
-      return {
-        view: "pages/phase1-preview",
-        options: {
-          pageTitle: "Phase 1 Preview",
-          bodyClass: "order-app",
-          contentClass: "order-shell",
-          topbarMenus: true,
-          topbarActions: '<a class="button secondary" href="/">Main Menu</a>',
-          footerScripts: pageScripts()
-        }
-      };
-    case "/categories.html":
-      return {
-        view: "pages/categories",
-        options: {
-          pageTitle: "Category Admin",
-          pageEyebrow: "Inventory Setup",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Category Admin", "Inventory Setup"),
-          topbarMenus: false,
-          topbarActions: adminActions({ includeSetup: true }),
-          footerScripts: pageScripts("/categories.js")
-        }
-      };
-    case "/suppliers.html":
-      return {
-        view: "pages/suppliers",
-        options: {
-          pageTitle: "Supplier Admin",
-          pageEyebrow: "Inventory Setup",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Supplier Admin", "Inventory Setup"),
-          topbarMenus: false,
-          topbarActions: adminActions({ includeSetup: true }),
-          footerScripts: pageScripts("/suppliers.js")
-        }
-      };
-    case "/shelf-codes.html":
-      return {
-        view: "pages/shelf-codes",
-        options: {
-          pageTitle: "Storage & Shelf Admin",
-          pageEyebrow: "Inventory Setup",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Storage & Shelf Admin", "Inventory Setup"),
-          topbarMenus: false,
-          topbarActions: adminActions({ includeSetup: true }),
-          footerScripts: pageScripts("/shelf-codes.js")
-        }
-      };
-    case "/user-admin.html":
-      return {
-        view: "pages/user-admin",
-        options: {
-          pageTitle: "User Administration",
-          pageEyebrow: "Inventory",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("User Admin", "Inventory"),
-          topbarMenus: false,
-          topbarActions: adminActions(),
-          footerScripts: pageScripts("/user-admin.js")
-        }
-      };
-    case "/inventory-settings.html":
-      return {
-        view: "pages/inventory-settings",
-        options: {
-          pageTitle: "Inventory Items",
-          pageEyebrow: "Inventory",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Inventory Items", "Inventory", { numericPassword: true }),
-          topbarMenus: false,
-          topbarActions: adminActions(),
-          footerScripts: pageScripts("/inventory-settings.js")
-        }
-      };
-    case "/inventory-add.html":
-      return {
-        view: "pages/inventory-add",
-        options: {
-          pageTitle: "Add Inventory Item",
-          pageEyebrow: "Inventory",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Add Inventory Item", "Inventory", { numericPassword: true }),
-          topbarMenus: false,
-          topbarActions: adminActions(),
-          footerScripts: pageScripts("/inventory-add.js")
-        }
-      };
-    case "/change-password.html":
-      return {
-        view: "pages/change-password",
-        options: {
-          pageTitle: "Change Password",
-          pageEyebrow: "Inventory",
-          contentClass: "shell setup-shell",
-          topbarMenus: false,
-          topbarActions: joinActions([actionButton("/", "Main Menu")]),
-          footerScripts: pageScripts("/change-password.js")
-        }
-      };
-    case "/settings.html":
-      return {
-        view: "pages/settings",
-        options: {
-          pageTitle: "My Settings",
-          pageEyebrow: "Inventory",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("My Settings", "Inventory"),
-          topbarMenus: false,
-          topbarActions: adminActions(),
-          footerScripts: pageScripts("/settings.js")
-        }
-      };
-    case "/standing-orders.html":
-      return {
-        view: "pages/standing-orders",
-        options: {
-          pageTitle: "Standing Orders",
-          pageEyebrow: "Inventory",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Standing Orders", "Inventory", { numericPassword: true }),
-          topbarMenus: false,
-          topbarActions: adminActions(),
-          footerScripts: pageScripts("/standing-orders.js")
-        }
-      };
-    case "/invoice-capture.html":
-      return {
-        view: "pages/invoice-capture",
-        options: {
-          pageTitle: "Invoice Capture",
-          pageEyebrow: "Inventory",
-          contentClass: "shell",
-          beforeMain: await loginPartial("Invoice Capture", "Inventory", { numericPassword: true }),
-          topbarMenus: false,
-          topbarActions: adminActions(),
-          footerScripts: pageScripts("/invoice-capture.js")
-        }
-      };
-    case "/ordering.html":
-      return {
-        view: "pages/ordering",
-        options: {
-          pageTitle: "MJ Stock Magic Ordering",
-          bodyClass: "order-app",
-          contentClass: "order-shell",
-          beforeMain: await loginPartial("MJ Stock Magic", "Inventory", { numericPassword: true }),
-          topbarMenus: true,
-          brandTitle: "MJ Stock Magic",
-          brandSubtitle: "MADAME JANETTE",
-          topbarActions: orderShellActions({ saveButtonId: "submitButton", saveButtonLabel: "0 Saved" }),
-          footerScripts: pageScripts("/app.js", { offline: true })
-        }
-      };
-    case "/stock-count.html":
-      return {
-        view: "pages/stock-count",
-        options: {
-          pageTitle: "Stock Count",
-          bodyClass: "order-app stock-count-app",
-          contentClass: "order-shell",
-          beforeMain: await loginPartial("Stock Count", "Inventory", { numericPassword: true }),
-          topbarMenus: true,
-          brandTitle: "MJ Stock Magic",
-          brandSubtitle: "STOCK COUNT",
-          topbarActions: orderShellActions({ saveButtonId: "saveAllButton", saveButtonLabel: "Save Counts" }),
-          footerScripts: pageScripts("/stock-count.js", { offline: true })
-        }
-      };
-    case "/receiving-sheet.html":
-      return {
-        view: "pages/receiving-sheet",
-        options: {
-          pageTitle: "Receiving",
-          contentClass: "shell sheet-shell",
-          beforeMain: await loginPartial("Receiving", "Inventory", { numericPassword: true }),
-          topbarClass: "no-print",
-          topbarActions: sheetActions([
-            { href: "/", label: "Main Menu" },
-            { href: "/driver-sheet.html", label: "Driver Sheet" },
-            { href: "/order-report.html", label: "Reports" }
-          ]),
-          footerScripts: pageScripts("/receiving-sheet.js")
-        }
-      };
-    case "/driver-sheet.html":
-      return {
-        view: "pages/driver-sheet",
-        options: {
-          pageTitle: "Driver Sheet",
-          contentClass: "shell sheet-shell",
-          beforeMain: await loginPartial("Driver Sheet", "Inventory", { numericPassword: true }),
-          topbarClass: "no-print",
-          topbarActions: sheetActions([
-            { href: "/", label: "Main Menu" },
-            { href: "/receiving-sheet.html", label: "Receiving" },
-            { href: "/order-report.html", label: "Reports" }
-          ]),
-          footerScripts: pageScripts("/driver-sheet.js")
-        }
-      };
-    case "/order-report.html":
-      return {
-        view: "pages/order-report",
-        options: {
-          pageTitle: "Order Report",
-          contentClass: "shell sheet-shell",
-          beforeMain: await loginPartial("Order Report", "Inventory", { numericPassword: true }),
-          topbarClass: "no-print",
-          topbarActions: sheetActions([
-            { href: "/", label: "Main Menu" },
-            { href: "/driver-sheet.html", label: "Driver Sheet" },
-            { href: "/receiving-sheet.html", label: "Receiving" }
-          ]),
-          footerScripts: pageScripts("/order-report.js")
-        }
-      };
-    case "/internal-orders.html":
-      return {
-        view: "pages/internal-orders",
-        options: {
-          pageTitle: "Internal Orders",
-          bodyClass: "order-app",
-          contentClass: "order-shell",
-          beforeMain: await loginPartial("Internal Orders", "Inventory", { numericPassword: true }),
-          topbarMenus: true,
-          brandTitle: "MJ Stock Magic",
-          brandSubtitle: "MADAME JANETTE",
-          topbarActions: orderShellActions({ saveButtonId: "submitButton", saveButtonLabel: "0 Saved" }),
-          footerScripts: pageScripts("/internal-orders.js", { offline: true })
-        }
-      };
-    case "/picker-sheet.html":
-      return {
-        view: "pages/picker-sheet",
-        options: {
-          pageTitle: "Picker Board",
-          contentClass: "shell setup-shell",
-          beforeMain: await loginPartial("Picker Board", "Inventory", { numericPassword: true }),
-          topbarMenus: false,
-          topbarActions: joinActions([actionUserChip(), actionLogout()]),
-          footerScripts: pageScripts("/picker-sheet.js", { offline: true })
-        }
-      };
-    default:
-      return null;
-  }
-}
+const viewHelpers = createViewHelpers(viewsDir);
+const buildPageRoute = createPageRouteBuilder(viewHelpers);
+const { renderView, serveStatic } = createRenderer({
+  publicDir,
+  viewsDir,
+  appVersion,
+  mimeTypes,
+  send
+});
 
 const server = http.createServer(async (req, res) => {
   try {

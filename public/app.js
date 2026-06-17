@@ -1219,6 +1219,7 @@ backButton.addEventListener("click", () => {
 productList.addEventListener("click", (event) => {
   const row = event.target.closest(".product-row");
   if (!row) return;
+  const clickedInteractive = event.target.closest("button, input, select, label, a");
 
   if (event.target.closest(".product-check")) {
     toggleProduct(row);
@@ -1272,6 +1273,11 @@ productList.addEventListener("click", (event) => {
     }
     syncProductRow(row);
     render();
+    return;
+  }
+
+  if (!clickedInteractive) {
+    toggleProduct(row);
   }
 });
 

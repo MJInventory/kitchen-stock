@@ -157,6 +157,15 @@ async function api(path, options) {
   return data;
 }
 
+async function queueApi(path, options = {}, meta = {}) {
+  if (!window.kitchenOfflineQueue?.request) return api(path, options);
+  return window.kitchenOfflineQueue.request(path, options, {
+    allowQueue: true,
+    token: sessionToken,
+    ...meta
+  });
+}
+
 async function refreshSession() {
   const data = await api("/api/me");
   saveSession({ token: sessionToken, user: data.user });
@@ -933,6 +942,30 @@ function syncProductRow(row) {
   });
 }
 
+function optimisticRequestFromEntry(entry, index = 0) {
+  const requestId = entry.requestId || `offline-request-${Date.now()}-${index}`;
+  return {
+    id: requestId,
+    requestId,
+    itemId: String(entry.item.id || "").trim(),
+    quantity: Math.max(1, Number(entry.quantity || 1)),
+    quantityNeeded: Math.max(1, Number(entry.quantity || 1)),
+    unit: entry.unit || itemUnit(entry.item),
+    orderUnit: entry.unit || itemUnit(entry.item),
+    urgency: entry.urgency || "Medium",
+    urgencyLevel: entry.urgency || "Medium",
+    inventoryArea: entry.item.inventoryArea || "",
+    storageLocation: entry.item.storageLocation || "",
+    shelfCode: entry.item.shelfCode || "",
+    requestedBy: sessionUser || "Kitchen",
+    requestedAt: new Date().toISOString(),
+    status: "Approved",
+    delivered: false,
+    received: false,
+    notes: ""
+  };
+}
+
 function toggleProduct(row) {
   const item = allItems.find((candidate) => candidate.id === row.dataset.itemId);
   if (!item) return;
@@ -977,6 +1010,7 @@ async function submitSelected(itemIds = null) {
   try {
     const deleteEntries = scopedEntries.filter((entry) => entry.deleteRequested && entry.requestId);
     const saveEntries = scopedEntries.filter((entry) => !entry.deleteRequested);
+    let queuedOffline = false;
 
     if (saveEntries.length && !confirmDuplicateSave(saveEntries)) {
       setMessage("Duplicate save cancelled.");
@@ -984,7 +1018,12 @@ async function submitSelected(itemIds = null) {
     }
 
     if (deleteEntries.length) {
-      await Promise.all(deleteEntries.map((entry) => api(`/api/requests/${entry.requestId}`, { method: "DELETE" })));
+      const deleteResults = await Promise.all(deleteEntries.map((entry) => queueApi(`/api/requests/${entry.requestId}`, {
+        method: "DELETE"
+      }, {
+        label: `${entry.item?.name || "Order item"} delete`
+      })));
+      queuedOffline = queuedOffline || deleteResults.some((result) => result?.offlineQueued);
     }
 
     const requests = saveEntries
@@ -1005,10 +1044,16 @@ async function submitSelected(itemIds = null) {
     }
     let data = { requests: [] };
     if (requests.length) {
-      data = await api("/api/requests/batch", {
+      data = await queueApi("/api/requests/batch", {
         method: "POST",
         body: JSON.stringify({ requests })
+      }, {
+        label: `${requests.length} order item(s)`,
+        fallbackData: {
+          requests: saveEntries.map((entry, index) => optimisticRequestFromEntry(entry, index))
+        }
       });
+      queuedOffline = queuedOffline || Boolean(data?.offlineQueued);
     }
     const deletedIds = new Set(deleteEntries.map((entry) => entry.requestId).filter(Boolean));
     const saved = requests.length;
@@ -1030,10 +1075,12 @@ async function submitSelected(itemIds = null) {
     const actions = [];
     if (saved) actions.push(`${saved} item(s) saved`);
     if (deleted) actions.push(`${deleted} item(s) deleted`);
-    setMessage(`${actions.join(" and ")}.`);
-    window.setTimeout(() => {
-      refresh().catch((error) => setMessage(error.message, true));
-    }, 250);
+    setMessage(queuedOffline ? `${actions.join(" and ")} offline. They will sync automatically.` : `${actions.join(" and ")}.`);
+    if (!queuedOffline) {
+      window.setTimeout(() => {
+        refresh().catch((error) => setMessage(error.message, true));
+      }, 250);
+    }
   } catch (error) {
     setMessage(error.message, true);
   } finally {
@@ -1068,13 +1115,21 @@ async function deliverDailyOrder(requestId) {
 }
 
 async function updateCurrentStock(itemId, countedQuantity) {
-  const data = await api("/api/stock-counts", {
+  const data = await queueApi("/api/stock-counts", {
     method: "POST",
     body: JSON.stringify({
       itemId,
       countedQuantity,
       notes: "Adjusted from request screen."
     })
+  }, {
+    label: "Stock update",
+    fallbackData: {
+      item: {
+        id: itemId,
+        quantity: Number(countedQuantity || 0)
+      }
+    }
   });
   allItems = allItems.map((item) => (item.id === data.item.id ? { ...item, quantity: data.item.quantity } : item));
   selected = new Map(
@@ -1129,6 +1184,9 @@ logoutButton.addEventListener("click", showLogin);
   if (event.target.value) window.location.href = event.target.value;
 }));
 refreshButton?.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
+window.addEventListener("kitchen-offline-queue-synced", () => {
+  refresh(true).catch((error) => setMessage(error.message, true));
+});
 submitButton.addEventListener("click", () => submitSelected());
 
 categoryGrid.addEventListener("click", (event) => {

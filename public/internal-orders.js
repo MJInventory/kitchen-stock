@@ -96,6 +96,15 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function queueApi(path, options = {}, meta = {}) {
+  if (!window.kitchenOfflineQueue?.request) return api(path, options);
+  return window.kitchenOfflineQueue.request(path, options, {
+    allowQueue: true,
+    token: sessionToken,
+    ...meta
+  });
+}
+
 function normalize(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -369,10 +378,17 @@ async function saveInternalOrder(article, removeAll = false) {
   if (removeAll) {
     if (!window.confirm("Remove this internal order?")) return;
   }
-  await api(`/api/internal-orders/${batchId}`, {
+  const result = await queueApi(`/api/internal-orders/${batchId}`, {
     method: "PATCH",
     body: JSON.stringify(payload)
+  }, {
+    label: removeAll ? "Internal order remove" : "Internal order update"
   });
+  if (result?.offlineQueued) {
+    internalDrafts.delete(batchId);
+    setMessage(removeAll ? "Internal order removal saved offline." : "Internal order update saved offline.");
+    return;
+  }
   await loadData();
   setMessage(removeAll ? "Internal order removed." : "Internal order updated.");
 }
@@ -382,7 +398,7 @@ async function submitInternalOrder() {
   submitButton.disabled = true;
   setMessage("Sending internal request...");
   try {
-    await api("/api/internal-orders", {
+    const result = await queueApi("/api/internal-orders", {
       method: "POST",
       body: JSON.stringify({
         lines: [...selected.values()].map((entry) => ({
@@ -390,10 +406,17 @@ async function submitInternalOrder() {
           quantityItems: entry.quantityItems
         }))
       })
+    }, {
+      label: "Internal request"
     });
     selected = new Map();
-    await loadData();
-    setMessage("Internal request sent to the picker.");
+    if (result?.offlineQueued) {
+      render();
+      setMessage("Internal request saved offline. It will sync when the signal is back.");
+    } else {
+      await loadData();
+      setMessage("Internal request sent to the picker.");
+    }
   } catch (error) {
     setMessage(error.message, true);
   } finally {
@@ -436,6 +459,9 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", showLogin);
 refreshButton?.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
+window.addEventListener("kitchen-offline-queue-synced", () => {
+  loadData().catch((error) => setMessage(error.message, true));
+});
 submitButton.addEventListener("click", () => submitInternalOrder().catch((error) => setMessage(error.message, true)));
 searchInput.addEventListener("input", render);
 areaFilter.addEventListener("change", render);

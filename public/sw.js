@@ -1,6 +1,7 @@
-const CACHE_NAME = "kitchen-stock-v2.007";
+const CACHE_NAME = "kitchen-stock-v2.008";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
+  "/offline-queue.js",
   "/madame-janette-logo-v162.png",
   "/mjstock-icon-192-v162.png",
   "/mjstock-icon-512-v162.png",
@@ -95,5 +96,6 @@ self.addEventListener("notificationclick", (event) => {
     await clients.openWindow(targetUrl);
   })());
 });
+
 
 

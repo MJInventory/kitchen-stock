@@ -84,6 +84,15 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function queueApi(path, options = {}, meta = {}) {
+  if (!window.kitchenOfflineQueue?.request) return api(path, options);
+  return window.kitchenOfflineQueue.request(path, options, {
+    allowQueue: true,
+    token: sessionToken,
+    ...meta
+  });
+}
+
 function itemCategory(item) {
   return item.category || "Unsorted";
 }
@@ -233,13 +242,21 @@ async function loadItems() {
 }
 
 async function saveCount(itemId, countedQuantity, notes = "") {
-  return api("/api/stock-counts", {
+  return queueApi("/api/stock-counts", {
     method: "POST",
     body: JSON.stringify({
       itemId,
       countedQuantity,
       notes
     })
+  }, {
+    label: "Stock count",
+    fallbackData: {
+      item: {
+        id: itemId,
+        quantity: Number(countedQuantity || 0)
+      }
+    }
   });
 }
 
@@ -254,14 +271,16 @@ async function saveAllCounts() {
   message(countMessage, `Saving ${entries.length} count${entries.length === 1 ? "" : "s"}...`);
 
   try {
+    let queuedOffline = false;
     for (const [itemId, value] of entries) {
       const result = await saveCount(itemId, value, draftNotes.get(itemId) || "");
+      queuedOffline = queuedOffline || Boolean(result?.offlineQueued);
       items = items.map((item) => (item.id === result.item.id ? { ...item, quantity: result.item.quantity } : item));
       draftCounts.delete(itemId);
       draftNotes.delete(itemId);
     }
     renderList();
-    message(countMessage, "Stock counts saved.");
+    message(countMessage, queuedOffline ? "Stock counts saved offline. They will sync automatically." : "Stock counts saved.");
   } catch (error) {
     message(countMessage, error.message, true);
   } finally {
@@ -297,6 +316,9 @@ loginForm.addEventListener("submit", async (event) => {
 logoutButton.addEventListener("click", showLogin);
 refreshButton?.addEventListener("click", () => loadItems().catch((error) => message(countMessage, error.message, true)));
 saveAllButton.addEventListener("click", saveAllCounts);
+window.addEventListener("kitchen-offline-queue-synced", () => {
+  loadItems().catch((error) => message(countMessage, error.message, true));
+});
 backToTopButton.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 
 [areaFilter, categoryFilter].forEach((control) => {

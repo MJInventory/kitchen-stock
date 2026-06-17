@@ -76,6 +76,15 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function queueApi(path, options = {}, meta = {}) {
+  if (!window.kitchenOfflineQueue?.request) return api(path, options);
+  return window.kitchenOfflineQueue.request(path, options, {
+    allowQueue: true,
+    token: sessionToken,
+    ...meta
+  });
+}
+
 function groupByRequester(orders) {
   const map = new Map();
   for (const order of orders) {
@@ -166,14 +175,22 @@ async function saveRequesterGroup(group) {
 
   setMessage(`Saving picked items for ${requester}...`);
   try {
+    let queuedOffline = false;
     for (const payload of payloads) {
-      await api(`/api/internal-orders/${payload.batchId}/pick`, {
+      const result = await queueApi(`/api/internal-orders/${payload.batchId}/pick`, {
         method: "PATCH",
         body: JSON.stringify({ lines: payload.lines })
+      }, {
+        label: `Picker save for ${requester}`
       });
+      queuedOffline = queuedOffline || Boolean(result?.offlineQueued);
     }
-    await loadData();
-    setMessage(`Picker save complete for ${requester}. Shortages and automatic minimum restock orders were updated.`);
+    if (queuedOffline) {
+      setMessage(`Picker save for ${requester} is stored offline. It will sync automatically.`);
+    } else {
+      await loadData();
+      setMessage(`Picker save complete for ${requester}. Shortages and automatic minimum restock orders were updated.`);
+    }
   } catch (error) {
     setMessage(error.message, true);
   }
@@ -243,6 +260,9 @@ loginForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", showLogin);
 refreshButton?.addEventListener("click", () => loadData().catch((error) => setMessage(error.message, true)));
+window.addEventListener("kitchen-offline-queue-synced", () => {
+  loadData().catch((error) => setMessage(error.message, true));
+});
 
 if (sessionToken && sessionUser) {
   showApp();

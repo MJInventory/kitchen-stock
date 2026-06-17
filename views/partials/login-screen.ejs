@@ -1,0 +1,10 @@
+<section id="loginScreen" class="login-screen">
+  <form id="loginForm" class="login-panel">
+    <p class="eyebrow"><%= eyebrow %></p>
+    <h1><%= title %></h1>
+    <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
+    <label>Password <input id="passwordInput" type="password"<% if (typeof passwordInputMode !== "undefined" && passwordInputMode) { %> inputmode="<%= passwordInputMode %>"<% } %> autocomplete="current-password" required></label>
+    <button type="submit">Log In</button>
+    <p id="loginMessage" role="status"></p>
+  </form>
+</section>

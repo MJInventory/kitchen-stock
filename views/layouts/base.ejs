@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include("../partials/head") %>
+  </head>
+  <body<% if (bodyClass) { %> class="<%= bodyClass %>"<% } %>>
+    <%- beforeMain %>
+    <main class="<%= contentClass %>">
+      <header class="<%= topbarMenus ? "order-topbar" : "topbar" %><% if (topbarClass) { %> <%= topbarClass %><% } %>">
+        <% if (topbarMenus) { %>
+          <%- include("../partials/brand") %>
+        <% } else { %>
+          <div>
+            <p class="eyebrow"><%= pageEyebrow %></p>
+            <h1><%= pageTitle %></h1>
+          </div>
+        <% } %>
+        <div class="top-actions">
+          <%- topbarActions %>
+        </div>
+      </header>
+
+      <%- body %>
+    </main>
+
+    <footer class="app-version">MJ Stock Magic v<%= appVersion %></footer>
+    <%- include("../partials/footer-scripts") %>
+  </body>
+</html>

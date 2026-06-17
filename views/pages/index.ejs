@@ -1,0 +1,58 @@
+<section class="daily-order-panel home-order-panel notification-panel">
+  <div class="daily-order-heading">
+    <h2>Notifications</h2>
+    <span id="notificationCount"></span>
+  </div>
+  <div class="notification-actions">
+    <button id="readAllNotificationsButton" class="icon-button" type="button">Clear notifications</button>
+    <button id="enablePushButton" class="icon-button" type="button" hidden>Enable phone notifications</button>
+  </div>
+  <div id="notificationList" class="daily-order-list notification-list"></div>
+</section>
+
+<section class="daily-order-panel home-order-panel dashboard-panel">
+  <div class="daily-order-heading">
+    <h2>Overview</h2>
+    <span id="dashboardMode"></span>
+  </div>
+  <p class="section-helper">Today's quick picture so nobody has to remember what is still waiting.</p>
+  <div id="dashboardCards" class="dashboard-cards"></div>
+</section>
+
+<section class="daily-order-panel home-order-panel">
+  <div class="daily-order-heading">
+    <h2>Today's Order</h2>
+    <span id="dailyOrderCount"></span>
+  </div>
+  <div class="order-filters daily-order-filters">
+    <select id="dailyScopeFilter" aria-label="Filter orders by scope">
+      <option value="">All work</option>
+      <option value="__mine__">My stuff</option>
+      <option value="__team__">Team stuff</option>
+    </select>
+    <select id="dailyAreaFilter" aria-label="Filter today's orders by area">
+      <option value="">All Areas</option>
+    </select>
+    <select id="dailyUserFilter" aria-label="Filter today's orders by user">
+      <option value="">All Users</option>
+    </select>
+  </div>
+  <p id="message" class="order-message" role="status"></p>
+  <div id="dailyOrderList" class="daily-order-list"></div>
+</section>
+
+<section class="daily-order-panel home-order-panel">
+  <div class="daily-order-heading">
+    <h2>Open Orders</h2>
+    <span id="openOrderCount"></span>
+  </div>
+  <div id="openOrderList" class="daily-order-list"></div>
+</section>
+
+<section class="daily-order-panel home-order-panel">
+  <div class="daily-order-heading">
+    <h2>Standing Orders</h2>
+    <span id="standingOrderCount"></span>
+  </div>
+  <div id="standingOrderList" class="daily-order-list"></div>
+</section>

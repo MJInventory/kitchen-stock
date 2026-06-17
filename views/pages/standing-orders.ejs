@@ -1,0 +1,35 @@
+<section class="panel">
+  <form id="standingOrderForm" class="admin-form-grid">
+    <label class="wide-field">Standing order name <input id="standingName" type="text" placeholder="Weekly dry goods, Monday delivery"></label>
+    <label>Supplier <select id="standingSupplier" required></select></label>
+    <label>Delivery date <input id="expectedDate" type="date" required></label>
+    <label>Schedule
+      <select id="schedule">
+        <option>Weekly</option>
+        <option>Daily</option>
+        <option>One Time</option>
+        <option>Other</option>
+      </select>
+    </label>
+    <label>Other schedule <input id="otherSchedule" type="text" placeholder="Every 2 weeks, monthly, manual"></label>
+    <fieldset class="wide-field inline-fieldset">
+      <legend>Items</legend>
+      <div class="standing-item-adder">
+        <input id="standingItemSearch" type="search" placeholder="Search inventory items">
+        <input id="standingQuantity" type="number" min="1" step="1" value="1" aria-label="Quantity">
+      </div>
+      <div id="standingItemResults" class="search-pick-list"></div>
+      <div id="standingItems" class="standing-items"></div>
+    </fieldset>
+    <label class="wide-field">Notes <textarea id="standingNotes" rows="3"></textarea></label>
+    <button type="submit">Create Standing Order</button>
+    <p id="standingMessage" role="status"></p>
+  </form>
+</section>
+
+<section id="standingList" class="settings-list standing-accordion-list"></section>
+
+<section class="panel standing-history-panel">
+  <h2>Recent Standing Order Runs</h2>
+  <div id="standingRunList" class="settings-list"></div>
+</section>

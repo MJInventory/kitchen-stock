@@ -1,0 +1,15 @@
+<section class="panel">
+  <form id="itemForm" class="admin-form-grid">
+    <label>Item name <input id="itemName" type="text" required></label>
+    <label>Category <select id="category" required></select></label>
+    <label>Area <select id="inventoryArea" required></select></label>
+    <label>Storage location <select id="storageLocation" required></select></label>
+    <label>Shelf code <select id="shelfCode"></select></label>
+    <label>Supplier <select id="supplierId"></select></label>
+    <label>Unit <select id="unit" required></select></label>
+    <label>Current stock <input id="currentQuantity" type="number" min="0" step="0.01" value="0" required></label>
+    <label>Minimum stock <input id="minimumThreshold" type="number" min="0" step="0.01" value="0" required></label>
+    <button type="submit">Add Item</button>
+    <p id="itemMessage" role="status"></p>
+  </form>
+</section>

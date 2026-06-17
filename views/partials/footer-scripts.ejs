@@ -1,0 +1,7 @@
+<% for (const script of footerScripts) { %>
+  <% if (typeof script === "string") { %>
+    <script src="<%= script %>"></script>
+  <% } else { %>
+    <script src="<%= script.src %>"<% if (script.type) { %> type="<%= script.type %>"<% } %>></script>
+  <% } %>
+<% } %>

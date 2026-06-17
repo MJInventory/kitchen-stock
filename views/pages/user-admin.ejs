@@ -1,0 +1,70 @@
+<section class="panel">
+  <h2>Add User</h2>
+  <form id="newUserForm" class="admin-form-grid">
+    <label>Name <input id="newName" type="text" required></label>
+    <label>Password <input id="newPassword" type="text" required></label>
+    <label>Role
+      <select id="newRole">
+        <option value="user">User</option>
+        <option value="staff">Staff</option>
+        <option value="power-user">Power User</option>
+        <option value="admin" data-god-only>Admin</option>
+        <option value="god" data-god-only>God</option>
+      </select>
+    </label>
+    <label>Theme
+      <select id="newTheme">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </label>
+    <fieldset class="inline-fieldset wide-field">
+      <legend>Notify for area orders</legend>
+      <div class="notify-area-grid">
+        <label class="check-label"><input id="newNotifyBar" type="checkbox" checked> Bar</label>
+        <label class="check-label"><input id="newNotifyFoh" type="checkbox" checked> FOH</label>
+        <label class="check-label"><input id="newNotifyKitchen" type="checkbox" checked> Kitchen</label>
+        <label class="check-label"><input id="newNotifyGeneral" type="checkbox" checked> General</label>
+      </div>
+    </fieldset>
+    <label class="check-label"><input id="newNotifyOrders" type="checkbox"> Notify on new orders</label>
+    <label class="check-label"><input id="newNotifyDelivery" type="checkbox" checked> Notify on delivered items</label>
+    <label class="check-label"><input id="newIsDriver" type="checkbox"> Dedicated driver</label>
+    <label class="check-label"><input id="newIsPicker" type="checkbox"> Picker</label>
+    <label class="check-label"><input id="newMustChange" type="checkbox"> Force password change</label>
+    <button type="submit">Add User</button>
+  </form>
+  <p id="adminMessage" role="status"></p>
+</section>
+
+<section class="panel user-admin-toolbar">
+  <h2>Find And Manage Users</h2>
+  <div class="user-admin-toolbar-grid">
+    <label>Search
+      <input id="userSearch" type="search" placeholder="Search by name, role or note">
+    </label>
+    <label>Role
+      <select id="roleFilter">
+        <option value="all">All roles</option>
+        <option value="god">God</option>
+        <option value="admin">Admin</option>
+        <option value="power-user">Power User</option>
+        <option value="staff">Staff</option>
+        <option value="user">User</option>
+      </select>
+    </label>
+    <label>Status
+      <select id="statusFilter">
+        <option value="all">All users</option>
+        <option value="active">Active only</option>
+        <option value="inactive">Inactive only</option>
+        <option value="must-change">Password change required</option>
+        <option value="drivers">Dedicated drivers</option>
+        <option value="pickers">Pickers</option>
+      </select>
+    </label>
+  </div>
+  <p id="userCount" class="toolbar-summary"></p>
+</section>
+
+<section id="userList" class="settings-list"></section>

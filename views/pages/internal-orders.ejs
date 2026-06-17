@@ -1,0 +1,48 @@
+<section class="daily-order-panel">
+  <div class="daily-order-heading">
+    <h2>Internal Requests</h2>
+    <span>Staff flow</span>
+  </div>
+  <p class="section-helper">Ask the picker for individual items. Stock is treated as 12 items per box for this first version.</p>
+</section>
+
+<section class="order-search-band">
+  <label class="search-box">
+    <span>Search</span>
+    <input id="searchInput" type="search" placeholder="Search inventory items..." autocomplete="off">
+  </label>
+  <div class="order-filters">
+    <select id="areaFilter" aria-label="Inventory area">
+      <option value="">All Areas</option>
+    </select>
+    <select id="locationFilter" aria-label="Storage location">
+      <option value="">All Locations</option>
+    </select>
+  </div>
+  <div id="selectedChips" class="selected-chips"></div>
+  <p id="message" class="order-message" role="status"></p>
+</section>
+
+<section id="categoryView" class="category-view">
+  <div class="order-divider"><span>All Categories</span></div>
+  <div id="categoryGrid" class="category-grid"></div>
+</section>
+
+<section id="productView" class="product-view" hidden>
+  <div class="product-heading">
+    <button id="backButton" class="back-button" type="button">Back Home</button>
+    <div>
+      <h2 id="categoryTitle">Products</h2>
+      <p id="categoryMeta"></p>
+    </div>
+  </div>
+  <div id="catalogList" class="product-list"></div>
+</section>
+
+<section class="daily-order-panel">
+  <div class="daily-order-heading">
+    <h2>My Internal Orders</h2>
+    <span id="internalCount"></span>
+  </div>
+  <div id="internalOrderList" class="daily-order-list"></div>
+</section>

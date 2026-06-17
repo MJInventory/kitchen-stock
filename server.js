@@ -1,7 +1,9 @@
+import "./lib/load-env.js";
 import http from "node:http";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
+import ejs from "ejs";
 import webpush from "web-push";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
@@ -10,6 +12,8 @@ import { getPool, postgresEnabled } from "./lib/postgres.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
+const viewsDir = join(__dirname, "views");
+const appVersion = "2.009";
 
 const baseId = "appAFvMwWZb2PPWUz";
 const inventoryTableId = "tblEuIXG6gxEiD5oU";
@@ -2517,7 +2521,7 @@ async function pgEnsureDriverSheetLines(selectedDate) {
     select
       $1::date,
       r.id,
-      i.primary_supplier_id,
+      coalesce(sso.id, i.primary_supplier_id),
       $3,
       r.ordered,
       r.delivered,
@@ -2526,6 +2530,10 @@ async function pgEnsureDriverSheetLines(selectedDate) {
       r.notes
     from order_requests r
     join inventory_items i on i.id = r.inventory_item_id
+    left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join standing_order_runs sor on sor.id = coalesce(r.standing_order_run_id, sorl.standing_order_run_id)
+    left join standing_orders so on so.id = coalesce(sor.standing_order_id, sorl.standing_order_id)
+    left join suppliers sso on sso.id = so.supplier_id
     where r.delivered = false
       and r.status in ('Pending', 'Approved')
       and (r.requested_at at time zone $2)::date <= $1::date
@@ -2535,6 +2543,27 @@ async function pgEnsureDriverSheetLines(selectedDate) {
         where d.sheet_date = $1::date and d.order_request_id = r.id
       )
   `, [selectedDate, appTimeZone, resolvedDriver || null]);
+
+  await db().query(`
+    update driver_sheet_lines d
+    set supplier_id = sso.id,
+        updated_at = now()
+    from order_requests r
+    join inventory_items i on i.id = r.inventory_item_id
+    left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join standing_order_runs sor on sor.id = coalesce(r.standing_order_run_id, sorl.standing_order_run_id)
+    left join standing_orders so on so.id = coalesce(sor.standing_order_id, sorl.standing_order_id)
+    left join suppliers sso on sso.id = so.supplier_id
+    where d.order_request_id = r.id
+      and d.sheet_date = $1::date
+      and r.delivered = false
+      and r.status in ('Pending', 'Approved')
+      and sso.id is not null
+      and d.supplier_id = i.primary_supplier_id
+      and i.primary_supplier_id is distinct from sso.id
+      and coalesce(d.ordered, false) = false
+      and coalesce(d.received, false) = false
+  `, [selectedDate]);
 
   if (resolvedDriver) {
     await db().query(`
@@ -2561,8 +2590,8 @@ async function pgDriverSheetRequests(selectedDate) {
       d.received_by_username as received_by,
       d.to_deliver,
       d.delivery_day::text as delivery_day,
-      coalesce(ds.name, sorl.supplier_name, sp.name) as supplier_name,
-      coalesce(ds.contact_information, ss.contact_information, sp.contact_information, '') as supplier_contact,
+      coalesce(ds.name, nullif(trim(sorl.supplier_name), ''), sso.name, sp.name) as supplier_name,
+      coalesce(ds.contact_information, ss.contact_information, sso.contact_information, sp.contact_information, '') as supplier_contact,
       r.id,
       r.request_number,
       r.inventory_item_id as item_id,
@@ -2592,13 +2621,16 @@ async function pgDriverSheetRequests(selectedDate) {
     left join units_of_measure u on u.id = i.unit_of_measure_id
     left join suppliers sp on sp.id = i.primary_supplier_id
     left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join standing_order_runs sor on sor.id = coalesce(r.standing_order_run_id, sorl.standing_order_run_id)
+    left join standing_orders so on so.id = coalesce(sor.standing_order_id, sorl.standing_order_id)
+    left join suppliers sso on sso.id = so.supplier_id
     left join suppliers ss on lower(ss.name) = lower(sorl.supplier_name)
     left join driver_sheet_lines d on d.order_request_id = r.id and d.sheet_date = $1::date
     left join suppliers ds on ds.id = d.supplier_id
     where r.delivered = false
       and r.status in ('Pending', 'Approved')
       and (r.requested_at at time zone $2)::date <= $1::date
-    order by coalesce(ds.name, sorl.supplier_name, sp.name) nulls last, c.name nulls last, sc.code nulls last, i.name
+    order by coalesce(ds.name, nullif(trim(sorl.supplier_name), ''), sso.name, sp.name) nulls last, c.name nulls last, sc.code nulls last, i.name
   `, [selectedDate, appTimeZone]);
   return result.rows.map((row) => pgRequestFromRow({
     ...row,
@@ -2678,7 +2710,7 @@ async function pgListOrderReport(date) {
       d.delivery_day::text as delivery_day,
       r.standing_order_run_id,
       r.standing_order_run_line_id,
-      coalesce(ds.name, sorl.supplier_name, sp.name) as supplier_name,
+      coalesce(ds.name, nullif(trim(sorl.supplier_name), ''), sso.name, sp.name) as supplier_name,
       r.id as request_id,
       r.request_number,
       r.quantity_needed as quantity,
@@ -2706,9 +2738,12 @@ async function pgListOrderReport(date) {
     left join units_of_measure u on u.id = i.unit_of_measure_id
     left join suppliers sp on sp.id = i.primary_supplier_id
     left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join standing_order_runs sor on sor.id = coalesce(r.standing_order_run_id, sorl.standing_order_run_id)
+    left join standing_orders so on so.id = coalesce(sor.standing_order_id, sorl.standing_order_id)
+    left join suppliers sso on sso.id = so.supplier_id
     left join suppliers ds on ds.id = d.supplier_id
     where d.sheet_date = $1::date
-    order by coalesce(ds.name, sorl.supplier_name, sp.name) nulls last, c.name nulls last, i.name
+    order by coalesce(ds.name, nullif(trim(sorl.supplier_name), ''), sso.name, sp.name) nulls last, c.name nulls last, i.name
   `, [selectedDate]);
   const rows = result.rows.map((row) => ({
     ...pgDriverLineFromRow(row),
@@ -3950,13 +3985,16 @@ async function pgDeliverDriverLine(recordId, requestRecordId, userName, options 
   const lineResult = await db().query(`
     select d.id, d.driver_username, d.ordered, d.to_deliver, d.delivery_day::text as delivery_day,
            d.received, d.received_at, d.received_by_username,
-           coalesce(ds.name, sorl.supplier_name, sp.name) as supplier_name,
-           coalesce(ds.contact_information, ss.contact_information, sp.contact_information, '') as supplier_contact
+           coalesce(ds.name, nullif(trim(sorl.supplier_name), ''), sso.name, sp.name) as supplier_name,
+           coalesce(ds.contact_information, ss.contact_information, sso.contact_information, sp.contact_information, '') as supplier_contact
     from driver_sheet_lines d
     join order_requests r on r.id = d.order_request_id
     join inventory_items i on i.id = r.inventory_item_id
     left join suppliers sp on sp.id = i.primary_supplier_id
     left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
+    left join standing_order_runs sor on sor.id = coalesce(r.standing_order_run_id, sorl.standing_order_run_id)
+    left join standing_orders so on so.id = coalesce(sor.standing_order_id, sorl.standing_order_id)
+    left join suppliers sso on sso.id = so.supplier_id
     left join suppliers ss on lower(ss.name) = lower(sorl.supplier_name)
     left join suppliers ds on ds.id = d.supplier_id
     where d.id = $1
@@ -7178,8 +7216,370 @@ async function serveStatic(req, res) {
   }
 }
 
+async function renderView(res, viewName, data = {}, status = 200) {
+  const viewData = {
+    appVersion,
+    bodyClass: "",
+    pageTitle: "MJ Stock Magic",
+    pageEyebrow: "Inventory",
+    brandTitle: "MJ Stock Magic",
+    brandSubtitle: "MADAME JANETTE",
+    themeColor: "#0f766e",
+    headExtras: "",
+    contentClass: "shell setup-shell",
+    beforeMain: "",
+    topbarMenus: false,
+    topbarClass: "",
+    topbarActions: "",
+    footerScripts: [],
+    ...data
+  };
+  const body = await ejs.renderFile(join(viewsDir, `${viewName}.ejs`), viewData, { views: [viewsDir] });
+  const html = await ejs.renderFile(
+    join(viewsDir, "layouts", "base.ejs"),
+    {
+      ...viewData,
+      body
+    },
+    { views: [viewsDir] }
+  );
+  send(res, status, html, "text/html; charset=utf-8");
+}
+
+async function renderPartial(partialName, data = {}) {
+  return ejs.renderFile(join(viewsDir, "partials", `${partialName}.ejs`), data, { views: [viewsDir] });
+}
+
+function pageScripts(moduleSrc, { offline = false } = {}) {
+  const scripts = ["/menus.js", "/push.js", "/theme.js"];
+  if (offline) scripts.push("/offline-queue.js");
+  if (moduleSrc) scripts.push({ src: moduleSrc, type: "module" });
+  return scripts;
+}
+
+async function loginPartial(title, eyebrow = "Inventory", { numericPassword = false } = {}) {
+  return renderPartial("login-screen", {
+    eyebrow,
+    title,
+    ...(numericPassword ? { passwordInputMode: "numeric" } : {})
+  });
+}
+
+function actionButton(href, label) {
+  return `<a class="button secondary" href="${href}">${label}</a>`;
+}
+
+function actionLogout({ compact = false } = {}) {
+  return compact
+    ? '<button id="logoutButton" class="icon-button" type="button" title="Log out">Log Out</button>'
+    : '<button id="logoutButton" class="secondary" type="button">Log Out</button>';
+}
+
+function actionUserChip() {
+  return '<span id="currentUser" class="user-chip"></span>';
+}
+
+function joinActions(actions) {
+  return actions.filter(Boolean).join("\n");
+}
+
+function adminActions({ includeSetup = false } = {}) {
+  return joinActions([
+    actionUserChip(),
+    includeSetup ? actionButton("/inventory-settings.html", "Setup") : "",
+    actionButton("/", "Main Menu"),
+    actionLogout()
+  ]);
+}
+
+function sheetActions(links = []) {
+  return joinActions([
+    actionUserChip(),
+    ...links.map((link) => actionButton(link.href, link.label)),
+    actionLogout()
+  ]);
+}
+
+function orderShellActions({ saveButtonId = "", saveButtonLabel = "", logoutCompact = true } = {}) {
+  return joinActions([
+    actionUserChip(),
+    saveButtonId ? `<button id="${saveButtonId}" class="save-pill" type="button">${saveButtonLabel}</button>` : "",
+    actionLogout({ compact: logoutCompact })
+  ]);
+}
+
+async function buildPageRoute(url) {
+  switch (url) {
+    case "/":
+    case "/index.html":
+      return {
+        view: "pages/index",
+        options: {
+          pageTitle: "MJ Stock Magic Home",
+          bodyClass: "order-app",
+          contentClass: "order-shell",
+          beforeMain: await loginPartial("MJ Stock Magic", "Inventory", { numericPassword: true }),
+          topbarMenus: true,
+          brandTitle: "MJ Stock Magic",
+          brandSubtitle: "MADAME JANETTE",
+          topbarActions: orderShellActions(),
+          footerScripts: pageScripts("/dashboard.js")
+        }
+      };
+    case "/phase1-preview":
+      return {
+        view: "pages/phase1-preview",
+        options: {
+          pageTitle: "Phase 1 Preview",
+          bodyClass: "order-app",
+          contentClass: "order-shell",
+          topbarMenus: true,
+          topbarActions: '<a class="button secondary" href="/">Main Menu</a>',
+          footerScripts: pageScripts()
+        }
+      };
+    case "/categories.html":
+      return {
+        view: "pages/categories",
+        options: {
+          pageTitle: "Category Admin",
+          pageEyebrow: "Inventory Setup",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Category Admin", "Inventory Setup"),
+          topbarMenus: false,
+          topbarActions: adminActions({ includeSetup: true }),
+          footerScripts: pageScripts("/categories.js")
+        }
+      };
+    case "/suppliers.html":
+      return {
+        view: "pages/suppliers",
+        options: {
+          pageTitle: "Supplier Admin",
+          pageEyebrow: "Inventory Setup",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Supplier Admin", "Inventory Setup"),
+          topbarMenus: false,
+          topbarActions: adminActions({ includeSetup: true }),
+          footerScripts: pageScripts("/suppliers.js")
+        }
+      };
+    case "/shelf-codes.html":
+      return {
+        view: "pages/shelf-codes",
+        options: {
+          pageTitle: "Storage & Shelf Admin",
+          pageEyebrow: "Inventory Setup",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Storage & Shelf Admin", "Inventory Setup"),
+          topbarMenus: false,
+          topbarActions: adminActions({ includeSetup: true }),
+          footerScripts: pageScripts("/shelf-codes.js")
+        }
+      };
+    case "/user-admin.html":
+      return {
+        view: "pages/user-admin",
+        options: {
+          pageTitle: "User Administration",
+          pageEyebrow: "Inventory",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("User Admin", "Inventory"),
+          topbarMenus: false,
+          topbarActions: adminActions(),
+          footerScripts: pageScripts("/user-admin.js")
+        }
+      };
+    case "/inventory-settings.html":
+      return {
+        view: "pages/inventory-settings",
+        options: {
+          pageTitle: "Inventory Items",
+          pageEyebrow: "Inventory",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Inventory Items", "Inventory", { numericPassword: true }),
+          topbarMenus: false,
+          topbarActions: adminActions(),
+          footerScripts: pageScripts("/inventory-settings.js")
+        }
+      };
+    case "/inventory-add.html":
+      return {
+        view: "pages/inventory-add",
+        options: {
+          pageTitle: "Add Inventory Item",
+          pageEyebrow: "Inventory",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Add Inventory Item", "Inventory", { numericPassword: true }),
+          topbarMenus: false,
+          topbarActions: adminActions(),
+          footerScripts: pageScripts("/inventory-add.js")
+        }
+      };
+    case "/change-password.html":
+      return {
+        view: "pages/change-password",
+        options: {
+          pageTitle: "Change Password",
+          pageEyebrow: "Inventory",
+          contentClass: "shell setup-shell",
+          topbarMenus: false,
+          topbarActions: joinActions([actionButton("/", "Main Menu")]),
+          footerScripts: pageScripts("/change-password.js")
+        }
+      };
+    case "/standing-orders.html":
+      return {
+        view: "pages/standing-orders",
+        options: {
+          pageTitle: "Standing Orders",
+          pageEyebrow: "Inventory",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Standing Orders", "Inventory", { numericPassword: true }),
+          topbarMenus: false,
+          topbarActions: adminActions(),
+          footerScripts: pageScripts("/standing-orders.js")
+        }
+      };
+    case "/invoice-capture.html":
+      return {
+        view: "pages/invoice-capture",
+        options: {
+          pageTitle: "Invoice Capture",
+          pageEyebrow: "Inventory",
+          contentClass: "shell",
+          beforeMain: await loginPartial("Invoice Capture", "Inventory", { numericPassword: true }),
+          topbarMenus: false,
+          topbarActions: adminActions(),
+          footerScripts: pageScripts("/invoice-capture.js")
+        }
+      };
+    case "/ordering.html":
+      return {
+        view: "pages/ordering",
+        options: {
+          pageTitle: "MJ Stock Magic Ordering",
+          bodyClass: "order-app",
+          contentClass: "order-shell",
+          beforeMain: await loginPartial("MJ Stock Magic", "Inventory", { numericPassword: true }),
+          topbarMenus: true,
+          brandTitle: "MJ Stock Magic",
+          brandSubtitle: "MADAME JANETTE",
+          topbarActions: orderShellActions({ saveButtonId: "submitButton", saveButtonLabel: "0 Saved" }),
+          footerScripts: pageScripts("/app.js", { offline: true })
+        }
+      };
+    case "/stock-count.html":
+      return {
+        view: "pages/stock-count",
+        options: {
+          pageTitle: "Stock Count",
+          bodyClass: "order-app stock-count-app",
+          contentClass: "order-shell",
+          beforeMain: await loginPartial("Stock Count", "Inventory", { numericPassword: true }),
+          topbarMenus: true,
+          brandTitle: "MJ Stock Magic",
+          brandSubtitle: "STOCK COUNT",
+          topbarActions: orderShellActions({ saveButtonId: "saveAllButton", saveButtonLabel: "Save Counts" }),
+          footerScripts: pageScripts("/stock-count.js", { offline: true })
+        }
+      };
+    case "/receiving-sheet.html":
+      return {
+        view: "pages/receiving-sheet",
+        options: {
+          pageTitle: "Receiving",
+          contentClass: "shell sheet-shell",
+          beforeMain: await loginPartial("Receiving", "Inventory", { numericPassword: true }),
+          topbarClass: "no-print",
+          topbarActions: sheetActions([
+            { href: "/", label: "Main Menu" },
+            { href: "/driver-sheet.html", label: "Driver Sheet" },
+            { href: "/order-report.html", label: "Reports" }
+          ]),
+          footerScripts: pageScripts("/receiving-sheet.js")
+        }
+      };
+    case "/driver-sheet.html":
+      return {
+        view: "pages/driver-sheet",
+        options: {
+          pageTitle: "Driver Sheet",
+          contentClass: "shell sheet-shell",
+          beforeMain: await loginPartial("Driver Sheet", "Inventory", { numericPassword: true }),
+          topbarClass: "no-print",
+          topbarActions: sheetActions([
+            { href: "/", label: "Main Menu" },
+            { href: "/receiving-sheet.html", label: "Receiving" },
+            { href: "/order-report.html", label: "Reports" }
+          ]),
+          footerScripts: pageScripts("/driver-sheet.js")
+        }
+      };
+    case "/order-report.html":
+      return {
+        view: "pages/order-report",
+        options: {
+          pageTitle: "Order Report",
+          contentClass: "shell sheet-shell",
+          beforeMain: await loginPartial("Order Report", "Inventory", { numericPassword: true }),
+          topbarClass: "no-print",
+          topbarActions: sheetActions([
+            { href: "/", label: "Main Menu" },
+            { href: "/driver-sheet.html", label: "Driver Sheet" },
+            { href: "/receiving-sheet.html", label: "Receiving" }
+          ]),
+          footerScripts: pageScripts("/order-report.js")
+        }
+      };
+    case "/internal-orders.html":
+      return {
+        view: "pages/internal-orders",
+        options: {
+          pageTitle: "Internal Orders",
+          bodyClass: "order-app",
+          contentClass: "order-shell",
+          beforeMain: await loginPartial("Internal Orders", "Inventory", { numericPassword: true }),
+          topbarMenus: true,
+          brandTitle: "MJ Stock Magic",
+          brandSubtitle: "MADAME JANETTE",
+          topbarActions: orderShellActions({ saveButtonId: "submitButton", saveButtonLabel: "0 Saved" }),
+          footerScripts: pageScripts("/internal-orders.js", { offline: true })
+        }
+      };
+    case "/picker-sheet.html":
+      return {
+        view: "pages/picker-sheet",
+        options: {
+          pageTitle: "Picker Board",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("Picker Board", "Inventory", { numericPassword: true }),
+          topbarMenus: false,
+          topbarActions: joinActions([actionUserChip(), actionLogout()]),
+          footerScripts: pageScripts("/picker-sheet.js", { offline: true })
+        }
+      };
+    default:
+      return null;
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    if (req.method === "GET" && req.url === "/storage-locations.html") {
+      res.writeHead(302, { Location: "/shelf-codes.html" });
+      res.end();
+      return;
+    }
+
+    if (req.method === "GET") {
+      const pageRoute = await buildPageRoute(req.url);
+      if (pageRoute) {
+        await renderView(res, pageRoute.view, pageRoute.options);
+        return;
+      }
+    }
+
     if (req.method === "POST" && req.url === "/api/login") {
       const payload = await readJson(req);
       const name = String(payload.username || "").trim();

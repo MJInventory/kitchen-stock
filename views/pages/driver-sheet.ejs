@@ -1,0 +1,38 @@
+<section class="panel no-print">
+  <div class="row">
+    <label>
+      Pickup date
+      <input id="sheetDate" type="date">
+    </label>
+    <label>
+      Driver
+      <input id="driverName" type="text" placeholder="Driver name">
+    </label>
+  </div>
+  <div class="sheet-actions">
+    <button id="loadSheetButton" type="button">Load Sheet</button>
+    <button id="saveDriverButton" type="button">Assign Driver</button>
+    <button id="printSheetButton" type="button">Print / Save PDF</button>
+  </div>
+  <p id="sheetMessage" role="status"></p>
+</section>
+
+<section id="printSheet" class="print-sheet">
+  <div class="sheet-header">
+    <div>
+      <p class="eyebrow">Daily Pickup Order</p>
+      <h1 id="printTitle">Driver Sheet</h1>
+    </div>
+    <div class="sheet-meta">
+      <span id="printDate"></span>
+      <span id="printDriver"></span>
+    </div>
+  </div>
+
+  <div class="signature-row">
+    <span>Driver signature:</span>
+    <span>Received by:</span>
+  </div>
+
+  <div id="sheetList" class="sheet-list"></div>
+</section>

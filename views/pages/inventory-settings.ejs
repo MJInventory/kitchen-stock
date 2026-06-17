@@ -1,0 +1,45 @@
+<section class="panel setup-menu-panel">
+  <div class="setup-menu-links">
+    <a class="button secondary" href="/inventory-add.html">Add Item</a>
+    <a class="button secondary" href="/categories.html">Categories</a>
+    <a class="button secondary" href="/suppliers.html">Suppliers</a>
+    <a class="button secondary" href="/shelf-codes.html">Storage &amp; Shelves</a>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="row">
+    <label>
+      Area
+      <select id="areaFilter">
+        <option value="">All</option>
+        <option>Bar</option>
+        <option>Kitchen</option>
+        <option>FOH</option>
+      </select>
+    </label>
+    <label>
+      Location
+      <select id="locationFilter">
+        <option value="">All</option>
+        <option>Dry Storage</option>
+        <option>Cooler</option>
+        <option>Freezer</option>
+        <option>Liquor Storage</option>
+        <option>General Storage</option>
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    <label>
+      Search
+      <input id="searchFilter" type="search" placeholder="Search item, supplier, category...">
+    </label>
+  </div>
+  <div class="setup-save-bar">
+    <p id="setupMessage" role="status"></p>
+    <button id="saveAllButton" type="button" disabled>Save All Changes</button>
+  </div>
+</section>
+
+<section id="itemSettingsList" class="settings-list"></section>

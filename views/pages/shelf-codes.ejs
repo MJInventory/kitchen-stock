@@ -1,0 +1,24 @@
+<section class="panel">
+  <h2>Storage Locations</h2>
+  <form id="locationForm" class="admin-form-grid">
+    <label>Name <input id="locationName" type="text" required></label>
+    <label class="check-label"><input id="locationActive" type="checkbox" checked> Active</label>
+    <button type="submit">Add Location</button>
+    <p id="locationMessage" role="status"></p>
+  </form>
+</section>
+
+<section id="locationList" class="settings-list"></section>
+
+<section class="panel">
+  <h2>Add Shelf Code</h2>
+  <form id="shelfForm" class="admin-form-grid">
+    <label>Shelf code <input id="shelfName" type="text" required></label>
+    <label>Storage location <select id="shelfLocation" required></select></label>
+    <label class="check-label"><input id="shelfActive" type="checkbox" checked> Active</label>
+    <button type="submit">Add Shelf</button>
+    <p id="shelfMessage" role="status"></p>
+  </form>
+</section>
+
+<section id="shelfList" class="settings-list"></section>

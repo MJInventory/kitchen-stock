@@ -1,4 +1,5 @@
 import {
+  escapeHtml,
   formatUserDisplay,
   sameUser,
   todayLocal

@@ -3,27 +3,27 @@
   <head>
     <%- include("../partials/head") %>
   </head>
-  <body<% if (bodyClass) { %> class="<%= bodyClass %>"<% } %>>
-    <%- beforeMain %>
-    <main class="<%= contentClass %>">
-      <header class="order-topbar<% if (topbarClass) { %> <%= topbarClass %><% } %>">
+  <body<% if (typeof bodyClass !== "undefined" && bodyClass) { %> class="<%= bodyClass %>"<% } %>>
+    <%- typeof beforeMain !== "undefined" ? beforeMain : "" %>
+    <main class="<%= typeof contentClass !== "undefined" && contentClass ? contentClass : "shell" %>">
+      <header class="order-topbar<% if (typeof topbarClass !== "undefined" && topbarClass) { %> <%= topbarClass %><% } %>">
         <%- include("../partials/brand") %>
         <div class="top-actions">
-          <%- topbarActions %>
+          <%- typeof topbarActions !== "undefined" ? topbarActions : "" %>
         </div>
       </header>
 
-      <% if (showPageIntro) { %>
+      <% if (typeof showPageIntro !== "undefined" && showPageIntro) { %>
         <section class="page-intro">
-          <p class="eyebrow"><%= pageEyebrow %></p>
-          <h1><%= pageTitle %></h1>
+          <p class="eyebrow"><%= typeof pageEyebrow !== "undefined" ? pageEyebrow : "" %></p>
+          <h1><%= typeof pageTitle !== "undefined" ? pageTitle : "MJ Stock Magic" %></h1>
         </section>
       <% } %>
 
-      <%- body %>
+      <%- typeof body !== "undefined" ? body : "" %>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v<%= appVersion %></footer>
+    <footer class="app-version">MJ Stock Magic v<%= typeof appVersion !== "undefined" ? appVersion : "" %></footer>
     <%- include("../partials/footer-scripts") %>
   </body>
 </html>

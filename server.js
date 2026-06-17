@@ -1,6 +1,5 @@
 import "./lib/load-env.js";
 import http from "node:http";
-import crypto from "node:crypto";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import webpush from "web-push";
@@ -47,6 +46,11 @@ import { ensurePostgresSchemaUpgrades as applyPostgresSchemaUpgrades } from "./l
 import { createViewHelpers } from "./lib/view-helpers.js";
 import { createPageRouteBuilder } from "./lib/page-routes.js";
 import { createRenderer } from "./lib/rendering.js";
+import { createUserHelpers } from "./lib/user-helpers.js";
+import { createAuditLogHelpers } from "./lib/audit-log.js";
+import { createPostgresRowMappers } from "./lib/postgres-row-mappers.js";
+import { createSupplierDomain } from "./lib/supplier-domain.js";
+import { createLookupAdminDomain } from "./lib/lookup-admin-domain.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
@@ -128,203 +132,78 @@ function todayIso() {
   }).format(new Date());
 }
 
-function cleanAuditSnapshot(value) {
-  if (value == null) return null;
-  try {
-    return JSON.parse(JSON.stringify(value));
-  } catch {
-    return null;
-  }
-}
+const {
+  cleanAuditSnapshot,
+  auditChanged,
+  pgRecordAuditEntry,
+  pgListAuditEntries
+} = createAuditLogHelpers({
+  ensurePostgresSchemaUpgrades,
+  db,
+  todayIso
+});
 
-function auditChanged(before, after) {
-  return JSON.stringify(cleanAuditSnapshot(before)) !== JSON.stringify(cleanAuditSnapshot(after));
-}
+const {
+  normalizeRole,
+  userPermissions,
+  presentUserName,
+  publicUser,
+  mapPgAppUserRow,
+  parseUsers,
+  createSession,
+  verifySession,
+  storeSession
+} = createUserHelpers({
+  userConfig,
+  editableUserSources,
+  gotoMenuOptions,
+  backofficeMenuOptions,
+  authSecret,
+  sessionMaxAgeMs,
+  clampOpenOrderDays,
+  normalizeHiddenMenuItems
+});
 
-async function pgRecordAuditEntry({
-  actionType,
-  entityType,
-  entityId = "",
-  entityName = "",
-  actorUsername = "",
-  reasonCode = "",
-  note = "",
-  before = null,
-  after = null,
-  actionDate = todayIso()
-}) {
-  await ensurePostgresSchemaUpgrades();
-  await db().query(`
-    insert into audit_log_entries (
-      action_date, action_type, entity_type, entity_id, entity_name,
-      actor_username, reason_code, note, before_json, after_json
-    )
-    values ($1::date, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
-  `, [
-    /^\d{4}-\d{2}-\d{2}$/.test(actionDate || "") ? actionDate : todayIso(),
-    actionType,
-    entityType,
-    String(entityId || ""),
-    String(entityName || ""),
-    String(actorUsername || ""),
-    String(reasonCode || ""),
-    String(note || ""),
-    JSON.stringify(cleanAuditSnapshot(before)),
-    JSON.stringify(cleanAuditSnapshot(after))
-  ]);
-}
-
-async function pgListAuditEntries(date) {
-  await ensurePostgresSchemaUpgrades();
-  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : todayIso();
-  const result = await db().query(`
-    select
-      id,
-      action_date::text as action_date,
-      action_type,
-      entity_type,
-      entity_id,
-      entity_name,
-      actor_username,
-      reason_code,
-      note,
-      before_json,
-      after_json,
-      created_at
-    from audit_log_entries
-    where action_date = $1::date
-    order by created_at desc, entity_type, entity_name
-  `, [selectedDate]);
-  return result.rows.map((row) => ({
-    id: row.id,
-    date: row.action_date || selectedDate,
-    actionType: row.action_type || "",
-    entityType: row.entity_type || "",
-    entityId: row.entity_id || "",
-    entityName: row.entity_name || "",
-    actorUsername: row.actor_username || "",
-    reasonCode: row.reason_code || "",
-    note: row.note || "",
-    before: row.before_json || null,
-    after: row.after_json || null,
-    createdAt: row.created_at || ""
-  }));
-}
-
-function parseUsers() {
-  return new Map(
-    userConfig
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => {
-        const [name, password, roleValue] = entry.split(":");
-        const role = normalizeRole(roleValue || (String(name || "").trim().toLowerCase() === "enno" ? "god" : "user"));
-        return [String(name || "").trim().toLowerCase(), {
-          name: String(name || "").trim(),
-          password: String(password || "").trim(),
-          role,
-          active: true,
-          mustChangePassword: false,
-          source: "env"
-        }];
-      })
-      .filter(([name, user]) => name && user.password)
-  );
-}
+const {
+  pgNumber,
+  pgItemFromRow,
+  pgRequestFromRow,
+  pgDriverLineFromRow,
+  pgStandingOrderFromRow
+} = createPostgresRowMappers({
+  standingRunIdFromNotes,
+  standingRunLineIdFromNotes
+});
+const {
+  pgListSuppliers,
+  pgListSuppliersAdmin,
+  pgSaveSupplier,
+  pgDeleteSupplier,
+  pgFindOrCreateSupplierByName
+} = createSupplierDomain({
+  db,
+  cache,
+  isValidId,
+  auditChanged,
+  pgRecordAuditEntry
+});
+const {
+  pgListStorageLocationsAdmin,
+  pgListCategoriesAdmin,
+  pgListShelfCodesAdmin,
+  pgSaveStorageLocation,
+  pgSaveCategory,
+  pgDeleteCategory,
+  pgSaveShelfCode
+} = createLookupAdminDomain({
+  db,
+  cache,
+  auditChanged,
+  pgRecordAuditEntry,
+  pgFindOrCreateLookupRecord
+});
 
 const users = parseUsers();
-
-function normalizeRole(role) {
-  const cleaned = String(role || "").trim().toLowerCase().replace(/[\s_-]+/g, "-");
-  if (cleaned === "god") return "god";
-  if (cleaned === "admin") return "admin";
-  if (cleaned === "power-user" || cleaned === "poweruser" || cleaned === "power") return "power-user";
-  if (cleaned === "staff") return "staff";
-  return "user";
-}
-
-function userPermissions(role) {
-  const normalized = normalizeRole(role);
-  const isGod = normalized === "god";
-  const isAdmin = normalized === "admin" || isGod;
-  const isPower = normalized === "power-user";
-  const isStaff = normalized === "staff";
-  return {
-    canAdminUsers: isAdmin,
-    canManageAdminRoles: isGod,
-    canDeleteAdmins: isGod,
-    canAddInventoryItems: isAdmin || isPower,
-    canDeleteAnyOrder: isAdmin || isPower,
-    canUseInvoices: isAdmin || isPower,
-    canSendInvoiceToAccounting: isAdmin,
-    canUseSupplierOrdering: !isStaff,
-    canPlaceInternalOrders: isStaff || isAdmin || isPower,
-    canPickInternalOrders: isAdmin || isPower
-  };
-}
-
-function presentUserName(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (raw !== raw.toLowerCase()) return raw;
-  return raw
-    .split(/\s+/)
-    .map((part) => part
-      .split("-")
-      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
-      .join("-"))
-    .join(" ");
-}
-
-function publicUser(user) {
-  const role = normalizeRole(user?.role);
-  const permissions = userPermissions(role);
-  if (Boolean(user?.isPicker) || Boolean(user?.is_picker)) {
-    permissions.canPickInternalOrders = true;
-  }
-  return {
-    name: presentUserName(user?.name || ""),
-    role,
-    theme: user?.theme === "light" ? "light" : "dark",
-    active: user?.active !== false,
-    mustChangePassword: Boolean(user?.mustChangePassword),
-    source: user?.source || "airtable",
-    settings: {
-      openOrderDays: clampOpenOrderDays(user?.openOrderDays ?? user?.open_order_days),
-      hiddenGotoMenu: normalizeHiddenMenuItems(user?.hiddenGotoMenu ?? user?.hidden_goto_menu, gotoMenuOptions),
-      hiddenBackofficeMenu: normalizeHiddenMenuItems(user?.hiddenBackofficeMenu ?? user?.hidden_backoffice_menu, backofficeMenuOptions)
-    },
-    permissions
-  };
-}
-
-function mapPgAppUserRow(row) {
-  return {
-    id: row.id,
-    name: presentUserName(row.display_name || row.username),
-    username: row.username,
-    lastLoginAt: row.last_login_at || "",
-    role: normalizeRole(row.role),
-    theme: row.theme === "light" ? "light" : "dark",
-    active: row.active !== false,
-    isDriver: Boolean(row.is_driver),
-    isPicker: Boolean(row.is_picker),
-    mustChangePassword: Boolean(row.must_change_password),
-    notifyOnNewOrders: Boolean(row.notify_on_new_orders),
-    notifyOnDelivery: row.notify_on_delivery !== false,
-    notifyAreas: {
-      bar: row.notify_area_bar !== false,
-      foh: row.notify_area_foh !== false,
-      kitchen: row.notify_area_kitchen !== false,
-      general: row.notify_area_general !== false
-    },
-    openOrderDays: clampOpenOrderDays(row.open_order_days),
-    hiddenGotoMenu: normalizeHiddenMenuItems(row.hidden_goto_menu, gotoMenuOptions),
-    hiddenBackofficeMenu: normalizeHiddenMenuItems(row.hidden_backoffice_menu, backofficeMenuOptions),
-    source: row.source || "postgres"
-  };
-}
 
 function publicUserForAdmin(user, actor = null) {
   const editable = editableUserSources.has(user.source);
@@ -348,60 +227,6 @@ function publicUserForAdmin(user, actor = null) {
     canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
     canDelete: actor ? canDeleteAppUser(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
   };
-}
-
-function storeSession(user) {
-  return { token: createSession(user), user: publicUser(user) };
-}
-
-function base64url(value) {
-  return Buffer.from(value).toString("base64url");
-}
-
-function sign(value) {
-  return crypto.createHmac("sha256", authSecret).update(value).digest("base64url");
-}
-
-function createSession(user) {
-  const safeUser = publicUser(user);
-  const payload = JSON.stringify({
-    user: safeUser.name,
-    role: safeUser.role,
-    isPicker: Boolean(user?.isPicker || user?.is_picker),
-    mustChangePassword: Boolean(safeUser.mustChangePassword),
-    exp: Date.now() + sessionMaxAgeMs
-  });
-  const encoded = base64url(payload);
-  return `${encoded}.${sign(encoded)}`;
-}
-
-function verifySession(tokenValue) {
-  if (!tokenValue || !tokenValue.includes(".")) return null;
-
-  const [encoded, signature] = tokenValue.split(".");
-  const expected = sign(encoded);
-
-  if (signature.length !== expected.length) {
-    return null;
-  }
-
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return null;
-  }
-
-  try {
-    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-    if (!payload.user || !payload.exp || Date.now() > payload.exp) return null;
-    return publicUser({
-      name: payload.user,
-      role: payload.role || "user",
-      isPicker: Boolean(payload.isPicker),
-      active: true,
-      mustChangePassword: Boolean(payload.mustChangePassword)
-    });
-  } catch {
-    return null;
-  }
 }
 
 function bearerUser(req) {
@@ -582,273 +407,6 @@ async function listAirtableRecords(tableId, params = {}) {
   } while (offset);
 
   return records;
-}
-
-function pgNumber(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function pgItemFromRow(row) {
-  return {
-    id: row.id,
-    name: row.name || "",
-    category: row.category || "",
-    categoryId: row.category_id || "",
-    storageLocation: row.storage_location || "",
-    storageLocationId: row.storage_location_id || "",
-    inventoryArea: row.inventory_area || "",
-    inventoryAreaId: row.inventory_area_id || "",
-    inventorySubgroup: row.category || "",
-    inventorySubgroupId: row.category_id || "",
-    shelfCode: row.shelf_code || "",
-    shelfCodeId: row.shelf_code_id || "",
-    supplierId: row.supplier_id || "",
-    supplierName: row.supplier_name || "Unassigned Supplier",
-    supplierContact: row.supplier_contact || "",
-    quantity: pgNumber(row.quantity),
-    unit: row.unit || "",
-    minimum: pgNumber(row.minimum)
-  };
-}
-
-function pgRequestFromRow(row) {
-  const notes = row.notes || "";
-  const standingRunId = row.standing_order_run_id || standingRunIdFromNotes(notes);
-  const standingRunLineId = row.standing_order_run_line_id || standingRunLineIdFromNotes(notes);
-  const requestedBy = row.requested_by || row.requested_by_username || "";
-  const partialReceipt = Boolean(row.partial_receipt);
-  let originType = "user";
-  if (partialReceipt) originType = "partial";
-  else if (standingRunLineId) originType = "standing";
-  else if (String(requestedBy || "").trim().toLowerCase() === "auto minimum" || String(notes).toLowerCase().includes("automatic minimum")) originType = "automatic";
-  return {
-    id: row.id,
-    requestId: row.request_number ?? row.request_id ?? null,
-    itemId: row.item_id || row.inventory_item_id || "",
-    quantity: pgNumber(row.quantity),
-    urgency: row.urgency || row.urgency_level || "",
-    category: row.category || "",
-    storageLocation: row.storage_location || "",
-    inventoryArea: row.inventory_area || "",
-    inventorySubgroup: row.category || "",
-    shelfCode: row.shelf_code || "",
-    requestedBy,
-    status: row.status || "",
-    received: Boolean(row.received ?? row.delivered),
-    receivedAt: row.received_at || row.delivered_at || "",
-    receivedBy: row.received_by || row.delivered_by || row.delivered_by_username || "",
-    requestedAt: row.requested_at || "",
-    notes,
-    itemName: row.item_name || "",
-    unit: row.unit || "",
-    supplierName: row.supplier_name || "Unassigned Supplier",
-    supplierContact: row.supplier_contact || "",
-    driverLineId: row.driver_line_id || "",
-    ordered: Boolean(row.ordered),
-    orderedAt: row.ordered_at || "",
-    orderedBy: row.ordered_by || row.ordered_by_username || "",
-    toDeliver: Boolean(row.to_deliver),
-    deliveryDay: row.delivery_day || "",
-    driverName: row.driver_name || row.driver_username || "",
-    delivered: Boolean(row.delivered),
-    deliveredAt: row.delivered_at || row.received_at || "",
-    deliveredBy: row.delivered_by || row.received_by || "",
-    standingRunId: standingRunId || "",
-    standingRunLineId: standingRunLineId || "",
-    partialReceipt,
-    originType
-  };
-}
-
-function pgDriverLineFromRow(row) {
-  const notes = row.notes || "";
-  const standingRunId = row.standing_order_run_id || standingRunIdFromNotes(notes);
-  const standingRunLineId = row.standing_order_run_line_id || standingRunLineIdFromNotes(notes);
-  return {
-    id: row.id,
-    requestRecordId: row.order_request_id || "",
-    requestId: row.request_number ?? null,
-    itemRecordId: row.inventory_item_id || "",
-    itemName: row.item_name || "",
-    quantity: pgNumber(row.quantity),
-    unit: row.unit || "",
-    category: row.category || "",
-    inventoryArea: row.inventory_area || "",
-    storageLocation: row.storage_location || "",
-    shelfCode: row.shelf_code || "",
-    supplierName: row.supplier_name || "Unassigned Supplier",
-    supplierContact: row.supplier_contact || "",
-    ordered: Boolean(row.ordered),
-    orderedAt: row.ordered_at || "",
-    orderedBy: row.ordered_by_username || "",
-    received: Boolean(row.received),
-    receivedAt: row.received_at || "",
-    receivedBy: row.received_by_username || "",
-    toDeliver: Boolean(row.to_deliver),
-    deliveryDay: row.delivery_day || "",
-    driverName: row.driver_username || "",
-    notes,
-    standingRunId: standingRunId || "",
-    standingRunLineId: standingRunLineId || ""
-  };
-}
-
-function pgStandingOrderFromRow(row) {
-  return {
-    id: row.id,
-    name: row.name || "",
-    itemId: row.items?.[0]?.itemId || "",
-    itemName: row.items?.[0]?.itemName || "",
-    items: Array.isArray(row.items) ? row.items : [],
-    supplierName: row.supplier_name || "",
-    quantity: row.items?.[0]?.quantity ?? null,
-    expectedDate: row.expected_date || "",
-    schedule: row.schedule || "Weekly",
-    otherSchedule: row.other_schedule || "",
-    active: row.active !== false,
-    lastGeneratedDate: row.last_generated_date || "",
-    notes: row.notes || ""
-  };
-}
-
-async function pgListSuppliers() {
-  const result = await db().query(`
-    select id, name, contact_information
-    from suppliers
-    where active = true
-    order by name
-  `);
-  return result.rows.map((row) => ({
-    id: row.id,
-    name: row.name || "",
-    contact: row.contact_information || ""
-  }));
-}
-
-async function pgListSuppliersAdmin() {
-  const result = await db().query(`
-    select id, name, contact_information, active
-    from suppliers
-    order by name
-  `);
-  return result.rows.map((row) => ({
-    id: row.id,
-    name: row.name || "",
-    contact: row.contact_information || "",
-    active: row.active !== false
-  }));
-}
-
-async function pgSaveSupplier(payload, recordId = "", actorUsername = "") {
-  const name = String(payload.name || "").trim();
-  const contact = String(payload.contact || "").trim();
-  const active = payload.active !== false;
-  if (!name) throw new Error("Supplier name is required.");
-  let result;
-  let before = null;
-  if (recordId) {
-    if (!isValidId(recordId)) throw new Error("Invalid supplier record.");
-    const current = await db().query(`select id, name, contact_information, active from suppliers where id = $1`, [recordId]);
-    before = current.rows[0] ? {
-      id: current.rows[0].id,
-      name: current.rows[0].name || "",
-      contact: current.rows[0].contact_information || "",
-      active: current.rows[0].active !== false
-    } : null;
-    result = await db().query(`
-      update suppliers
-      set name = $2,
-          contact_information = $3,
-          active = $4,
-          updated_at = now()
-      where id = $1
-      returning id, name, contact_information, active
-    `, [recordId, name, contact, active]);
-  } else {
-    result = await db().query(`
-      insert into suppliers (name, contact_information, active)
-      values ($1, $2, $3)
-      returning id, name, contact_information, active
-    `, [name, contact, active]);
-  }
-  cache.suppliers.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  const row = result.rows[0];
-  const saved = {
-    id: row.id,
-    name: row.name || "",
-    contact: row.contact_information || "",
-    active: row.active !== false
-  };
-  if (!recordId || auditChanged(before, saved)) {
-    await pgRecordAuditEntry({
-      actionType: recordId ? "change" : "add",
-      entityType: "supplier",
-      entityId: saved.id,
-      entityName: saved.name,
-      actorUsername,
-      reasonCode: recordId ? "supplier-update" : "supplier-create",
-      before,
-      after: saved
-    });
-  }
-  return saved;
-}
-
-async function pgDeleteSupplier(recordId, actorUsername = "") {
-  if (!isValidId(recordId)) throw new Error("Invalid supplier record.");
-  const current = await db().query(`select id, name, contact_information, active from suppliers where id = $1`, [recordId]);
-  const before = current.rows[0] ? {
-    id: current.rows[0].id,
-    name: current.rows[0].name || "",
-    contact: current.rows[0].contact_information || "",
-    active: current.rows[0].active !== false
-  } : null;
-  const inUse = await db().query(`
-    select exists(select 1 from inventory_items where primary_supplier_id = $1) as inventory_used,
-           exists(select 1 from standing_orders where supplier_id = $1) as standing_used,
-           exists(select 1 from driver_sheet_lines where supplier_id = $1) as driver_used
-  `, [recordId]);
-  const usage = inUse.rows[0] || {};
-  if (usage.inventory_used || usage.standing_used || usage.driver_used) {
-    throw new Error("This supplier is still used by inventory items, standing orders, or driver lines. Set it inactive instead of deleting it.");
-  }
-  await db().query(`delete from suppliers where id = $1`, [recordId]);
-  cache.suppliers.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  if (before) {
-    await pgRecordAuditEntry({
-      actionType: "delete",
-      entityType: "supplier",
-      entityId: recordId,
-      entityName: before.name,
-      actorUsername,
-      reasonCode: "supplier-delete",
-      before
-    });
-  }
-  return { ok: true, recordId };
-}
-
-async function pgFindOrCreateSupplierByName(name) {
-  const cleaned = String(name || "").trim();
-  if (!cleaned) return null;
-  const existing = await db().query(`
-    select id, name, contact_information
-    from suppliers
-    where lower(name) = lower($1)
-    limit 1
-  `, [cleaned]);
-  if (existing.rows[0]) return existing.rows[0];
-  const created = await db().query(`
-    insert into suppliers (name, contact_information, active)
-    values ($1, '', true)
-    returning id, name, contact_information
-  `, [cleaned]);
-  cache.suppliers.expiresAt = 0;
-  return created.rows[0] || null;
 }
 
 function pgInvoiceCaptureFromRow(row) {
@@ -3936,40 +3494,6 @@ async function pgDeleteRequest(recordId, actorUsername = "") {
   return { id: result.rows[0]?.id || recordId, deleted: Boolean(result.rowCount) };
 }
 
-async function pgListStorageLocationsAdmin() {
-  const result = await db().query(`
-    select id, name, active
-    from storage_locations
-    order by sort_order, name
-  `);
-  return result.rows.map((row) => ({ id: row.id, name: row.name || "", active: row.active !== false }));
-}
-
-async function pgListCategoriesAdmin() {
-  const result = await db().query(`
-    select id, name
-    from categories
-    order by sort_order, name
-  `);
-  return result.rows.map((row) => ({ id: row.id, name: row.name || "" }));
-}
-
-async function pgListShelfCodesAdmin() {
-  const result = await db().query(`
-    select sc.id, sc.code as name, sl.name as storage_location, sl.id as storage_location_id, sc.active
-    from shelf_codes sc
-    left join storage_locations sl on sl.id = sc.storage_location_id
-    order by sl.name nulls last, sc.sort_order, sc.code
-  `);
-  return result.rows.map((row) => ({
-    id: row.id,
-    name: row.name || "",
-    storageLocation: row.storage_location || "",
-    storageLocationId: row.storage_location_id || "",
-    active: row.active !== false
-  }));
-}
-
 async function pgFindOrCreateLookupRecord(lookupKey, value) {
   const cleaned = String(value || "").trim();
   if (!cleaned) return "";
@@ -4013,187 +3537,6 @@ async function pgResolveShelfCodeRecord(name, storageLocation) {
   `, [storageLocationId, shelfName]);
   cache.lookups.expiresAt = 0;
   return inserted.rows[0].id;
-}
-
-async function pgSaveStorageLocation(payload, recordId = "", actorUsername = "") {
-  const name = String(payload.name || payload.storageLocation || "").trim();
-  const active = payload.active !== false;
-  if (!name) throw new Error("Storage location name is required.");
-  let before = null;
-  if (recordId) {
-    const current = await db().query(`select id, name, active from storage_locations where id = $1`, [recordId]);
-    before = current.rows[0] ? {
-      id: current.rows[0].id,
-      name: current.rows[0].name || "",
-      active: current.rows[0].active !== false
-    } : null;
-    const result = await db().query(`
-      update storage_locations
-      set name = $2, active = $3, updated_at = now()
-      where id = $1
-      returning id, name, active
-    `, [recordId, name, active]);
-    cache.lookups.expiresAt = 0;
-    const saved = { id: result.rows[0].id, name: result.rows[0].name, active: result.rows[0].active !== false };
-    if (auditChanged(before, saved)) {
-      await pgRecordAuditEntry({
-        actionType: "change",
-        entityType: "storage-location",
-        entityId: saved.id,
-        entityName: saved.name,
-        actorUsername,
-        reasonCode: "storage-location-update",
-        before,
-        after: saved
-      });
-    }
-    return saved;
-  }
-  const result = await db().query(`
-    insert into storage_locations (name, active, sort_order)
-    values ($1, $2, 0)
-    returning id, name, active
-  `, [name, active]);
-  cache.lookups.expiresAt = 0;
-  const saved = { id: result.rows[0].id, name: result.rows[0].name, active: result.rows[0].active !== false };
-  await pgRecordAuditEntry({
-    actionType: "add",
-    entityType: "storage-location",
-    entityId: saved.id,
-    entityName: saved.name,
-    actorUsername,
-    reasonCode: "storage-location-create",
-    after: saved
-  });
-  return saved;
-}
-
-async function pgSaveCategory(payload, recordId = "", actorUsername = "") {
-  const name = String(payload.name || payload.category || "").trim();
-  if (!name) throw new Error("Category name is required.");
-  let before = null;
-  if (recordId) {
-    const current = await db().query(`select id, name from categories where id = $1`, [recordId]);
-    before = current.rows[0] ? { id: current.rows[0].id, name: current.rows[0].name || "" } : null;
-    const result = await db().query(`
-      update categories
-      set name = $2, updated_at = now()
-      where id = $1
-      returning id, name
-    `, [recordId, name]);
-    cache.lookups.expiresAt = 0;
-    const saved = { id: result.rows[0].id, name: result.rows[0].name };
-    if (auditChanged(before, saved)) {
-      await pgRecordAuditEntry({
-        actionType: "change",
-        entityType: "category",
-        entityId: saved.id,
-        entityName: saved.name,
-        actorUsername,
-        reasonCode: "category-update",
-        before,
-        after: saved
-      });
-    }
-    return saved;
-  }
-  const result = await db().query(`
-    insert into categories (name, active, sort_order)
-    values ($1, true, 0)
-    returning id, name
-  `, [name]);
-  cache.lookups.expiresAt = 0;
-  const saved = { id: result.rows[0].id, name: result.rows[0].name };
-  await pgRecordAuditEntry({
-    actionType: "add",
-    entityType: "category",
-    entityId: saved.id,
-    entityName: saved.name,
-    actorUsername,
-    reasonCode: "category-create",
-    after: saved
-  });
-  return saved;
-}
-
-async function pgDeleteCategory(recordId, actorUsername = "") {
-  const current = await db().query(`select id, name from categories where id = $1`, [recordId]);
-  const before = current.rows[0] ? { id: current.rows[0].id, name: current.rows[0].name || "" } : null;
-  await db().query(`delete from categories where id = $1`, [recordId]);
-  cache.lookups.expiresAt = 0;
-  if (before) {
-    await pgRecordAuditEntry({
-      actionType: "delete",
-      entityType: "category",
-      entityId: recordId,
-      entityName: before.name,
-      actorUsername,
-      reasonCode: "category-delete",
-      before
-    });
-  }
-  return { ok: true, recordId };
-}
-
-async function pgSaveShelfCode(payload, recordId = "", actorUsername = "") {
-  const name = String(payload.name || payload.shelfCode || "").trim();
-  const storageLocation = String(payload.storageLocation || "").trim();
-  const active = payload.active !== false;
-  if (!name) throw new Error("Shelf code is required.");
-  const storageLocationId = storageLocation ? await pgFindOrCreateLookupRecord("storageLocations", storageLocation) : null;
-  let before = null;
-  if (recordId) {
-    const current = await db().query(`
-      select sc.id, sc.code, sc.active, sl.name as storage_location
-      from shelf_codes sc
-      left join storage_locations sl on sl.id = sc.storage_location_id
-      where sc.id = $1
-    `, [recordId]);
-    before = current.rows[0] ? {
-      id: current.rows[0].id,
-      name: current.rows[0].code || "",
-      storageLocation: current.rows[0].storage_location || "",
-      active: current.rows[0].active !== false
-    } : null;
-    const result = await db().query(`
-      update shelf_codes
-      set code = $2, storage_location_id = $3, active = $4, updated_at = now()
-      where id = $1
-      returning id, code, active
-    `, [recordId, name, storageLocationId, active]);
-    cache.lookups.expiresAt = 0;
-    const saved = { id: result.rows[0].id, name: result.rows[0].code, storageLocation, storageLocationId, active: result.rows[0].active !== false };
-    if (auditChanged(before, saved)) {
-      await pgRecordAuditEntry({
-        actionType: "change",
-        entityType: "shelf-code",
-        entityId: saved.id,
-        entityName: `${saved.storageLocation || "No Location"} / ${saved.name}`,
-        actorUsername,
-        reasonCode: "shelf-code-update",
-        before,
-        after: saved
-      });
-    }
-    return saved;
-  }
-  const result = await db().query(`
-    insert into shelf_codes (storage_location_id, code, active, sort_order)
-    values ($1, $2, $3, 0)
-    returning id, code, active
-  `, [storageLocationId, name, active]);
-  cache.lookups.expiresAt = 0;
-  const saved = { id: result.rows[0].id, name: result.rows[0].code, storageLocation, storageLocationId, active: result.rows[0].active !== false };
-  await pgRecordAuditEntry({
-    actionType: "add",
-    entityType: "shelf-code",
-    entityId: saved.id,
-    entityName: `${saved.storageLocation || "No Location"} / ${saved.name}`,
-    actorUsername,
-    reasonCode: "shelf-code-create",
-    after: saved
-  });
-  return saved;
 }
 
 async function pgUpdateItemSettings(recordId, payload, actorUsername = "") {

@@ -325,7 +325,7 @@ function renderActivity(entries) {
         <div class="activity-row-meta">
           <span>${escapeHtml(labelForActionType(entry.actionType))}</span>
           <span>${escapeHtml(labelForEntityType(entry.entityType))}</span>
-          <span>${escapeHtml(formatUserDisplay(entry.actorUsername || "System"))}</span>
+          <span>${escapeHtml(`By ${formatUserDisplay(entry.actorUsername || "System")}`)}</span>
           ${entry.reasonCode ? `<span>${escapeHtml(labelForReasonCode(entry.reasonCode))}</span>` : ""}
         </div>
         ${entry.note ? `<p class="activity-note">${escapeHtml(entry.note)}</p>` : ""}

@@ -1205,7 +1205,29 @@ async function pgListOpenRequests() {
   return result.rows.map(pgRequestFromRow);
 }
 
+async function pgRepairStandingOrderStates() {
+  await ensurePostgresSchemaUpgrades();
+  await db().query(`
+    update standing_orders so
+    set active = true,
+        updated_at = now()
+    where coalesce(so.deleted, false) = false
+      and so.schedule = 'One Time'
+      and so.active = false
+      and so.expected_arrival_date is not null
+      and so.expected_arrival_date >= current_date
+      and not exists (
+        select 1
+        from standing_order_runs sor
+        where sor.standing_order_id = so.id
+          and sor.expected_delivery_date = so.expected_arrival_date
+          and sor.status = 'Closed'
+      )
+  `);
+}
+
 async function pgListStandingOrders() {
+  await pgRepairStandingOrderStates();
   const result = await db().query(`
     select
       so.id,
@@ -1719,7 +1741,7 @@ async function pgGenerateStandingOrdersForDate(selectedDate, userName = "System"
             active = $4,
             updated_at = now()
         where id = $1
-      `, [order.id, selectedDate, nextDate || selectedDate, order.schedule === "One Time" ? false : order.active]);
+      `, [order.id, selectedDate, nextDate || selectedDate, order.active]);
       continue;
     }
 
@@ -1771,7 +1793,7 @@ async function pgGenerateStandingOrdersForDate(selectedDate, userName = "System"
           active = $4,
           updated_at = now()
       where id = $1
-    `, [order.id, selectedDate, nextDate || selectedDate, order.schedule === "One Time" ? false : order.active]);
+    `, [order.id, selectedDate, nextDate || selectedDate, order.active]);
   }
 
   cache.requests.expiresAt = 0;

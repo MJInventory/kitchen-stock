@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v2.006";
+const CACHE_NAME = "kitchen-stock-v2.007";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/madame-janette-logo-v162.png",
@@ -95,4 +95,5 @@ self.addEventListener("notificationclick", (event) => {
     await clients.openWindow(targetUrl);
   })());
 });
+
 

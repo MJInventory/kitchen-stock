@@ -34,6 +34,22 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function init() {
+  if (!sessionToken) {
+    setMessage("Log in first, then change your password.", true);
+    return;
+  }
+  try {
+    const data = await api("/api/me");
+    if (data?.token && data?.user) saveSession(data);
+    if (data?.user?.mustChangePassword) {
+      setMessage("Choose a new password before you continue.", false);
+    }
+  } catch (error) {
+    setMessage(error.message || "Could not load your session.", true);
+  }
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (newPassword.value !== repeatPassword.value) {
@@ -58,9 +74,7 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-if (!sessionToken) {
-  setMessage("Log in first, then change your password.", true);
-}
+init();
 
 
 

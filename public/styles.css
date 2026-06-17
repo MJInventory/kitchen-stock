@@ -2091,7 +2091,7 @@ body.order-app {
 .product-row.selected .product-controls {
   grid-area: controls;
   display: grid;
-  grid-template-columns: minmax(0, max-content) 28px 56px 28px 96px 110px minmax(140px, max-content);
+  grid-template-columns: minmax(0, max-content) 28px 56px 28px 96px 110px auto minmax(140px, max-content);
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -2152,6 +2152,16 @@ body.order-app {
   font-size: 12px;
 }
 
+.row-save-button {
+  width: auto !important;
+  min-width: 78px !important;
+  padding: 0 14px !important;
+  background: var(--order-gold) !important;
+  color: #130f06 !important;
+  border-color: var(--order-gold) !important;
+  font-weight: 700;
+}
+
 .product-row.selected .product-controls > * {
   min-width: 0;
 }
@@ -2205,6 +2215,7 @@ body.order-app {
   .order-app .product-row.selected .qty-input,
   .order-app .product-row.selected .unit-input,
   .order-app .product-row.selected .urgency-input,
+  .order-app .product-row.selected .row-save-button,
   .order-app .product-row.selected .product-delete-toggle {
     width: 100%;
   }
@@ -3396,6 +3407,7 @@ body.order-app {
   .order-app .product-row.selected .qty-input,
   .order-app .product-row.selected .unit-input,
   .order-app .product-row.selected .urgency-input,
+  .order-app .product-row.selected .row-save-button,
   .order-app .product-row.selected .product-delete-toggle {
     width: 100%;
   }

@@ -274,6 +274,66 @@ function requestStatusChips(request, today = todayLocal()) {
   return chips;
 }
 
+function duplicateSourceLabel(request, today = todayLocal()) {
+  const requestedByName = formatUserDisplay(requestUser(request) || "Team");
+  const deliveryDay = String(request.deliveryDay || "").trim();
+  if (request.partialReceipt) {
+    return `Partly delivered earlier and still open${deliveryDay ? ` for ${deliveryDay}` : ""}`;
+  }
+  if (Boolean(request.standingRunId) || isStandingOrder(request)) {
+    const expected = deliveryDay || expectedDateFromRequest(request) || requestDay(request) || today;
+    return `Standing order already open for ${expected}`;
+  }
+  if (request.toDeliver) {
+    return `Already scheduled for delivery${deliveryDay ? ` on ${deliveryDay}` : ""}`;
+  }
+  const day = requestDay(request) || today;
+  return `Already ordered on ${day} by ${requestedByName}`;
+}
+
+function duplicateReferencesForEntry(entry) {
+  const itemId = String(entry?.item?.id || "").trim();
+  const currentRequestId = String(entry?.requestId || "").trim();
+  const today = todayLocal();
+  if (!itemId) return [];
+  return recentRequests
+    .filter((request) => String(request?.itemId || "").trim() === itemId)
+    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => String(request.id || "").trim() !== currentRequestId)
+    .filter((request) => {
+      const requestDate = requestDay(request);
+      const deliveryDay = String(request.deliveryDay || "").trim();
+      const sameDayOrder = !request.standingRunId && !isStandingOrder(request) && requestDate === today;
+      const standingPending = (Boolean(request.standingRunId) || isStandingOrder(request))
+        && Boolean((deliveryDay && deliveryDay <= today) || expectedDateFromRequest(request) === today || (requestDate && requestDate <= today));
+      const scheduledToday = Boolean(request.toDeliver) && (!deliveryDay || deliveryDay === today);
+      const partialCarry = Boolean(request.partialReceipt);
+      return sameDayOrder || standingPending || scheduledToday || partialCarry;
+    });
+}
+
+function confirmDuplicateSave(entries) {
+  const warnings = entries
+    .map((entry) => ({
+      entry,
+      refs: duplicateReferencesForEntry(entry)
+    }))
+    .filter((result) => result.refs.length);
+  if (!warnings.length) return true;
+
+  const lines = warnings.flatMap(({ entry, refs }) => {
+    const itemName = entry?.item?.name || "Item";
+    return [
+      `${itemName} already has an open reference:`,
+      ...refs.map((request) => `- ${duplicateSourceLabel(request)}`)
+    ];
+  });
+
+  return window.confirm(
+    `This looks like a possible double order.\n\n${lines.join("\n")}\n\nDo you want to save it anyway?`
+  );
+}
+
 function renderStatusChips(chips = []) {
   if (!chips.length) return "";
   return `<div class="status-chip-row">${chips.map(([label, tone]) => `<span class="status-chip ${tone}">${escapeHtml(label)}</span>`).join("")}</div>`;
@@ -764,6 +824,7 @@ function renderProductList() {
             <select class="urgency-input" aria-label="Urgency">
               ${["Low", "Medium", "High", "Critical"].map((level) => `<option${level === urgency ? " selected" : ""}>${level}</option>`).join("")}
             </select>
+            <button class="row-save-button" type="button">${hasExistingOrder ? "Update" : "Save"}</button>
             ${hasExistingOrder ? `
               <label class="product-delete-toggle">
                 <input class="delete-request-input" type="checkbox"${deleteRequested ? " checked" : ""}>
@@ -899,16 +960,28 @@ async function refresh(silent = false) {
   setMessage("");
 }
 
-async function submitSelected() {
-  if (!selected.size) return;
+function collectSelectedEntries(itemIds = null) {
+  const wantedIds = itemIds ? new Set(itemIds.map((value) => String(value || "").trim()).filter(Boolean)) : null;
+  return [...selected.values()]
+    .filter((entry) => entry?.item?.id)
+    .filter((entry) => !wantedIds || wantedIds.has(String(entry.item.id)));
+}
+
+async function submitSelected(itemIds = null) {
+  const scopedEntries = collectSelectedEntries(itemIds);
+  if (!scopedEntries.length) return;
 
   submitButton.disabled = true;
   setMessage("Saving order...");
 
   try {
-    const entries = [...selected.values()].filter((entry) => entry?.item?.id);
-    const deleteEntries = entries.filter((entry) => entry.deleteRequested && entry.requestId);
-    const saveEntries = entries.filter((entry) => !entry.deleteRequested);
+    const deleteEntries = scopedEntries.filter((entry) => entry.deleteRequested && entry.requestId);
+    const saveEntries = scopedEntries.filter((entry) => !entry.deleteRequested);
+
+    if (saveEntries.length && !confirmDuplicateSave(saveEntries)) {
+      setMessage("Duplicate save cancelled.");
+      return;
+    }
 
     if (deleteEntries.length) {
       await Promise.all(deleteEntries.map((entry) => api(`/api/requests/${entry.requestId}`, { method: "DELETE" })));
@@ -966,6 +1039,18 @@ async function submitSelected() {
   } finally {
     updateSaveButton();
   }
+}
+
+function ensureRowSelection(row) {
+  const item = allItems.find((candidate) => candidate.id === row.dataset.itemId);
+  if (!item) return null;
+  const quantityInput = row.querySelector(".qty-input");
+  const quantity = Math.max(1, Number(quantityInput?.value || 1));
+  if (!selected.has(item.id)) {
+    selectItem(item, quantity, row.querySelector(".urgency-input")?.value || "Medium");
+  }
+  syncProductRow(row);
+  return item;
 }
 
 async function deleteDailyOrder(requestId) {
@@ -1081,6 +1166,22 @@ productList.addEventListener("click", (event) => {
         render();
         setMessage("Current stock updated.");
       })
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => {
+        button.disabled = false;
+      });
+    return;
+  }
+
+  if (event.target.closest(".row-save-button")) {
+    const button = event.target.closest(".row-save-button");
+    const item = ensureRowSelection(row);
+    if (!item) {
+      setMessage("Choose a valid item first.", true);
+      return;
+    }
+    button.disabled = true;
+    submitSelected([item.id])
       .catch((error) => setMessage(error.message, true))
       .finally(() => {
         button.disabled = false;

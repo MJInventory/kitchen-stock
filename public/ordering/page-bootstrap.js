@@ -58,6 +58,7 @@ import {
   loadOrderingBootstrapCache,
   saveOrderingBootstrapCache
 } from "./bootstrap-cache.js";
+import { createOrderingBootstrapContext } from "./bootstrap-context.js";
 import {
   deleteDailyOrderAction,
   deliverDailyOrderAction,
@@ -103,55 +104,58 @@ import { createOrderingFlowController } from "./controller-flow.js";
 import { attachOrderingInteractions } from "./interactions.js";
 
 export function startOrderingPage({ window = globalThis.window, document = globalThis.document, localStorage = globalThis.localStorage } = {}) {
-const loginScreen = document.querySelector("#loginScreen");
-const loginForm = document.querySelector("#loginForm");
-const usernameInput = document.querySelector("#usernameInput");
-const passwordInput = document.querySelector("#passwordInput");
-const loginMessage = document.querySelector("#loginMessage");
-const currentUser = document.querySelector("#currentUser");
-const areaFilter = document.querySelector("#areaFilter");
-const locationFilter = document.querySelector("#locationFilter");
-const refreshButton = document.querySelector("#refreshButton");
-const submitButton = document.querySelector("#submitButton");
-const featureMenu = document.querySelector("#featureMenu");
-const backofficeMenu = document.querySelector("#backofficeMenu");
-const searchInput = document.querySelector("#searchInput");
-const requestScopeFilter = document.querySelector("#requestScopeFilter");
-const selectedChips = document.querySelector("#selectedChips");
-const categoryView = document.querySelector("#categoryView");
-const categoryGrid = document.querySelector("#categoryGrid");
-const productView = document.querySelector("#productView");
-const productList = document.querySelector("#productList");
-const categoryTitle = document.querySelector("#categoryTitle");
-const categoryMeta = document.querySelector("#categoryMeta");
-const backButton = document.querySelector("#backButton");
-const dailyOrderCount = document.querySelector("#dailyOrderCount");
-const dailyOrderList = document.querySelector("#dailyOrderList");
-const standingOrderCount = document.querySelector("#standingOrderCount");
-const standingOrderList = document.querySelector("#standingOrderList");
-const notificationCount = document.querySelector("#notificationCount");
-const notificationList = document.querySelector("#notificationList");
-const notificationPanel = document.querySelector(".notification-panel");
-const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
-const orderingMode = document.querySelector("#orderingMode");
-const orderingSummaryCards = document.querySelector("#orderingSummaryCards");
-const message = document.querySelector("#message");
-const pageParams = new URLSearchParams(window.location.search);
-
-let allItems = [];
-let recentRequests = [];
-let standingOrders = [];
-let notifications = [];
-let activeCategory = "";
-let selected = new Map();
-let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
-let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-let orderingSummaryFilter = "all";
-const bootstrapCacheKey = "kitchenStockOrderingBootstrap";
-let pendingJumpItemId = String(pageParams.get("itemId") || "").trim();
-let pendingJumpCategory = String(pageParams.get("category") || "").trim();
+const { refs, state } = createOrderingBootstrapContext({ window, document, localStorage });
+const {
+  loginScreen,
+  loginForm,
+  usernameInput,
+  passwordInput,
+  loginMessage,
+  currentUser,
+  areaFilter,
+  locationFilter,
+  refreshButton,
+  submitButton,
+  featureMenu,
+  backofficeMenu,
+  searchInput,
+  requestScopeFilter,
+  selectedChips,
+  categoryView,
+  categoryGrid,
+  productView,
+  productList,
+  categoryTitle,
+  categoryMeta,
+  backButton,
+  dailyOrderCount,
+  dailyOrderList,
+  standingOrderCount,
+  standingOrderList,
+  notificationCount,
+  notificationList,
+  notificationPanel,
+  readAllNotificationsButton,
+  orderingMode,
+  orderingSummaryCards,
+  message
+} = refs;
+let {
+  allItems,
+  recentRequests,
+  standingOrders,
+  notifications,
+  activeCategory,
+  selected,
+  sessionToken,
+  sessionUser,
+  sessionRole,
+  sessionPermissions,
+  orderingSummaryFilter,
+  bootstrapCacheKey,
+  pendingJumpItemId,
+  pendingJumpCategory
+} = state;
 
 const {
   setMessage,

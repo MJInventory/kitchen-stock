@@ -157,7 +157,6 @@ const {
   presentUserName,
   publicUser,
   mapPgAppUserRow,
-  parseUsers,
   createSession,
   verifySession,
   storeSession
@@ -229,6 +228,10 @@ const {
   pgFindOrCreateLookupRecord
 });
 const {
+  normalizeLegacyAppUser,
+  legacyAppUserUpdateFields,
+  canChangeAppUserRole,
+  canDeleteAppUserRecord,
   pgListAppUsers,
   pgFindAppUserByName,
   pgCreateAppUser,
@@ -394,11 +397,9 @@ const {
   pgEnsureDriverSheetLines
 });
 
-const users = parseUsers();
-
 function publicUserForAdmin(user, actor = null) {
   const editable = editableUserSources.has(user.source);
-  const canEditRole = actor ? canChangeAppUser(actor, user, user.role) : true;
+  const canEditRole = actor ? canChangeAppUserRole(actor, user, user.role) : true;
   return {
     ...publicUser(user),
     id: user.id || "",
@@ -416,7 +417,7 @@ function publicUserForAdmin(user, actor = null) {
     editable,
     canEditRole,
     canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
-    canDelete: actor ? canDeleteAppUser(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
+    canDelete: actor ? canDeleteAppUserRecord(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
   };
 }
 
@@ -723,34 +724,6 @@ async function getRequests() {
   return cached("requests", requestCacheMs, listRequests);
 }
 
-function normalizeAppUser(record) {
-  const fields = record.fields || {};
-  const name = String(fields.Name || fields.Username || "").trim();
-  return {
-    id: record.id,
-    name,
-    password: String(fields.Password || "").trim(),
-    role: name.toLowerCase() === "enno" ? "god" : normalizeRole(fields.Role || "user"),
-    theme: String(fields.Theme || "dark").trim().toLowerCase() === "light" ? "light" : "dark",
-    active: fields.Active !== false,
-    mustChangePassword: Boolean(fields["Force Password Change"]),
-    source: "airtable"
-  };
-}
-
-function envUsersList() {
-  return [...users.values()].map((user) => ({
-    id: `env-${user.name.toLowerCase()}`,
-    name: user.name,
-    password: user.password,
-    role: normalizeRole(user.role),
-    theme: user.theme === "light" ? "light" : "dark",
-    active: user.active !== false,
-    mustChangePassword: Boolean(user.mustChangePassword),
-    source: "env"
-  }));
-}
-
 async function getAppUsersTableId() {
   if (appUsersTableIdFromEnv) return appUsersTableIdFromEnv;
   const schema = await getSchema();
@@ -775,84 +748,6 @@ async function refreshUserFromDirectory(user) {
   const freshUser = await findAppUserByName(user?.name);
   if (!freshUser) return user;
   return freshUser;
-}
-
-function appUserFields(payload, schema = null) {
-  const name = String(payload.name || "").trim();
-  const password = String(payload.password || "").trim();
-  const role = normalizeRole(payload.role);
-  const theme = String(payload.theme || "dark").trim().toLowerCase() === "light" ? "Light" : "Dark";
-  const active = payload.active !== false;
-  const mustChangePassword = Boolean(payload.mustChangePassword);
-
-  if (!name) throw new Error("User name is required.");
-  if (!password) throw new Error("Password is required.");
-  const fields = {
-    Name: name,
-    Password: password,
-    Role: role === "god"
-      ? "God"
-      : role === "admin"
-        ? "Admin"
-        : role === "power-user"
-          ? "Power User"
-          : role === "staff"
-            ? "Staff"
-            : "User"
-  };
-  if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
-  if (!schema || schema.appUsers.hasActive) fields.Active = active;
-  if (!schema || schema.appUsers.hasForcePasswordChange) fields["Force Password Change"] = mustChangePassword;
-  return fields;
-}
-
-function appUserUpdateFields(payload, currentUser, schema = null) {
-  const name = String(payload.name || currentUser?.name || "").trim();
-  const role = normalizeRole(payload.role || currentUser?.role || "user");
-  const theme = String(payload.theme || currentUser?.theme || "dark").trim().toLowerCase() === "light" ? "Light" : "Dark";
-  const active = payload.active !== false;
-  const mustChangePassword = Boolean(payload.mustChangePassword);
-  const password = String(payload.password || "").trim();
-
-  if (!name) throw new Error("User name is required.");
-  const fields = {
-    Name: name,
-    Role: role === "god"
-      ? "God"
-      : role === "admin"
-        ? "Admin"
-        : role === "power-user"
-          ? "Power User"
-          : role === "staff"
-            ? "Staff"
-            : "User"
-  };
-  if (password) fields.Password = password;
-  if (!schema || schema.appUsers.hasTheme) fields.Theme = theme;
-  if (!schema || schema.appUsers.hasActive) fields.Active = active;
-  if (!schema || schema.appUsers.hasForcePasswordChange) fields["Force Password Change"] = mustChangePassword;
-  return fields;
-}
-
-function canChangeAppUser(actor, target, nextRole) {
-  const actorRole = normalizeRole(actor?.role);
-  const targetRole = normalizeRole(target?.role);
-  const wantedRole = normalizeRole(nextRole);
-  const actorIsGod = actorRole === "god";
-  const actorIsAdmin = actorRole === "admin";
-  if (actorIsGod) return true;
-  if (!actorIsAdmin) return false;
-  if (targetRole === "admin" || targetRole === "god") return false;
-  if (wantedRole === "admin" || wantedRole === "god") return false;
-  return true;
-}
-
-function canDeleteAppUser(actor, target) {
-  const actorRole = normalizeRole(actor?.role);
-  const targetRole = normalizeRole(target?.role);
-  if (actorRole === "god") return true;
-  if (actorRole !== "admin") return false;
-  return targetRole === "power-user" || targetRole === "staff" || targetRole === "user";
 }
 
 async function findAppUserById(recordId) {
@@ -948,13 +843,13 @@ async function updateAppUser(recordId, payload, actorUsername = "") {
   const schema = await getSchema();
   const currentUser = await findAppUserById(recordId);
   if (!currentUser) throw new Error("User was not found.");
-  const fields = appUserUpdateFields(payload, currentUser, schema);
+  const fields = legacyAppUserUpdateFields(payload, currentUser, schema);
   const record = await airtable(`${tableId}/${recordId}`, {
     method: "PATCH",
     body: JSON.stringify({ fields, typecast: true })
   });
   cache.appUsers.expiresAt = 0;
-  return normalizeAppUser(record);
+  return normalizeLegacyAppUser(record);
 }
 
 async function deleteAppUser(recordId, actorUsername = "") {
@@ -2570,7 +2465,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
       const payload = await readJson(req);
-      if (!canChangeAppUser(user, { role: "user" }, payload.role)) {
+      if (!canChangeAppUserRole(user, { role: "user" }, payload.role)) {
         send(res, 403, { error: "Only God can create admin or god users." });
         return;
       }
@@ -2590,7 +2485,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 404, { error: "User was not found." });
         return;
       }
-      if (!canChangeAppUser(user, target, payload.role)) {
+      if (!canChangeAppUserRole(user, target, payload.role)) {
         send(res, 403, { error: "Only God can change admin roles. Admins can manage power users and users only." });
         return;
       }
@@ -2613,7 +2508,7 @@ const server = http.createServer(async (req, res) => {
         send(res, 403, { error: "You cannot delete your own user." });
         return;
       }
-      if (!canDeleteAppUser(user, target)) {
+      if (!canDeleteAppUserRecord(user, target)) {
         send(res, 403, { error: "Only God can delete admin users. Admins can delete power users and users only." });
         return;
       }

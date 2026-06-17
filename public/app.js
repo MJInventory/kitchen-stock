@@ -88,7 +88,6 @@ import {
   collectSelectedOrderingEntries,
   confirmDuplicateSelectionSave,
   ensureOrderingRowSelection,
-  selectOrderingItem,
   syncOrderingProductRow,
   toggleOrderingProduct
 } from "./ordering/controller-selection.js";
@@ -100,6 +99,7 @@ import {
   showOrderingLogin
 } from "./ordering/controller-session.js";
 import { createOrderingRuntime } from "./ordering/controller-runtime.js";
+import { createOrderingFlowController } from "./ordering/controller-flow.js";
 import { attachOrderingInteractions } from "./ordering/interactions.js";
 
 const loginScreen = document.querySelector("#loginScreen");
@@ -320,155 +320,70 @@ function applyBootstrapData(data = {}) {
   render();
 }
 
-function selectItem(item, quantity = defaultQuantity(item), urgency = "Medium") {
-  selectOrderingItem(selected, item, quantity, urgency, defaultQuantity, itemUnit);
-}
-
-function buildSelectedFromRecentRequests() {
-  return buildSelectedFromRequests({
-    recentRequests,
-    allItems,
-    today: todayLocal(),
-    sameUser,
-    sessionUser,
-    localDateKey,
-    itemUnit,
-    hasValidRequestItemId,
-    isStandingOrder
-  });
-}
-
-function syncProductRow(row) {
-  syncOrderingProductRow(row, allItems, selected, itemUnit);
-}
-
-function optimisticRequestFromEntry(entry, index = 0) {
-  return optimisticRequestFromSelection({
-    entry,
-    index,
-    sessionUser,
-    itemUnit
-  });
-}
-
-function toggleProduct(row) {
-  toggleOrderingProduct(row, {
-    allItems,
-    selected,
-    selectItem,
-    syncProductRow,
-    render,
-    itemUnit
-  });
-}
-
-async function refresh(silent = false) {
-  if (!silent) setMessage("Loading products...");
-  const data = await api("/api/bootstrap");
-  applyBootstrapData(data);
-  applyPendingJump();
-  saveBootstrapCache(data);
-  setMessage("");
-}
-
-function collectSelectedEntries(itemIds = null) {
-  return collectSelectedOrderingEntries(selected, itemIds);
-}
-
-async function submitSelected(itemIds = null) {
-  const result = await submitOrderingSelection({
-    itemIds,
-    selected,
-    submitButton,
-    setMessage,
-    queueApi,
-    confirmDuplicateSave,
-    itemUnit,
-    sessionUser,
-    optimisticRequestFromEntry,
-    recentRequests,
-    buildSelectedFromRecentRequests: (requestsOverride = recentRequests) => {
-      const previous = recentRequests;
-      recentRequests = requestsOverride;
-      const rebuilt = buildSelectedFromRecentRequests();
-      recentRequests = previous;
-      return rebuilt;
-    },
-    render: (nextRequests, nextSelected) => {
-      recentRequests = nextRequests;
-      selected = nextSelected;
-      render();
-    },
-    updateSaveButton,
-    refresh
-  });
-  recentRequests = result.recentRequests;
-  selected = result.selected;
-}
-
-function ensureRowSelection(row) {
-  return ensureOrderingRowSelection(row, {
-    allItems,
-    selected,
-    selectItem,
-    syncProductRow
-  });
-}
-
-async function deleteDailyOrder(requestId) {
-  const result = await deleteDailyOrderAction({
-    requestId,
-    api,
-    recentRequests,
-    buildSelectedFromRecentRequests: (requestsOverride = recentRequests) => {
-      const previous = recentRequests;
-      recentRequests = requestsOverride;
-      const rebuilt = buildSelectedFromRecentRequests();
-      recentRequests = previous;
-      return rebuilt;
-    },
-    render: (nextRequests, nextSelected) => {
-      recentRequests = nextRequests;
-      selected = nextSelected;
-      render();
-    },
-    setMessage
-  });
-  recentRequests = result.recentRequests;
-  selected = result.selected;
-}
-
-async function deliverDailyOrder(requestId) {
-  await deliverDailyOrderAction({
-    requestId,
-    api,
-    refresh,
-    setMessage
-  });
-}
-
-async function updateCurrentStock(itemId, countedQuantity) {
-  const result = await updateCurrentStockAction({
-    itemId,
-    countedQuantity,
-    queueApi,
-    allItems,
-    selected
-  });
-  allItems = result.allItems;
-  selected = result.selected;
-}
-
-async function markNotificationsRead(ids = []) {
-  notifications = await markNotificationsReadAction({
-    ids,
-    api,
-    renderNotifications: (nextNotifications) => {
-      notifications = nextNotifications;
-      renderNotifications();
-    }
-  });
-}
+const {
+  selectItem,
+  buildSelectedFromRecentRequests,
+  syncProductRow,
+  optimisticRequestFromEntry,
+  toggleProduct,
+  refresh,
+  collectSelectedEntries,
+  submitSelected,
+  ensureRowSelection,
+  deleteDailyOrder,
+  deliverDailyOrder,
+  updateCurrentStock,
+  markNotificationsRead
+} = createOrderingFlowController({
+  submitButton,
+  getAllItems: () => allItems,
+  setAllItems: (value) => {
+    allItems = value;
+  },
+  getRecentRequests: () => recentRequests,
+  setRecentRequests: (value) => {
+    recentRequests = value;
+  },
+  getSelected: () => selected,
+  setSelected: (value) => {
+    selected = value;
+  },
+  getNotifications: () => notifications,
+  setNotifications: (value) => {
+    notifications = value;
+  },
+  getSessionUser: () => sessionUser,
+  todayLocal,
+  defaultQuantity,
+  itemUnit,
+  sameUser,
+  localDateKey,
+  hasValidRequestItemId,
+  isStandingOrder,
+  buildSelectedFromRequests,
+  syncOrderingProductRow,
+  optimisticRequestFromSelection,
+  toggleOrderingProduct,
+  collectSelectedOrderingEntries,
+  submitOrderingSelection,
+  ensureOrderingRowSelection,
+  deleteDailyOrderAction,
+  deliverDailyOrderAction,
+  updateCurrentStockAction,
+  markNotificationsReadAction,
+  api,
+  queueApi,
+  setMessage,
+  render,
+  refreshOrderingDisplay: (data) => {
+    applyBootstrapData(data);
+    applyPendingJump();
+    saveBootstrapCache(data);
+  },
+  renderNotifications,
+  confirmDuplicateSave,
+  updateSaveButton
+});
 
 attachOrderingInteractions({
   loginForm,

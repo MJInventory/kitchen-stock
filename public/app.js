@@ -83,6 +83,7 @@ import {
   renderProductListBlock,
   renderStandingOrdersBlock
 } from "./ordering/controller-renderers.js";
+import { createOrderingDisplayController } from "./ordering/controller-display.js";
 import {
   collectSelectedOrderingEntries,
   confirmDuplicateSelectionSave,
@@ -187,96 +188,118 @@ const {
   }
 });
 
-function hasSearchTerm() {
-  return hasSearchTermValue(searchInput.value);
-}
-
-function selectedRequestScope() {
-  return String(requestScopeFilter?.value || "").trim();
-}
-
-function requestMatchesScope(request) {
-  return requestMatchesScopeValue(request, {
-    scope: selectedRequestScope(),
-    sessionUser,
-    sameUser,
-    requestUser
-  });
-}
-
-function displayRoleMode() {
-  return displayRoleModeValue(sessionRole);
-}
-
-function requestOpenStatsForItem(itemId) {
-  return requestOpenStatsForItemValue(itemId, {
-    recentRequests,
-    sameUser,
-    requestUser,
-    sessionUser,
-    isStandingOrder
-  });
-}
-
-function isStandingDue(order, today = todayLocal()) {
-  return isStandingDueValue(order, today);
-}
-
-function orderingItemMatchesSummary(item, today = todayLocal()) {
-  return orderingItemMatchesSummaryValue(item, {
-    orderingSummaryFilter,
-    today,
-    requestOpenStatsForItem,
-    selected,
-    recentRequests,
-    isStandingOrder,
-    isOlderOpenRequest,
-    standingOrders
-  });
-}
-
-function orderingRequestMatchesSummary(request, today = todayLocal()) {
-  return orderingRequestMatchesSummaryValue(request, {
-    orderingSummaryFilter,
-    today,
-    allItems,
-    selected,
-    sameUser,
-    sessionUser,
-    requestUser,
-    isOlderOpenRequest
-  });
-}
-
-function confirmDuplicateSave(entries) {
-  return confirmDuplicateSelectionSave(entries, {
-    recentRequests,
-    requestDay,
-    today: todayLocal(),
-    isStandingOrder,
-    expectedDateFromRequest,
-    duplicateSourceLabel,
-    windowObject: window
-  });
-}
-
-function renderOrderingSummary() {
-  renderOrderingSummaryBlock({
-    renderOrderingSummaryView,
-    orderingSummaryCards,
-    orderingMode,
-    displayRoleMode,
-    today: todayLocal(),
-    recentRequests,
-    selected,
-    sessionUser,
-    sameUser,
-    allItems,
-    standingOrders,
-    isStandingDue,
-    orderingSummaryFilter
-  });
-}
+const {
+  hasSearchTerm,
+  requestMatchesScope,
+  displayRoleMode,
+  requestOpenStatsForItem,
+  isStandingDue,
+  orderingItemMatchesSummary,
+  orderingRequestMatchesSummary,
+  confirmDuplicateSave,
+  renderOrderingSummary,
+  entryUnit,
+  addItemHrefFromSearch,
+  defaultQuantity,
+  filterItems,
+  itemSearchScore,
+  categoryStats,
+  updateSaveButton,
+  renderSelectedChips,
+  renderNotifications,
+  jumpToItem,
+  applyPendingJump,
+  renderDailyOrder,
+  renderStandingOrders,
+  renderCategories,
+  renderProductList,
+  render
+} = createOrderingDisplayController({
+  searchInput,
+  areaFilter,
+  locationFilter,
+  requestScopeFilter,
+  orderingMode,
+  orderingSummaryCards,
+  selectedChips,
+  notificationList,
+  notificationCount,
+  notificationPanel,
+  readAllNotificationsButton,
+  dailyOrderCount,
+  dailyOrderList,
+  standingOrderCount,
+  standingOrderList,
+  categoryGrid,
+  categoryView,
+  productView,
+  backButton,
+  productList,
+  categoryTitle,
+  categoryMeta,
+  submitButton,
+  windowObject: window,
+  getAllItems: () => allItems,
+  getRecentRequests: () => recentRequests,
+  getStandingOrders: () => standingOrders,
+  getNotifications: () => notifications,
+  getSelected: () => selected,
+  getSessionUser: () => sessionUser,
+  getSessionRole: () => sessionRole,
+  getSessionPermissions: () => sessionPermissions,
+  getOrderingSummaryFilter: () => orderingSummaryFilter,
+  getActiveCategory: () => activeCategory,
+  setActiveCategory: (value) => {
+    activeCategory = value;
+  },
+  getPendingJumpItemId: () => pendingJumpItemId,
+  setPendingJumpItemId: (value) => {
+    pendingJumpItemId = value;
+  },
+  getPendingJumpCategory: () => pendingJumpCategory,
+  setPendingJumpCategory: (value) => {
+    pendingJumpCategory = value;
+  },
+  todayLocal,
+  hasSearchTermValue,
+  requestMatchesScopeValue,
+  displayRoleModeValue,
+  requestOpenStatsForItemValue,
+  isStandingDueValue,
+  orderingItemMatchesSummaryValue,
+  orderingRequestMatchesSummaryValue,
+  confirmDuplicateSelectionSave,
+  requestDay,
+  expectedDateFromRequest,
+  duplicateSourceLabel,
+  isStandingOrder,
+  isOlderOpenRequest,
+  addItemHrefFromSearchValue,
+  defaultQuantityForItem,
+  filterOrderingItems,
+  normalize,
+  searchTokens,
+  scoreOrderingItemSearch,
+  computeCategoryStats,
+  itemUnit,
+  renderOrderingSummaryBlock,
+  renderOrderingSummaryView,
+  renderSelectedChipsView,
+  renderNotificationsBlock,
+  renderNotificationsView,
+  renderDailyOrderBlock,
+  renderDailyOrderView,
+  renderStandingOrdersBlock,
+  renderStandingOrdersView,
+  renderCategoriesBlock,
+  renderCategoriesView,
+  renderProductListBlock,
+  renderProductListView,
+  itemCategory,
+  sameUser,
+  requestUser,
+  hasValidRequestItemId
+});
 
 function loadBootstrapCache() {
   return loadOrderingBootstrapCache(bootstrapCacheKey);
@@ -295,175 +318,6 @@ function applyBootstrapData(data = {}) {
   });
   selected = buildSelectedFromRecentRequests();
   render();
-}
-
-function entryUnit(entry) {
-  return entry?.unit || itemUnit(entry?.item || {});
-}
-
-function addItemHrefFromSearch() {
-  return addItemHrefFromSearchValue({
-    searchValue: searchInput.value,
-    area: areaFilter.value,
-    location: locationFilter.value
-  });
-}
-
-function defaultQuantity(item) {
-  return defaultQuantityForItem(item);
-}
-
-function filterItems() {
-  return filterOrderingItems({
-    items: allItems,
-    area: areaFilter.value,
-    location: locationFilter.value,
-    search: searchInput.value,
-    normalize,
-    searchTokens,
-    orderingItemMatchesSummary,
-    today: todayLocal()
-  });
-}
-
-function itemSearchScore(item) {
-  return scoreOrderingItemSearch(item, searchInput.value, normalize);
-}
-
-function categoryStats(category, items) {
-  return computeCategoryStats(category, items, selected);
-}
-
-function updateSaveButton() {
-  const count = selected.size;
-  submitButton.textContent = `${count} Saved`;
-  submitButton.disabled = count === 0;
-}
-
-function renderSelectedChips() {
-  renderSelectedChipsView({
-    selectedChips,
-    selected,
-    entryUnit
-  });
-}
-
-function renderNotifications() {
-  renderNotificationsBlock({
-    renderNotificationsView,
-    notificationList,
-    notificationCount,
-    notificationPanel,
-    readAllNotificationsButton,
-    notifications
-  })
-}
-
-function jumpToItem(itemId, category = "") {
-  const item = allItems.find((candidate) => String(candidate.id) === String(itemId));
-  if (!item) return;
-  pendingJumpItemId = String(item.id);
-  pendingJumpCategory = category || itemCategory(item);
-  searchInput.value = "";
-  activeCategory = pendingJumpCategory || itemCategory(item);
-  categoryView.hidden = true;
-  productView.hidden = false;
-  render();
-  const row = productList.querySelector(`.product-row[data-item-id="${String(item.id || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`);
-  if (!row) return;
-  row.classList.add("jump-highlight");
-  row.scrollIntoView({ behavior: "smooth", block: "center" });
-  window.setTimeout(() => row.classList.remove("jump-highlight"), 2400);
-}
-
-function applyPendingJump() {
-  if (!pendingJumpItemId) return;
-  jumpToItem(pendingJumpItemId, pendingJumpCategory);
-  pendingJumpItemId = "";
-  pendingJumpCategory = "";
-  if (window.history?.replaceState) {
-    window.history.replaceState({}, "", "/ordering.html");
-  }
-}
-
-function renderDailyOrder() {
-  renderDailyOrderBlock({
-    renderDailyOrderView,
-    dailyOrderCount,
-    dailyOrderList,
-    today: todayLocal(),
-    recentRequests,
-    hasValidRequestItemId,
-    requestMatchesScope,
-    orderingRequestMatchesSummary,
-    allItems,
-    sameUser,
-    sessionPermissions,
-    sessionUser
-  })
-}
-
-function renderStandingOrders() {
-  renderStandingOrdersBlock({
-    renderStandingOrdersView,
-    standingOrderCount,
-    standingOrderList,
-    standingOrders
-  });
-}
-
-function renderCategories() {
-  renderCategoriesBlock({
-    renderCategoriesView,
-    categoryGrid,
-    filterItems,
-    selected,
-    categoryStats,
-    requestOpenStatsForItem
-  })
-}
-
-function renderProductList() {
-  renderProductListBlock({
-    renderProductListView,
-    activeCategory,
-    categoryTitle,
-    categoryMeta,
-    backButton,
-    productList,
-    filterItems,
-    hasSearchTerm,
-    itemSearchScore,
-    selected,
-    defaultQuantity,
-    itemUnit,
-    requestOpenStatsForItem,
-    addItemHrefFromSearch,
-    sessionPermissions
-  })
-}
-
-function render() {
-  renderOrderingPageBlock({
-    hasSearchTerm,
-    categoryView,
-    productView,
-    backButton,
-    renderCategories,
-    renderProductList,
-    renderSelectedChips,
-    renderOrderingSummary,
-    renderDailyOrder,
-    renderStandingOrders,
-    renderNotifications,
-    updateSaveButton,
-    activeCategoryRef: {
-      get: () => activeCategory,
-      set: (value) => {
-        activeCategory = value;
-      }
-    }
-  });
 }
 
 function selectItem(item, quantity = defaultQuantity(item), urgency = "Medium") {

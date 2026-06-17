@@ -1009,6 +1009,10 @@ button:hover,
   background: #fde7e7;
 }
 
+.sheet-group tbody tr.driver-overdue-row td {
+  background: #fde7e7;
+}
+
 .sheet-group h2 {
   margin: 0 0 8px;
   font-size: 18px;
@@ -1185,6 +1189,23 @@ td small {
   border: 1px solid #98a2b3;
   background: #f8fafc;
   padding: 8px;
+}
+
+.report-summary article.report-filter-card {
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.report-summary article.report-filter-card:hover,
+.report-summary article.report-filter-card:focus-visible {
+  border-color: #d4a514;
+  box-shadow: 0 0 0 2px rgba(212, 165, 20, 0.16);
+  outline: none;
+}
+
+.report-summary article.report-filter-card.active {
+  border-color: #d4a514;
+  background: #fff8e1;
 }
 
 .report-summary strong {
@@ -3010,6 +3031,14 @@ body.order-app {
   border-color: #4a4438;
 }
 
+:root[data-theme="dark"] .sheet-shell .report-summary article.report-filter-card:hover,
+:root[data-theme="dark"] .sheet-shell .report-summary article.report-filter-card:focus-visible,
+:root[data-theme="dark"] .sheet-shell .report-summary article.report-filter-card.active {
+  border-color: #d4a514;
+  background: #2f2817;
+  box-shadow: 0 0 0 2px rgba(212, 165, 20, 0.16);
+}
+
 :root[data-theme="dark"] .sheet-shell .report-summary strong,
 :root[data-theme="dark"] .sheet-shell .report-summary span {
   color: #f4efe5;
@@ -3029,6 +3058,10 @@ body.order-app {
 
 :root[data-theme="dark"] .sheet-shell .sheet-group tbody tr.receiving-origin-partial td {
   background: rgba(248, 113, 113, 0.16);
+}
+
+:root[data-theme="dark"] .sheet-shell .sheet-group tbody tr.driver-overdue-row td {
+  background: rgba(248, 113, 113, 0.18);
 }
 
 :root[data-theme="dark"] .sheet-shell .report-waiting td {
@@ -3232,10 +3265,11 @@ body.order-app {
     min-height: auto;
     padding: 14px 12px;
     align-items: stretch;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "brand actions"
-      "nav nav";
+      "brand"
+      "nav"
+      "actions";
     gap: 12px;
   }
 
@@ -3246,13 +3280,13 @@ body.order-app {
   .order-app .top-actions {
     grid-area: actions;
     position: static;
-    width: auto;
+    width: 100%;
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
-    align-items: flex-end;
+    align-items: center;
     gap: 6px;
-    align-self: start;
+    align-self: stretch;
   }
 
   .brand-mark {
@@ -3282,6 +3316,11 @@ body.order-app {
 
   .order-topbar > .menu-duo {
     grid-area: nav;
+  }
+
+  .order-topbar > .menu-duo,
+  .order-app .top-actions {
+    min-width: 0;
   }
 
   .feature-select {

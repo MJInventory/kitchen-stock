@@ -181,6 +181,20 @@ function requestDay(request) {
   return stamp ? localDateKey(stamp) : "";
 }
 
+function scheduledDeliveryDay(request) {
+  return String(request?.deliveryDay || "").trim();
+}
+
+function hasFutureScheduledDelivery(request, today = todayLocal()) {
+  const deliveryDay = scheduledDeliveryDay(request);
+  return Boolean(deliveryDay) && deliveryDay > today;
+}
+
+function isOlderOpenRequest(request, today = todayLocal()) {
+  const day = requestDay(request);
+  return Boolean(day) && day < today && !isStandingOrderRequest(request) && !hasFutureScheduledDelivery(request, today);
+}
+
 function requestUser(request) {
   return String(request.requestedBy || "").trim();
 }
@@ -293,8 +307,8 @@ function requesterMatches(request) {
 
 function requestStatusChips(request, today = todayLocal()) {
   const chips = [];
-  const day = requestDay(request);
-  if (day && day < today) chips.push(["Older open", "older"]);
+  if (hasFutureScheduledDelivery(request, today)) chips.push(["Scheduled", "deliver"]);
+  else if (isOlderOpenRequest(request, today)) chips.push(["Older open", "older"]);
   else chips.push(["Today", "today"]);
   chips.push([sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`, sameUser(requestUser(request), sessionUser) ? "mine" : "team"]);
   if (isInternalShortageRequest(request)) chips.push(["Shortage", "critical"]);
@@ -358,10 +372,7 @@ function renderDashboardCards() {
   const unresolved = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
   const myOpen = unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
   const teamToday = unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
-  const olderOpen = unresolved.filter((request) => {
-    const day = requestDay(request);
-    return day && day < today && !isStandingOrderRequest(request);
-  }).length;
+  const olderOpen = unresolved.filter((request) => isOlderOpenRequest(request, today)).length;
   const belowMin = allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
   const standingDue = standingOrders.filter((order) => {
     const expected = String(order.expectedDate || "").trim();
@@ -469,13 +480,9 @@ function renderOpenOrders() {
   const selectedArea = selectedDailyArea();
   const openRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
-    .filter((request) => !isStandingOrderRequest(request))
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
-    .filter((request) => {
-      const day = requestDay(request);
-      return !day || day < selectedDay;
-    })
+    .filter((request) => isOlderOpenRequest(request, selectedDay))
     .sort(logicalRequestCompare);
 
   openOrderCount.textContent = `${openRequests.length} open`;

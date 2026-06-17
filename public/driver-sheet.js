@@ -44,6 +44,35 @@ function todayLocal() {
   return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
+function localDateKey(value) {
+  const stamp = String(value || "").trim();
+  if (!stamp) return "";
+  const parsed = new Date(stamp);
+  if (Number.isNaN(parsed.getTime())) return stamp.slice(0, 10);
+  const offset = parsed.getTimezoneOffset();
+  return new Date(parsed.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+function scheduledDeliveryDay(request) {
+  return String(request?.deliveryDay || "").trim();
+}
+
+function hasFutureScheduledDelivery(request, today = todayLocal()) {
+  const deliveryDay = scheduledDeliveryDay(request);
+  return Boolean(deliveryDay) && deliveryDay > today;
+}
+
+function requestIsOlderThanDays(request, days) {
+  const requestedDay = localDateKey(request?.requestedAt);
+  if (!requestedDay) return false;
+  if (hasFutureScheduledDelivery(request)) return false;
+  const today = new Date(`${todayLocal()}T00:00:00`);
+  const requested = new Date(`${requestedDay}T00:00:00`);
+  if (Number.isNaN(today.getTime()) || Number.isNaN(requested.getTime())) return false;
+  const ageDays = Math.floor((today.getTime() - requested.getTime()) / 86400000);
+  return ageDays > days;
+}
+
 function setMessage(text, isError = false) {
   sheetMessage.textContent = text;
   sheetMessage.classList.toggle("error", isError);
@@ -325,7 +354,7 @@ function renderSheet(data) {
                   ${category.requests
                     .sort(logicalRequestCompare)
                     .map((request) => `
-                      <tr data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
+                      <tr class="${requestIsOlderThanDays(request, 7) ? "driver-overdue-row" : ""}" data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
                         <td>
                           <button class="driver-check-button${request.ordered ? " checked" : ""}" type="button" data-action="ordered" ${request.driverLineId ? "" : "disabled"} aria-label="Mark ordered">
                             ${request.ordered ? "&#10003;" : ""}

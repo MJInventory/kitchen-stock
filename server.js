@@ -13,7 +13,7 @@ import { getPool, postgresEnabled } from "./lib/postgres.js";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
 const viewsDir = join(__dirname, "views");
-const appVersion = "2.009";
+const appVersion = "2.011";
 
 const baseId = "appAFvMwWZb2PPWUz";
 const inventoryTableId = "tblEuIXG6gxEiD5oU";
@@ -29,7 +29,7 @@ const authSecret = process.env.AUTH_SECRET || "change-this-secret-in-render";
 const sessionMaxAgeMs = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
 const userConfig = process.env.APP_USERS || "";
 const allowedUnits = new Set(["box", "bag", "item", "bottle"]);
-const editableUserSources = new Set(["airtable", "postgres"]);
+const editableUserSources = new Set(["postgres"]);
 const accountingInbox = process.env.ACCOUNTING_INBOX || "bills.madameja.23d9599b@billfiles.com";
 const smtpHost = process.env.SMTP_HOST || "";
 const smtpPort = Number(process.env.SMTP_PORT || 587);
@@ -207,6 +207,12 @@ async function ensurePostgresSchemaUpgrades() {
     await db().query(`
       create index if not exists idx_audit_log_entries_date_created
         on audit_log_entries (action_date desc, created_at desc)
+    `);
+    await db().query(`
+      update app_users
+      set source = 'postgres',
+          updated_at = now()
+      where coalesce(source, '') <> 'postgres'
     `);
     await db().query(`
       create table if not exists internal_order_batches (
@@ -4410,16 +4416,7 @@ async function pgCreateInventoryItem(payload, actorUsername = "") {
 }
 
 async function listItems() {
-  if (hasPostgres()) {
-    return pgListItems();
-  }
-  const suppliers = await getSuppliers();
-  const lookups = await getLookups();
-  const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
-  const records = await listAirtableRecords(inventoryTableId);
-  return records
-    .map((record) => normalizeItem(record, supplierById, lookups))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return pgListItems();
 }
 
 function linkedValue(record, linkFieldName, fallbackFieldName, lookupMap) {
@@ -4454,112 +4451,27 @@ function normalizeItem(record, supplierById, lookups) {
 }
 
 async function listSuppliers() {
-  if (hasPostgres()) {
-    return pgListSuppliers();
-  }
-  const records = await listAirtableRecords(suppliersTableId);
-  return records
-    .map((record) => ({
-      id: record.id,
-      name: record.fields["Supplier Name"] || "",
-      contact: record.fields["Contact Information"] || ""
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return pgListSuppliers();
 }
 
 async function listSuppliersAdmin() {
-  if (hasPostgres()) {
-    return pgListSuppliersAdmin();
-  }
-  const records = await listAirtableRecords(suppliersTableId);
-  return records
-    .map((record) => ({
-      id: record.id,
-      name: record.fields["Supplier Name"] || "",
-      contact: record.fields["Contact Information"] || "",
-      active: record.fields.Active !== false
-    }))
-    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }));
+  return pgListSuppliersAdmin();
 }
 
 async function saveSupplier(payload, recordId = "", actorUsername = "") {
-  if (hasPostgres()) {
-    return pgSaveSupplier(payload, recordId, actorUsername);
-  }
-  const name = String(payload.name || "").trim();
-  const contact = String(payload.contact || "").trim();
-  const active = payload.active !== false;
-  if (!name) throw new Error("Supplier name is required.");
-  const fields = {
-    "Supplier Name": name,
-    "Contact Information": contact,
-    Active: active
-  };
-  const record = recordId
-    ? await airtable(`${suppliersTableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
-    : await airtable(suppliersTableId, { method: "POST", body: JSON.stringify({ fields }) });
-  cache.suppliers.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  return {
-    id: record.id,
-    name: record.fields["Supplier Name"] || "",
-    contact: record.fields["Contact Information"] || "",
-    active: record.fields.Active !== false
-  };
+  return pgSaveSupplier(payload, recordId, actorUsername);
 }
 
 async function deleteSupplier(recordId, actorUsername = "") {
-  if (hasPostgres()) {
-    return pgDeleteSupplier(recordId, actorUsername);
-  }
-  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
-    throw new Error("Invalid supplier record.");
-  }
-  await airtable(`${suppliersTableId}/${recordId}`, { method: "DELETE" });
-  cache.suppliers.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  return { ok: true, recordId };
+  return pgDeleteSupplier(recordId, actorUsername);
 }
 
 async function listRequests() {
-  if (hasPostgres()) {
-    return pgListRequests();
-  }
-  const data = await airtable(`${requestsTableId}?pageSize=20&sort%5B0%5D%5Bfield%5D=Request%20ID&sort%5B0%5D%5Bdirection%5D=desc`);
-  return data.records.map((record) => ({
-    id: record.id,
-    requestId: record.fields["Request ID"],
-    itemId: record.fields["Requested Item"]?.[0] || "",
-    quantity: record.fields["Quantity Needed"] ?? null,
-    urgency: record.fields["Urgency Level"] || "",
-    storageLocation: record.fields["Storage Location"] || "",
-    inventoryArea: record.fields["Inventory Area"] || "",
-    inventorySubgroup: record.fields["Inventory Subgroup"] || "",
-    shelfCode: record.fields["Shelf Code"] || "",
-    requestedBy: record.fields["Requested By"] || "",
-    status: record.fields.Status || "",
-    received: Boolean(record.fields.Received),
-    receivedAt: record.fields["Received Date/Time"] || "",
-    receivedBy: record.fields["Received By"] || "",
-    notes: record.fields.Notes || "",
-    requestedAt: record.fields["Request Date/Time"] || ""
-  }));
+  return pgListRequests();
 }
 
 async function listOpenRequests() {
-  if (hasPostgres()) {
-    return pgListOpenRequests();
-  }
-  const records = await listAirtableRecords(requestsTableId, {
-    filterByFormula: "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))",
-    "sort[0][field]": "Requested By",
-    "sort[0][direction]": "asc",
-    "sort[1][field]": "Request ID",
-    "sort[1][direction]": "asc",
-    "sort[2][field]": "Request Date/Time",
-    "sort[2][direction]": "desc"
-  });
-  return records.map(normalizeRequest);
+  return pgListOpenRequests();
 }
 
 async function cached(key, ttlMs, loader) {
@@ -4633,45 +4545,7 @@ async function getAppUsersTableId() {
 }
 
 async function listAppUsers() {
-  if (hasPostgres()) {
-    return pgListAppUsers();
-  }
-  const tableId = await getAppUsersTableId();
-  if (!tableId) return envUsersList();
-
-  const records = await listAirtableRecords(tableId, {
-    pageSize: "100",
-    "sort[0][field]": "Name",
-    "sort[0][direction]": "asc"
-  });
-
-  const tableUsers = records.map(normalizeAppUser).filter((user) => user.name && user.password);
-  const tableUserNames = new Set(tableUsers.map((user) => user.name.toLowerCase()));
-  for (const envUser of users.values()) {
-    if (!tableUserNames.has(envUser.name.toLowerCase())) {
-      try {
-        const schema = await getSchema();
-        const fields = appUserFields({
-          name: envUser.name,
-          password: envUser.password,
-          role: envUser.role,
-          theme: envUser.theme || "dark",
-          active: true,
-          mustChangePassword: false
-        }, schema);
-        const record = await airtable(tableId, {
-          method: "POST",
-          body: JSON.stringify({ fields, typecast: true })
-        });
-        const createdUser = normalizeAppUser(record);
-        tableUsers.push(createdUser);
-        tableUserNames.add(createdUser.name.toLowerCase());
-      } catch {
-        tableUsers.push({ ...envUser, id: `env-${envUser.name.toLowerCase()}`, source: "env" });
-      }
-    }
-  }
-  return tableUsers.sort((a, b) => a.name.localeCompare(b.name));
+  return pgListAppUsers();
 }
 
 async function getAppUsers() {
@@ -4680,15 +4554,8 @@ async function getAppUsers() {
 
 async function findAppUserByName(name) {
   const normalized = String(name || "").trim().toLowerCase();
-  if (hasPostgres()) {
-    const user = await pgFindAppUserByName(normalized);
-    return user && user.active !== false ? user : null;
-  }
-  const appUsers = await getAppUsers();
-  return appUsers.find((user) =>
-    (String(user.username || user.name || "").toLowerCase() === normalized || String(user.name || "").toLowerCase() === normalized)
-    && user.active !== false
-  );
+  const user = await pgFindAppUserByName(normalized);
+  return user && user.active !== false ? user : null;
 }
 
 async function refreshUserFromDirectory(user) {
@@ -4781,49 +4648,11 @@ async function findAppUserById(recordId) {
 }
 
 async function createAppUser(payload, actorUsername = "") {
-  if (hasPostgres()) {
-    return pgCreateAppUser(payload, actorUsername);
-  }
-  const tableId = await getAppUsersTableId();
-  if (!tableId) throw new Error("App Users table is not configured yet. Create an Airtable table named App Users with fields Name, Password, Role, Active.");
-
-  const schema = await getSchema();
-  const fields = appUserFields(payload, schema);
-  const existing = await findAppUserByName(fields.Name);
-  if (existing && !String(existing.id).startsWith("env-")) throw new Error("That user already exists.");
-
-  const record = await airtable(tableId, {
-    method: "POST",
-    body: JSON.stringify({ fields, typecast: true })
-  });
-  cache.appUsers.expiresAt = 0;
-  return normalizeAppUser(record);
+  return pgCreateAppUser(payload, actorUsername);
 }
 
 async function changeOwnPassword(userName, currentPassword, newPassword, options = {}) {
-  if (hasPostgres()) {
-    return pgChangeOwnPassword(userName, currentPassword, newPassword, options);
-  }
-  const appUser = await findAppUserByName(userName);
-  if (!appUser) throw new Error("User was not found.");
-  if (!editableUserSources.has(appUser.source)) {
-    throw new Error("This user is configured in Render. Move users to the App Users Airtable table before changing passwords online.");
-  }
-  if (!options.forceChange && appUser.password !== String(currentPassword || "")) throw new Error("Current password is not correct.");
-  if (String(newPassword || "").trim().length < 2) throw new Error("New password is too short.");
-
-  const tableId = await getAppUsersTableId();
-  const record = await airtable(`${tableId}/${appUser.id}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      fields: {
-        Password: String(newPassword).trim(),
-        "Force Password Change": false
-      }
-    })
-  });
-  cache.appUsers.expiresAt = 0;
-  return normalizeAppUser(record);
+  return pgChangeOwnPassword(userName, currentPassword, newPassword, options);
 }
 
 async function itemFormOptions() {
@@ -4902,16 +4731,7 @@ async function getStandingOrdersTableId() {
 }
 
 async function listStandingOrders() {
-  if (hasPostgres()) {
-    return pgListStandingOrders();
-  }
-  const tableId = await getStandingOrdersTableId();
-  if (!tableId) return [];
-  const records = await listAirtableRecords(tableId, {
-    "sort[0][field]": "Expected Arrival Date",
-    "sort[0][direction]": "asc"
-  });
-  return records.map(normalizeStandingOrder);
+  return pgListStandingOrders();
 }
 
 function nextStandingOrderDate(order, generatedDate) {
@@ -5002,55 +4822,11 @@ async function resolveDailyGuestCountsSchema() {
 }
 
 async function getDailyGuestCount(date) {
-  if (hasPostgres()) {
-    return pgGetDailyGuestCount(date);
-  }
-  const guestSchema = await resolveDailyGuestCountsSchema();
-  const tableId = guestSchema.tableId;
-  if (!tableId) return null;
-  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
-  const dateField = guestSchema.dateField || "Date";
-  const records = await listAirtableRecords(tableId, {
-    filterByFormula: `IS_SAME({${dateField}}, '${selectedDate}', 'day')`,
-    pageSize: "1"
-  });
-  return records[0] ? normalizeDailyGuestCount(records[0]) : null;
+  return pgGetDailyGuestCount(date);
 }
 
 async function saveDailyGuestCount(payload, user) {
-  if (hasPostgres()) {
-    return pgSaveDailyGuestCount(payload, user);
-  }
-  if (!user.permissions?.canAdminUsers) throw new Error("Only admins can enter daily guest counts.");
-  const guestSchema = await resolveDailyGuestCountsSchema();
-  const tableId = guestSchema.tableId;
-  if (!tableId) throw new Error("Daily Guest Counts table is not configured. Add an Airtable table named Daily Guest Counts.");
-
-  const selectedDate = String(payload.date || "").trim();
-  const guests = Number(payload.guests);
-  const notes = String(payload.notes || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) throw new Error("Choose a valid date.");
-  if (!Number.isFinite(guests) || guests < 0) throw new Error("Guest count must be zero or greater.");
-
-  const existing = await getDailyGuestCount(selectedDate);
-  const dateField = guestSchema.dateField || "Date";
-  const guestField = guestSchema.guestField || "Guest Count";
-  const notesField = guestSchema.notesField || "Notes";
-  const enteredByField = guestSchema.enteredByField || "Entered By";
-  const enteredAtField = guestSchema.enteredAtField || "Entered At";
-  const fields = {
-    [dateField]: selectedDate,
-    [guestField]: guests,
-    [notesField]: notes,
-    [enteredByField]: user.name,
-    [enteredAtField]: new Date().toISOString()
-  };
-
-  const record = existing
-    ? await airtable(`${tableId}/${existing.id}`, { method: "PATCH", body: JSON.stringify({ fields }) })
-    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
-
-  return normalizeDailyGuestCount(record);
+  return pgSaveDailyGuestCount(payload, user);
 }
 
 function isStandingOrderDue(order, selectedDate) {
@@ -5665,10 +5441,7 @@ async function listLookupRecords() {
 }
 
 async function getLookups() {
-  if (hasPostgres()) {
-    return pgListLookups();
-  }
-  return cached("lookups", itemCacheMs, listLookupRecords);
+  return pgListLookups();
 }
 
 async function findOrCreateLookupRecord(lookupKey, value) {
@@ -5718,63 +5491,15 @@ function normalizeShelfCode(record) {
 }
 
 async function listStorageLocationsAdmin() {
-  if (hasPostgres()) {
-    return pgListStorageLocationsAdmin();
-  }
-  const schema = await getSchema();
-  const tableId = schema.tables.storageLocations;
-  if (!tableId) throw new Error("Storage Locations table was not found.");
-  const records = await listAirtableRecords(tableId, {
-    "sort[0][field]": "Storage Location",
-    "sort[0][direction]": "asc"
-  });
-  return records.map(normalizeStorageLocation).filter((entry) => entry.name);
+  return pgListStorageLocationsAdmin();
 }
 
 async function listCategoriesAdmin() {
-  if (hasPostgres()) {
-    return pgListCategoriesAdmin();
-  }
-  const schema = await getSchema();
-  const tableId = schema.tables.categories;
-  if (!tableId) throw new Error("Categories table was not found.");
-  const records = await listAirtableRecords(tableId, {
-    "sort[0][field]": "Category",
-    "sort[0][direction]": "asc"
-  });
-  return records.map(normalizeCategory).filter((entry) => entry.name);
+  return pgListCategoriesAdmin();
 }
 
 async function listShelfCodesAdmin() {
-  if (hasPostgres()) {
-    return pgListShelfCodesAdmin();
-  }
-  let schema = await getSchema();
-  schema = await ensureShelfCodeStorageLocationField(schema);
-  const tableId = schema.tables.shelfCodes;
-  if (!tableId) throw new Error("Shelf Codes table was not found.");
-  const records = await listAirtableRecords(tableId, {
-    "sort[0][field]": "Shelf Code",
-    "sort[0][direction]": "asc"
-  });
-  const locations = await listStorageLocationsAdmin();
-  const locationById = new Map(locations.map((location) => [location.id, location.name]));
-  const unique = new Map();
-  for (const shelf of records
-    .map(normalizeShelfCode)
-    .map((shelf) => ({
-      ...shelf,
-      storageLocation: shelf.storageLocation || locationById.get(shelf.storageLocationId) || ""
-    }))
-    .filter((entry) => entry.name)) {
-    const key = `${String(shelf.storageLocation || "").trim().toLowerCase()}::${String(shelf.name || "").trim().toLowerCase()}`;
-    if (!unique.has(key)) unique.set(key, shelf);
-  }
-  return [...unique.values()].sort((a, b) => {
-    const location = a.storageLocation.localeCompare(b.storageLocation);
-    if (location) return location;
-    return a.name.localeCompare(b.name, undefined, { numeric: true });
-  });
+  return pgListShelfCodesAdmin();
 }
 
 async function findExistingShelfCodeRecordId(name, storageLocation, excludeRecordId = "") {
@@ -6049,174 +5774,15 @@ async function listRequestsByRecordIds(recordIds) {
 }
 
 async function listOrderReport(date) {
-  if (hasPostgres()) {
-    return pgListOrderReport(date);
-  }
-  const schema = await getSchema();
-  const driverLinesTableId = schema.tables.driverSheetLines;
-  if (!driverLinesTableId) throw new Error("Driver Sheet Lines table is not configured.");
-
-  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
-
-  await listDriverSheet(selectedDate);
-  const guestCount = await getDailyGuestCount(selectedDate);
-  const lines = await listDriverSheetLines(driverLinesTableId, selectedDate);
-  const requestById = await listRequestsByRecordIds(lines.map((line) => line.requestRecordId));
-  const standingOrders = (await listStandingOrders())
-    .sort((a, b) => {
-      const dateCompare = String(a.expectedDate || "").localeCompare(String(b.expectedDate || ""));
-      if (dateCompare) return dateCompare;
-      const supplierCompare = String(a.supplierName || "").localeCompare(String(b.supplierName || ""));
-      if (supplierCompare) return supplierCompare;
-      return String(a.name || "").localeCompare(String(b.name || ""));
-    });
-
-  const rows = lines
-    .map((line) => {
-      const request = requestById.get(line.requestRecordId);
-      const delivered = Boolean(line.received || request?.received);
-      const ordered = Boolean(line.ordered);
-      return {
-        ...line,
-        quantity: line.quantity ?? request?.quantity ?? null,
-        unit: line.unit || "",
-        requestedBy: request?.requestedBy || "",
-        requestedAt: request?.requestedAt || "",
-        urgency: request?.urgency || "",
-        notes: line.notes || request?.notes || "",
-        status: delivered ? "Delivered" : ordered ? "Picked / Ordered" : "Waiting",
-        delivered,
-        receivedAt: line.receivedAt || request?.receivedAt || "",
-        receivedBy: line.receivedBy || request?.receivedBy || "",
-        waiting: !delivered
-      };
-    })
-    .sort((a, b) => {
-      const logical = logicalOrderCompare(a, b);
-      if (logical) return logical;
-      const status = String(a.status || "").localeCompare(String(b.status || ""));
-      if (status) return status;
-      return String(a.requestId || "").localeCompare(String(b.requestId || ""));
-    });
-  const reportRows = rows.filter((row) => !row.standingRunId);
-
-  return {
-    date: selectedDate,
-    summary: {
-      guests: guestCount?.guests ?? null,
-      totalLines: reportRows.length,
-      orderedLines: reportRows.filter((row) => row.ordered).length,
-      deliveredLines: reportRows.filter((row) => row.delivered).length,
-      waitingLines: reportRows.filter((row) => row.waiting).length,
-      toDeliverLines: reportRows.filter((row) => row.toDeliver).length
-    },
-    guestCount,
-    rows: reportRows,
-    standingOrders
-  };
+  return pgListOrderReport(date);
 }
 
 async function listDriverSheet(date) {
-  if (hasPostgres()) {
-    return pgListDriverSheet(date);
-  }
-  const schema = await getSchema();
-  const driverLinesTableId = schema.tables.driverSheetLines;
-  const items = await getItems();
-  const suppliers = await getSuppliers();
-  const itemById = new Map(items.map((item) => [item.id, item]));
-  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
-  await generateStandingOrdersForDate(selectedDate);
-  const formula = "AND(OR({Status}='Pending', {Status}='Approved'), NOT({Received}))";
-  const query = new URLSearchParams({
-    pageSize: "100",
-    filterByFormula: formula,
-    "sort[0][field]": "Inventory Area",
-    "sort[0][direction]": "asc",
-    "sort[1][field]": "Storage Location",
-    "sort[1][direction]": "asc",
-    "sort[2][field]": "Request ID",
-    "sort[2][direction]": "asc"
-  });
-  const records = await listAirtableRecords(requestsTableId, Object.fromEntries(query.entries()));
-  const requests = records.map((record) => {
-    const request = normalizeRequest(record);
-    const item = itemById.get(request.itemId);
-    return {
-      ...request,
-      itemName: item?.name || "Requested item",
-      unit: item?.unit || "",
-      supplierName: item?.supplierName || "Unassigned Supplier",
-      supplierContact: item?.supplierContact || "",
-      category: request.category || item?.category || "",
-      storageLocation: request.storageLocation || item?.storageLocation || "",
-      inventoryArea: request.inventoryArea || item?.inventoryArea || "",
-      shelfCode: request.shelfCode || item?.shelfCode || ""
-    };
-  });
-
-  let lineByRequestId = new Map();
-  if (driverLinesTableId) {
-    await persistDriverSheetLines(driverLinesTableId, selectedDate, requests);
-    const lines = await listDriverSheetLines(driverLinesTableId, selectedDate);
-    lineByRequestId = new Map(lines.map((line) => [line.requestRecordId, line]));
-  }
-
-  const mergedRequests = requests.map((request) => {
-    const line = lineByRequestId.get(request.id);
-    return {
-      ...request,
-      driverLineId: line?.id || "",
-      ordered: Boolean(line?.ordered),
-      toDeliver: Boolean(line?.toDeliver),
-      deliveryDay: line?.deliveryDay || "",
-      driverName: line?.driverName || "",
-      orderedAt: line?.orderedAt || "",
-      orderedBy: line?.orderedBy || "",
-      delivered: Boolean(line?.received || request.received),
-      receivedAt: line?.receivedAt || request.receivedAt || "",
-      receivedBy: line?.receivedBy || request.receivedBy || "",
-      supplierName: line?.supplierName || request.supplierName,
-      supplierContact: line?.supplierContact || request.supplierContact
-    };
-  })
-    .filter((request) => {
-      if (!request.requestedAt) return true;
-      const requestDate = String(request.requestedAt).slice(0, 10);
-      return !requestDate || requestDate <= selectedDate;
-    })
-    .sort(logicalOrderCompare);
-
-  return {
-    date: selectedDate,
-    driverName: [...lineByRequestId.values()].find((line) => line.driverName)?.driverName || "",
-    requests: mergedRequests,
-    suppliers: suppliers.map((supplier) => ({
-      id: supplier.id,
-      name: supplier.name,
-      contact: supplier.contact
-    }))
-  };
+  return pgListDriverSheet(date);
 }
 
 async function listReceivingSheet(date) {
-  if (hasPostgres()) {
-    return pgListReceivingSheet(date);
-  }
-  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10);
-  const sheet = await listDriverSheet(selectedDate);
-  const visibleRequests = sheet.requests.filter((request) => {
-    if (request.delivered || request.status === "Fulfilled") return false;
-    if (!request.requestedAt) return true;
-    const requestDate = String(request.requestedAt).slice(0, 10);
-    return !requestDate || requestDate <= selectedDate;
-  });
-
-  return {
-    ...sheet,
-    date: selectedDate,
-    requests: visibleRequests
-  };
+  return pgListReceivingSheet(date);
 }
 
 async function assignDriverToSheet(date, driverName, user) {
@@ -7309,7 +6875,8 @@ function orderShellActions({ saveButtonId = "", saveButtonLabel = "", logoutComp
 }
 
 async function buildPageRoute(url) {
-  switch (url) {
+  const pathname = new URL(url, "http://localhost").pathname;
+  switch (pathname) {
     case "/":
     case "/index.html":
       return {

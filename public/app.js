@@ -231,6 +231,20 @@ function requestDay(request) {
   return localDateKey(request?.requestedAt || "");
 }
 
+function scheduledDeliveryDay(request) {
+  return String(request?.deliveryDay || "").trim();
+}
+
+function hasFutureScheduledDelivery(request, today = todayLocal()) {
+  const deliveryDay = scheduledDeliveryDay(request);
+  return Boolean(deliveryDay) && deliveryDay > today;
+}
+
+function isOlderOpenRequest(request, today = todayLocal()) {
+  const day = requestDay(request);
+  return Boolean(day) && day < today && !hasFutureScheduledDelivery(request, today);
+}
+
 function selectedRequestScope() {
   return String(requestScopeFilter?.value || "").trim();
 }
@@ -268,8 +282,8 @@ function requestOpenStatsForItem(itemId) {
 
 function requestStatusChips(request, today = todayLocal()) {
   const chips = [];
-  const day = requestDay(request);
-  if (day && day < today) chips.push(["Older open", "older"]);
+  if (hasFutureScheduledDelivery(request, today)) chips.push(["Scheduled", "deliver"]);
+  else if (isOlderOpenRequest(request, today)) chips.push(["Older open", "older"]);
   else chips.push(["Today", "today"]);
   chips.push([
     sameUser(requestUser(request), sessionUser) ? "My item" : `By ${formatUserDisplay(requestUser(request) || "Team")}`,
@@ -370,10 +384,7 @@ function renderOrderingSummary() {
     ["Saved by me", selected.size, "Items you are actively editing right now"],
     ["My open", unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length, "Still open with your name on them"],
     ["Team open", unresolved.filter((request) => !sameUser(requestUser(request), sessionUser)).length, "Open lines from everybody else"],
-    ["Older open", unresolved.filter((request) => {
-      const day = requestDay(request);
-      return day && day < today;
-    }).length, "Still waiting from previous days"],
+    ["Older open", unresolved.filter((request) => isOlderOpenRequest(request, today)).length, "Still waiting from previous days"],
     ["Below minimum", allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length, "Items already below their minimum"],
     ["Standing due", standingOrders.filter((order) => {
       const expected = String(order.expectedDate || "").trim();

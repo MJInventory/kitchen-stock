@@ -25,6 +25,12 @@ const activityReportList = document.querySelector("#activityReportList");
 let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+let currentReportRows = [];
+let currentActivityEntries = [];
+let currentStandingOrders = [];
+let currentGuestCount = { guests: "", notes: "" };
+let activeReportFilter = "all";
+let activeActivityFilter = "all";
 
 function formatUserDisplay(value) {
   const raw = String(value || "").trim();
@@ -133,20 +139,28 @@ function logicalRowCompare(a, b) {
   return String(a.status || "").localeCompare(String(b.status || ""));
 }
 
+function reportRowsForFilter(rows = [], filter = "all") {
+  if (filter === "picked") return rows.filter((row) => row.ordered);
+  if (filter === "deliver") return rows.filter((row) => row.toDeliver);
+  if (filter === "delivered") return rows.filter((row) => row.delivered);
+  if (filter === "waiting") return rows.filter((row) => row.waiting);
+  return rows;
+}
+
 function renderSummary(summary) {
   const cards = [
-    ["Guests", summary.guests ?? "-"],
-    ["Total lines", summary.totalLines || 0],
-    ["Picked / ordered", summary.orderedLines || 0],
-    ["2Deliver", summary.toDeliverLines || 0],
-    ["Delivered", summary.deliveredLines || 0],
-    ["Waiting", summary.waitingLines || 0]
+    ["Guests", summary.guests ?? "-", ""],
+    ["Total lines", summary.totalLines || 0, "all"],
+    ["Picked / ordered", summary.orderedLines || 0, "picked"],
+    ["2Deliver", summary.toDeliverLines || 0, "deliver"],
+    ["Delivered", summary.deliveredLines || 0, "delivered"],
+    ["Waiting", summary.waitingLines || 0, "waiting"]
   ];
 
   reportSummary.innerHTML = cards
     .map(
-      ([label, value]) => `
-        <article>
+      ([label, value, filter]) => `
+        <article class="${filter ? "report-filter-card" : "report-info-card"}${filter && activeReportFilter === filter ? " active" : ""}"${filter ? ` data-report-filter="${escapeHtml(filter)}" role="button" tabindex="0"` : ""}>
           <strong>${escapeHtml(value)}</strong>
           <span>${escapeHtml(label)}</span>
         </article>
@@ -293,29 +307,34 @@ function labelForReasonCode(value) {
 
 function renderActivity(entries) {
   const list = Array.isArray(entries) ? entries : [];
+  currentActivityEntries = list;
   const adds = list.filter((entry) => entry.actionType === "add").length;
   const changes = list.filter((entry) => entry.actionType === "change").length;
   const deletes = list.filter((entry) => entry.actionType === "delete").length;
   const actors = new Set(list.map((entry) => String(entry.actorUsername || "").trim()).filter(Boolean)).size;
 
   activitySummary.innerHTML = [
-    ["Adds", adds],
-    ["Changes", changes],
-    ["Deletes", deletes],
-    ["Users", actors]
-  ].map(([label, value]) => `
-    <article>
+    ["Adds", adds, "add"],
+    ["Changes", changes, "change"],
+    ["Deletes", deletes, "delete"],
+    ["Users", actors, ""]
+  ].map(([label, value, filter]) => `
+    <article class="${filter ? "report-filter-card" : "report-info-card"}${filter && activeActivityFilter === filter ? " active" : ""}"${filter ? ` data-activity-filter="${escapeHtml(filter)}" role="button" tabindex="0"` : ""}>
       <strong>${escapeHtml(value)}</strong>
       <span>${escapeHtml(label)}</span>
     </article>
   `).join("");
 
-  if (!list.length) {
+  const visible = activeActivityFilter === "all"
+    ? list
+    : list.filter((entry) => entry.actionType === activeActivityFilter);
+
+  if (!visible.length) {
     activityReportList.innerHTML = '<p class="empty-sheet">No recorded adds, changes, or deletes for this day.</p>';
     return;
   }
 
-  activityReportList.innerHTML = list
+  activityReportList.innerHTML = visible
     .map((entry) => `
       <article class="activity-row action-${escapeHtml(entry.actionType)}">
         <div class="activity-row-top">
@@ -335,19 +354,24 @@ function renderActivity(entries) {
 }
 
 function renderReport(data) {
+  currentReportRows = Array.isArray(data.rows) ? data.rows : [];
+  currentStandingOrders = Array.isArray(data.standingOrders) ? data.standingOrders : [];
+  currentGuestCount = data.guestCount || { guests: "", notes: "" };
   printDate.textContent = `Date: ${data.date}`;
   guestCountInput.value = data.guestCount?.guests ?? "";
   guestNotesInput.value = data.guestCount?.notes ?? "";
   renderSummary(data.summary || {});
-  renderStandingOrders(data.standingOrders || []);
+  renderStandingOrders(currentStandingOrders);
   renderActivity(data.activity || []);
 
-  if (!data.rows.length) {
+  const visibleRows = reportRowsForFilter(currentReportRows, activeReportFilter);
+
+  if (!visibleRows.length) {
     reportList.innerHTML = '<p class="empty-sheet">No order lines found for this date.</p>';
     return;
   }
 
-  const groups = groupBySupplier(data.rows);
+  const groups = groupBySupplier(visibleRows);
   reportList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([supplier, rows]) => `
@@ -412,6 +436,30 @@ async function loadReport() {
   setMessage("");
 }
 
+function updateReportFilter(filter) {
+  activeReportFilter = filter || "all";
+  renderReport({
+    date: reportDate.value,
+    summary: {
+      guests: guestCountInput.value || "-",
+      totalLines: currentReportRows.length,
+      orderedLines: currentReportRows.filter((row) => row.ordered).length,
+      toDeliverLines: currentReportRows.filter((row) => row.toDeliver).length,
+      deliveredLines: currentReportRows.filter((row) => row.delivered).length,
+      waitingLines: currentReportRows.filter((row) => row.waiting).length
+    },
+    rows: currentReportRows,
+    standingOrders: currentStandingOrders,
+    activity: currentActivityEntries,
+    guestCount: currentGuestCount
+  });
+}
+
+function updateActivityFilter(filter) {
+  activeActivityFilter = filter || "all";
+  renderActivity(currentActivityEntries);
+}
+
 async function saveGuests() {
   setMessage("Saving guests...");
   await api("/api/daily-guests", {
@@ -430,6 +478,18 @@ reportDate.value = todayLocal();
 loadReportButton.addEventListener("click", () => loadReport().catch((error) => setMessage(error.message, true)));
 saveGuestsButton.addEventListener("click", () => saveGuests().catch((error) => setMessage(error.message, true)));
 printReportButton.addEventListener("click", () => window.print());
+reportSummary?.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-report-filter]");
+  if (!card) return;
+  const nextFilter = card.dataset.reportFilter || "all";
+  updateReportFilter(activeReportFilter === nextFilter ? "all" : nextFilter);
+});
+activitySummary?.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-activity-filter]");
+  if (!card) return;
+  const nextFilter = card.dataset.activityFilter || "all";
+  updateActivityFilter(activeActivityFilter === nextFilter ? "all" : nextFilter);
+});
 logoutButton.addEventListener("click", showLogin);
 
 loginForm.addEventListener("submit", async (event) => {

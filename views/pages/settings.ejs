@@ -1,0 +1,31 @@
+<section class="panel">
+  <h2>Personal Settings</h2>
+  <p class="section-helper">Tune how your screen behaves without exposing screens your role should never see.</p>
+  <form id="settingsForm" class="admin-form-grid">
+    <label>
+      Theme
+      <select id="themeSelect" required>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </label>
+    <label>
+      Mark open orders as old after
+      <input id="openOrderDays" type="number" min="1" max="30" required>
+    </label>
+    <div class="wide-field">
+      <p class="settings-subtitle">Go to menu</p>
+      <div id="gotoMenuOptions" class="notify-area-grid compact"></div>
+    </div>
+    <div class="wide-field">
+      <p class="settings-subtitle">Backoffice menu</p>
+      <div id="backofficeMenuOptions" class="notify-area-grid compact"></div>
+    </div>
+    <div class="wide-field settings-actions-row">
+      <a class="secondary" href="/change-password.html">Change Password</a>
+      <button id="settingsLogoutButton" class="secondary" type="button">Log Out</button>
+    </div>
+    <button type="submit">Save Settings</button>
+    <p id="settingsMessage" role="status"></p>
+  </form>
+</section>

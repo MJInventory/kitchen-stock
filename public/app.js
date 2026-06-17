@@ -44,6 +44,7 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+let orderingSummaryFilter = "all";
 const bootstrapCacheKey = "kitchenStockOrderingBootstrap";
 let pendingJumpItemId = String(pageParams.get("itemId") || "").trim();
 let pendingJumpCategory = String(pageParams.get("category") || "").trim();
@@ -73,6 +74,20 @@ function formatUserDisplay(value) {
 
 function sameUser(left, right) {
   return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
+}
+
+function readUserSettings() {
+  try {
+    return JSON.parse(localStorage.getItem("kitchenStockSettings") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function openOrderThresholdDays() {
+  const parsed = Number.parseInt(String(readUserSettings().openOrderDays ?? 7), 10);
+  if (!Number.isFinite(parsed)) return 7;
+  return Math.min(30, Math.max(1, parsed));
 }
 
 function todayLocal() {
@@ -242,7 +257,11 @@ function hasFutureScheduledDelivery(request, today = todayLocal()) {
 
 function isOlderOpenRequest(request, today = todayLocal()) {
   const day = requestDay(request);
-  return Boolean(day) && day < today && !hasFutureScheduledDelivery(request, today);
+  if (!day || hasFutureScheduledDelivery(request, today)) return false;
+  const requestedDate = new Date(`${day}T00:00:00`);
+  const todayDate = new Date(`${today}T00:00:00`);
+  const diffDays = Math.floor((todayDate.getTime() - requestedDate.getTime()) / 86400000);
+  return diffDays >= openOrderThresholdDays();
 }
 
 function selectedRequestScope() {
@@ -278,6 +297,52 @@ function requestOpenStatsForItem(itemId) {
     team: open.filter((request) => !sameUser(requestUser(request), sessionUser)).length,
     total: open.length
   };
+}
+
+function isStandingDue(order, today = todayLocal()) {
+  const expected = String(order?.expectedDate || "").trim();
+  return Boolean(expected) && expected <= today;
+}
+
+function orderingItemMatchesSummary(item, today = todayLocal()) {
+  if (orderingSummaryFilter === "all") return true;
+  const openStats = requestOpenStatsForItem(item.id);
+  if (orderingSummaryFilter === "saved") return selected.has(item.id);
+  if (orderingSummaryFilter === "mine") return openStats.mine > 0;
+  if (orderingSummaryFilter === "team") return openStats.team > 0;
+  if (orderingSummaryFilter === "older") {
+    return recentRequests.some((request) =>
+      String(request.itemId) === String(item.id)
+      && !request.received
+      && request.status !== "Fulfilled"
+      && !request.standingRunId
+      && !isStandingOrder(request)
+      && isOlderOpenRequest(request, today)
+    );
+  }
+  if (orderingSummaryFilter === "below") {
+    return Number(item.quantity || 0) < Number(item.minimum || 0);
+  }
+  if (orderingSummaryFilter === "standing") {
+    return standingOrders.some((order) =>
+      isStandingDue(order, today)
+      && (order.items || []).some((line) => String(line.itemId) === String(item.id))
+    );
+  }
+  return true;
+}
+
+function orderingRequestMatchesSummary(request, today = todayLocal()) {
+  if (orderingSummaryFilter === "all") return true;
+  const item = allItems.find((candidate) => String(candidate.id) === String(request.itemId));
+  if (!item) return false;
+  if (orderingSummaryFilter === "saved") return selected.has(item.id);
+  if (orderingSummaryFilter === "mine") return sameUser(requestUser(request), sessionUser);
+  if (orderingSummaryFilter === "team") return !sameUser(requestUser(request), sessionUser);
+  if (orderingSummaryFilter === "older") return isOlderOpenRequest(request, today);
+  if (orderingSummaryFilter === "below") return Number(item.quantity || 0) < Number(item.minimum || 0);
+  if (orderingSummaryFilter === "standing") return false;
+  return true;
 }
 
 function requestStatusChips(request, today = todayLocal()) {
@@ -381,25 +446,22 @@ function renderOrderingSummary() {
     .filter((request) => !isStandingOrder(request));
 
   const summary = [
-    ["Saved by me", selected.size, "Items you are actively editing right now"],
-    ["My open", unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length, "Still open with your name on them"],
-    ["Team open", unresolved.filter((request) => !sameUser(requestUser(request), sessionUser)).length, "Open lines from everybody else"],
-    ["Older open", unresolved.filter((request) => isOlderOpenRequest(request, today)).length, "Still waiting from previous days"],
-    ["Below minimum", allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length, "Items already below their minimum"],
-    ["Standing due", standingOrders.filter((order) => {
-      const expected = String(order.expectedDate || "").trim();
-      return expected && expected <= today;
-    }).length, "Standing orders due now or overdue"]
+    ["Saved by me", selected.size, "Items you are actively editing right now", "saved"],
+    ["My open", unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length, "Still open with your name on them", "mine"],
+    ["Team open", unresolved.filter((request) => !sameUser(requestUser(request), sessionUser)).length, "Open lines from everybody else", "team"],
+    ["Older open", unresolved.filter((request) => isOlderOpenRequest(request, today)).length, "Still waiting from previous days", "older"],
+    ["Below minimum", allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length, "Items already below their minimum", "below"],
+    ["Standing due", standingOrders.filter((order) => isStandingDue(order, today)).length, "Standing orders due now or overdue", "standing"]
   ];
 
   orderingSummaryCards.innerHTML = summary
-    .filter(([, value]) => Number(value || 0) > 0)
-    .map(([label, value, hint]) => `
-    <article class="dashboard-card">
+    .filter(([, value, , filterKey]) => Number(value || 0) > 0 || orderingSummaryFilter === filterKey)
+    .map(([label, value, hint, filterKey]) => `
+    <button class="dashboard-card dashboard-filter-card${orderingSummaryFilter === filterKey ? " active" : ""}" type="button" data-ordering-filter="${escapeHtml(filterKey)}" aria-pressed="${orderingSummaryFilter === filterKey ? "true" : "false"}">
       <strong>${escapeHtml(value)}</strong>
       <span>${escapeHtml(label)}</span>
       <small>${escapeHtml(hint)}</small>
-    </article>
+    </button>
   `).join("");
 
   if (!orderingSummaryCards.innerHTML) {
@@ -473,6 +535,7 @@ function filterItems() {
   const location = locationFilter.value;
   const search = normalize(searchInput.value);
   const tokens = searchTokens(searchInput.value);
+  const today = todayLocal();
 
   return allItems.filter((item) => {
     const areaMatches = !area || !item.inventoryArea || item.inventoryArea === area;
@@ -486,7 +549,8 @@ function filterItems() {
       item.supplierName
     ].join(" "));
     const searchMatches = !tokens.length || (searchText.includes(search) && tokens.every((token) => searchText.includes(token)));
-    return areaMatches && locationMatches && searchMatches;
+    const summaryMatches = orderingItemMatchesSummary(item, today);
+    return areaMatches && locationMatches && searchMatches && summaryMatches;
   });
 }
 
@@ -680,6 +744,7 @@ function renderDailyOrder() {
     .filter((request) => !isStandingOrder(request))
     .filter(hasValidRequestItemId)
     .filter(requestMatchesScope)
+    .filter((request) => orderingRequestMatchesSummary(request, selectedDay))
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100));
@@ -1369,6 +1434,16 @@ readAllNotificationsButton?.addEventListener("click", () => {
 requestScopeFilter?.addEventListener("change", () => {
   renderOrderingSummary();
   renderDailyOrder();
+  renderCategories();
+  if (!productView.hidden || hasSearchTerm()) renderProductList();
+});
+
+orderingSummaryCards?.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-ordering-filter]");
+  if (!card) return;
+  const nextFilter = String(card.dataset.orderingFilter || "").trim();
+  orderingSummaryFilter = orderingSummaryFilter === nextFilter ? "all" : nextFilter;
+  render();
 });
 
 ["input", "change", "search"].forEach((eventName) => {

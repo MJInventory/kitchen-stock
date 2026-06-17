@@ -13,7 +13,7 @@ import { getPool, postgresEnabled } from "./lib/postgres.js";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
 const viewsDir = join(__dirname, "views");
-const appVersion = "2.011";
+const appVersion = "2.012";
 
 const baseId = "appAFvMwWZb2PPWUz";
 const inventoryTableId = "tblEuIXG6gxEiD5oU";
@@ -95,6 +95,46 @@ function normalizeNotificationAreaName(value) {
   return "";
 }
 
+const gotoMenuOptions = [
+  "/",
+  "/ordering.html",
+  "/internal-orders.html",
+  "/picker-sheet.html",
+  "/receiving-sheet.html",
+  "/driver-sheet.html",
+  "/stock-count.html",
+  "/order-report.html"
+];
+
+const backofficeMenuOptions = [
+  "/settings.html",
+  "/standing-orders.html",
+  "/inventory-settings.html",
+  "/suppliers.html",
+  "/categories.html",
+  "/shelf-codes.html",
+  "/user-admin.html",
+  "/change-password.html",
+  "__logout__"
+];
+
+function clampOpenOrderDays(value) {
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+  if (!Number.isFinite(parsed)) return 7;
+  return Math.min(30, Math.max(1, parsed));
+}
+
+function normalizeHiddenMenuItems(values, allowedValues) {
+  const allowed = new Set(allowedValues);
+  const list = Array.isArray(values)
+    ? values
+    : String(values || "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  return [...new Set(list.filter((entry) => allowed.has(entry)))];
+}
+
 function hasPostgres() {
   return postgresEnabled();
 }
@@ -114,7 +154,10 @@ async function ensurePostgresSchemaUpgrades() {
         add column if not exists notify_area_kitchen boolean not null default true,
         add column if not exists notify_area_general boolean not null default true,
         add column if not exists is_driver boolean not null default false,
-        add column if not exists is_picker boolean not null default false
+        add column if not exists is_picker boolean not null default false,
+        add column if not exists open_order_days integer not null default 7,
+        add column if not exists hidden_goto_menu jsonb not null default '[]'::jsonb,
+        add column if not exists hidden_backoffice_menu jsonb not null default '[]'::jsonb
     `);
     await db().query(`
       alter table standing_orders
@@ -470,6 +513,11 @@ function publicUser(user) {
     active: user?.active !== false,
     mustChangePassword: Boolean(user?.mustChangePassword),
     source: user?.source || "airtable",
+    settings: {
+      openOrderDays: clampOpenOrderDays(user?.openOrderDays ?? user?.open_order_days),
+      hiddenGotoMenu: normalizeHiddenMenuItems(user?.hiddenGotoMenu ?? user?.hidden_goto_menu, gotoMenuOptions),
+      hiddenBackofficeMenu: normalizeHiddenMenuItems(user?.hiddenBackofficeMenu ?? user?.hidden_backoffice_menu, backofficeMenuOptions)
+    },
     permissions
   };
 }
@@ -494,6 +542,9 @@ function mapPgAppUserRow(row) {
       kitchen: row.notify_area_kitchen !== false,
       general: row.notify_area_general !== false
     },
+    openOrderDays: clampOpenOrderDays(row.open_order_days),
+    hiddenGotoMenu: normalizeHiddenMenuItems(row.hidden_goto_menu, gotoMenuOptions),
+    hiddenBackofficeMenu: normalizeHiddenMenuItems(row.hidden_backoffice_menu, backofficeMenuOptions),
     source: row.source || "postgres"
   };
 }
@@ -1882,6 +1933,7 @@ async function pgListAppUsers() {
            is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           open_order_days, hidden_goto_menu, hidden_backoffice_menu,
            source, last_login_at
     from app_users
     order by username
@@ -1898,6 +1950,7 @@ async function pgFindAppUserByName(name) {
            is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           open_order_days, hidden_goto_menu, hidden_backoffice_menu,
            source, last_login_at
     from app_users
     where lower(username) = $1 or lower(display_name) = $1
@@ -1924,19 +1977,24 @@ async function pgCreateAppUser(payload, actorUsername = "") {
   const notifyAreas = payload.notifyAreas || {};
   const wantsDriver = Boolean(payload.isDriver);
   const wantsPicker = Boolean(payload.isPicker);
+  const openOrderDays = clampOpenOrderDays(payload.openOrderDays);
+  const hiddenGotoMenu = normalizeHiddenMenuItems(payload.hiddenGotoMenu, gotoMenuOptions);
+  const hiddenBackofficeMenu = normalizeHiddenMenuItems(payload.hiddenBackofficeMenu, backofficeMenuOptions);
   const result = await db().query(`
     insert into app_users (
       username, display_name, password_hash, role, theme, active, must_change_password,
       is_driver, is_picker,
       notify_on_new_orders, notify_on_delivery,
       notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+      open_order_days, hidden_goto_menu, hidden_backoffice_menu,
       source
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'postgres')
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, 'postgres')
     returning id, username, display_name, role, theme, active, must_change_password,
               is_driver, is_picker,
               notify_on_new_orders, notify_on_delivery,
               notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+              open_order_days, hidden_goto_menu, hidden_backoffice_menu,
               source, last_login_at
   `, [
     username,
@@ -1953,7 +2011,10 @@ async function pgCreateAppUser(payload, actorUsername = "") {
     notifyAreas.bar !== false,
     notifyAreas.foh !== false,
     notifyAreas.kitchen !== false,
-    notifyAreas.general !== false
+    notifyAreas.general !== false,
+    openOrderDays,
+    JSON.stringify(hiddenGotoMenu),
+    JSON.stringify(hiddenBackofficeMenu)
   ]);
   const createdId = result.rows[0]?.id || "";
   if (wantsDriver && createdId) {
@@ -1969,6 +2030,7 @@ async function pgCreateAppUser(payload, actorUsername = "") {
            is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           open_order_days, hidden_goto_menu, hidden_backoffice_menu,
            source, last_login_at
     from app_users
     where id = $1
@@ -1996,6 +2058,7 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
            is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           open_order_days, hidden_goto_menu, hidden_backoffice_menu,
            source, last_login_at
     from app_users
     where id = $1
@@ -2016,6 +2079,15 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
   const nextNotifyAreaFoh = notifyAreas.foh !== false;
   const nextNotifyAreaKitchen = notifyAreas.kitchen !== false;
   const nextNotifyAreaGeneral = notifyAreas.general !== false;
+  const nextOpenOrderDays = Object.prototype.hasOwnProperty.call(payload, "openOrderDays")
+    ? clampOpenOrderDays(payload.openOrderDays)
+    : clampOpenOrderDays(user.open_order_days);
+  const nextHiddenGotoMenu = Object.prototype.hasOwnProperty.call(payload, "hiddenGotoMenu")
+    ? normalizeHiddenMenuItems(payload.hiddenGotoMenu, gotoMenuOptions)
+    : normalizeHiddenMenuItems(user.hidden_goto_menu, gotoMenuOptions);
+  const nextHiddenBackofficeMenu = Object.prototype.hasOwnProperty.call(payload, "hiddenBackofficeMenu")
+    ? normalizeHiddenMenuItems(payload.hiddenBackofficeMenu, backofficeMenuOptions)
+    : normalizeHiddenMenuItems(user.hidden_backoffice_menu, backofficeMenuOptions);
   const nextIsDriver = Object.prototype.hasOwnProperty.call(payload, "isDriver")
     ? Boolean(payload.isDriver)
     : Boolean(user.is_driver);
@@ -2023,7 +2095,11 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
     ? Boolean(payload.isPicker)
     : Boolean(user.is_picker);
   let passwordSql = "";
-  const values = [recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextIsDriver, nextIsPicker, nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral];
+  const values = [
+    recordId, nextUsername, nextName, nextRole, nextTheme, nextActive, nextMustChange, nextIsDriver, nextIsPicker,
+    nextNotifyOnNewOrders, nextNotifyOnDelivery, nextNotifyAreaBar, nextNotifyAreaFoh, nextNotifyAreaKitchen, nextNotifyAreaGeneral,
+    nextOpenOrderDays, JSON.stringify(nextHiddenGotoMenu), JSON.stringify(nextHiddenBackofficeMenu)
+  ];
   if (String(payload.password || "").trim()) {
     const passwordHash = await bcrypt.hash(String(payload.password).trim(), 10);
     values.push(passwordHash);
@@ -2045,6 +2121,9 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
         notify_area_foh = $13,
         notify_area_kitchen = $14,
         notify_area_general = $15,
+        open_order_days = $16,
+        hidden_goto_menu = $17::jsonb,
+        hidden_backoffice_menu = $18::jsonb,
         updated_at = now()
         ${passwordSql}
     where id = $1
@@ -2052,6 +2131,7 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
               is_driver, is_picker,
               notify_on_new_orders, notify_on_delivery,
               notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+              open_order_days, hidden_goto_menu, hidden_backoffice_menu,
               source, last_login_at
   `, values);
   const updatedId = result.rows[0]?.id || recordId;
@@ -2068,6 +2148,7 @@ async function pgUpdateAppUser(recordId, payload, actorUsername = "") {
            is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           open_order_days, hidden_goto_menu, hidden_backoffice_menu,
            source, last_login_at
     from app_users
     where id = $1
@@ -2096,6 +2177,7 @@ async function pgDeleteAppUser(recordId, actorUsername = "") {
            is_driver, is_picker,
            notify_on_new_orders, notify_on_delivery,
            notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+           open_order_days, hidden_goto_menu, hidden_backoffice_menu,
            source, last_login_at
     from app_users
     where id = $1
@@ -2130,7 +2212,10 @@ async function pgChangeOwnPassword(userName, currentPassword, newPassword, optio
     where id = $1
     returning id, username, display_name, role, theme, active, must_change_password,
               is_driver, is_picker,
-              notify_on_new_orders, notify_on_delivery, source, last_login_at
+              notify_on_new_orders, notify_on_delivery,
+              notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+              open_order_days, hidden_goto_menu, hidden_backoffice_menu,
+              source, last_login_at
   `, [user.id, passwordHash]);
   const row = result.rows[0];
   cache.appUsers.expiresAt = 0;
@@ -2145,6 +2230,38 @@ async function pgChangeOwnPassword(userName, currentPassword, newPassword, optio
     note: options.forceChange ? "Password reset through admin or forced change flow." : "User changed password."
   });
   return saved;
+}
+
+async function pgGetOwnSettings(userName) {
+  const user = await pgFindAppUserByName(userName);
+  if (!user) throw new Error("User was not found.");
+  return publicUser(user).settings;
+}
+
+async function pgUpdateOwnSettings(userName, payload = {}) {
+  const user = await pgFindAppUserByName(userName);
+  if (!user?.id) throw new Error("User was not found.");
+  const theme = String(payload.theme ?? user.theme ?? "dark").trim().toLowerCase() === "light" ? "light" : "dark";
+  const openOrderDays = clampOpenOrderDays(payload.openOrderDays ?? user.openOrderDays);
+  const hiddenGotoMenu = normalizeHiddenMenuItems(payload.hiddenGotoMenu ?? user.hiddenGotoMenu, gotoMenuOptions);
+  const hiddenBackofficeMenu = normalizeHiddenMenuItems(payload.hiddenBackofficeMenu ?? user.hiddenBackofficeMenu, backofficeMenuOptions);
+  const result = await db().query(`
+    update app_users
+    set theme = $2,
+        open_order_days = $3,
+        hidden_goto_menu = $4::jsonb,
+        hidden_backoffice_menu = $5::jsonb,
+        updated_at = now()
+    where id = $1
+    returning id, username, display_name, role, theme, active, must_change_password,
+              is_driver, is_picker,
+              notify_on_new_orders, notify_on_delivery,
+              notify_area_bar, notify_area_foh, notify_area_kitchen, notify_area_general,
+              open_order_days, hidden_goto_menu, hidden_backoffice_menu,
+              source, last_login_at
+  `, [user.id, theme, openOrderDays, JSON.stringify(hiddenGotoMenu), JSON.stringify(hiddenBackofficeMenu)]);
+  cache.appUsers.expiresAt = 0;
+  return publicUser(mapPgAppUserRow(result.rows[0])).settings;
 }
 
 async function pgListNotificationsForUser(userName, limit = 20) {
@@ -6842,7 +6959,7 @@ function actionLogout({ compact = false } = {}) {
 }
 
 function actionUserChip() {
-  return '<span id="currentUser" class="user-chip"></span>';
+  return '<a id="currentUser" class="user-chip" href="/settings.html" hidden></a>';
 }
 
 function joinActions(actions) {
@@ -6993,6 +7110,19 @@ async function buildPageRoute(url) {
           topbarMenus: false,
           topbarActions: joinActions([actionButton("/", "Main Menu")]),
           footerScripts: pageScripts("/change-password.js")
+        }
+      };
+    case "/settings.html":
+      return {
+        view: "pages/settings",
+        options: {
+          pageTitle: "My Settings",
+          pageEyebrow: "Inventory",
+          contentClass: "shell setup-shell",
+          beforeMain: await loginPartial("My Settings", "Inventory"),
+          topbarMenus: false,
+          topbarActions: adminActions(),
+          footerScripts: pageScripts("/settings.js")
         }
       };
     case "/standing-orders.html":
@@ -7195,6 +7325,27 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       send(res, 200, storeSession(freshUser));
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/api/user-settings") {
+      const user = requireUser(req, res, { allowPasswordChange: true });
+      if (!user) return;
+      const settings = hasPostgres()
+        ? await pgGetOwnSettings(user.name)
+        : publicUser(user).settings;
+      send(res, 200, { settings });
+      return;
+    }
+
+    if (req.method === "PATCH" && req.url === "/api/user-settings") {
+      const user = requireUser(req, res, { allowPasswordChange: true });
+      if (!user) return;
+      const payload = await readJson(req);
+      const settings = hasPostgres()
+        ? await pgUpdateOwnSettings(user.name, payload)
+        : publicUser(user).settings;
+      send(res, 200, { settings });
       return;
     }
 

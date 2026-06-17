@@ -3,6 +3,7 @@
   let permissions = {};
   let storedRole = "";
   let sessionToken = "";
+  let userSettings = {};
 
   const gotoItems = [
     { label: "Front Page", href: "/" },
@@ -16,20 +17,20 @@
   ];
 
   const backofficeItems = [
+    { label: "Settings", href: "/settings.html" },
     { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
     { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
     { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },
     { label: "Categories", href: "/categories.html", permission: "canAddInventoryItems" },
     { label: "Storage & Shelves", href: "/shelf-codes.html", permission: "canAddInventoryItems" },
-    { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" },
-    { label: "Change Password", href: "/change-password.html" },
-    { label: "Log Out", href: "__logout__" }
+    { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" }
   ];
 
   function syncSessionState() {
     permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
     storedRole = String(localStorage.getItem("kitchenStockRole") || "").trim().toLowerCase();
     sessionToken = localStorage.getItem("kitchenStockToken") || "";
+    userSettings = JSON.parse(localStorage.getItem("kitchenStockSettings") || "{}");
   }
 
   function effectivePermissionSet() {
@@ -49,7 +50,13 @@
 
   function allowed(item) {
     const currentPermissions = effectivePermissionSet();
-    return !item.permission || Boolean(currentPermissions[item.permission]);
+    if (item.permission && !currentPermissions[item.permission]) return false;
+    const hiddenGoto = Array.isArray(userSettings.hiddenGotoMenu) ? userSettings.hiddenGotoMenu : [];
+    const hiddenBackoffice = Array.isArray(userSettings.hiddenBackofficeMenu) ? userSettings.hiddenBackofficeMenu : [];
+    if (item.href === "/settings.html") return true;
+    if (gotoItems.includes(item)) return !hiddenGoto.includes(item.href);
+    if (backofficeItems.includes(item)) return !hiddenBackoffice.includes(item.href);
+    return true;
   }
 
   function renderSelect(label, selectId, items) {
@@ -101,20 +108,6 @@
     menus.querySelectorAll("select").forEach((select) => {
       select.addEventListener("change", (event) => {
         if (!event.target.value) return;
-        if (event.target.value === "__logout__") {
-          const logoutButton = document.querySelector("#logoutButton");
-          if (logoutButton) {
-            logoutButton.click();
-            event.target.value = "";
-            return;
-          }
-          localStorage.removeItem("kitchenStockToken");
-          localStorage.removeItem("kitchenStockUser");
-          localStorage.removeItem("kitchenStockRole");
-          localStorage.removeItem("kitchenStockPermissions");
-          window.location.href = currentPath === "/" ? "/" : "/";
-          return;
-        }
         window.location.href = event.target.value;
       });
     });
@@ -138,6 +131,8 @@
       storedRole = String(data.user.role || storedRole || "").trim().toLowerCase();
       localStorage.setItem("kitchenStockRole", storedRole);
       localStorage.setItem("kitchenStockUser", data.user.name || localStorage.getItem("kitchenStockUser") || "");
+      userSettings = data.user.settings || userSettings || {};
+      localStorage.setItem("kitchenStockSettings", JSON.stringify(userSettings));
       syncSessionState();
     } catch {
       // Keep cached permissions if the refresh check fails.

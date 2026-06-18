@@ -492,8 +492,8 @@ const {
   normalizeItem,
   findOrCreateLookupRecord: (lookupKey, value) => findOrCreateLookupRecord(lookupKey, value),
   resolveShelfCodeRecord: (shelfCode, storageLocation) => resolveShelfCodeRecord(shelfCode, storageLocation),
-  saveStandingOrderDefinition: (payload, user) => saveStandingOrderDefinition(payload, user),
-  generateStandingOrdersForDate: (selectedDate, userName = "System") => generateStandingOrdersForDate(selectedDate, userName),
+  saveStandingOrderDefinition: (payload, user) => pgSaveStandingOrderDefinition(payload, user),
+  generateStandingOrdersForDate: (selectedDate, userName = "System") => pgGenerateStandingOrdersForDate(selectedDate, userName),
   pgListOrderReport,
   pgListDriverSheet,
   pgListReceivingSheet,
@@ -593,8 +593,8 @@ const handleOperationsApi = createOperationsApi({
   readJson,
   send,
   getItems,
-  listOpenRequests,
-  listStandingOrders,
+  listOpenRequests: pgListOpenRequests,
+  listStandingOrders: pgListStandingOrders,
   pgListNotificationsForUser,
   pgMarkNotificationsRead,
   listDriverSheet,
@@ -602,8 +602,8 @@ const handleOperationsApi = createOperationsApi({
   listReceivingSheet,
   pgSaveSupplierDeliveryNote,
   listOrderReport,
-  getDailyGuestCount,
-  saveDailyGuestCount
+  getDailyGuestCount: pgGetDailyGuestCount,
+  saveDailyGuestCount: pgSaveDailyGuestCount
 });
 const handleWorkflowApi = createWorkflowApi({
   requireUser,
@@ -629,9 +629,9 @@ const handleWorkflowApi = createWorkflowApi({
   pgUpdateInternalOrderRequest,
   pgUpdateInternalOrderPicking,
   createStandingOrder,
-  listStandingOrders: () => listStandingOrders(),
-  listStandingOrderRuns: () => listStandingOrderRuns(),
-  updateStandingOrderRecord,
+  listStandingOrders: () => pgListStandingOrders(),
+  listStandingOrderRuns: () => pgListStandingOrderRuns(),
+  updateStandingOrderRecord: pgUpdateStandingOrderRecord,
   pgDeleteStandingOrder
 });
 
@@ -725,18 +725,6 @@ function normalizeItem(record, supplierById, lookups) {
 
 async function listSuppliers() {
   return pgListSuppliers();
-}
-
-async function listSuppliersAdmin() {
-  return pgListSuppliersAdmin();
-}
-
-async function saveSupplier(payload, recordId = "", actorUsername = "") {
-  return pgSaveSupplier(payload, recordId, actorUsername);
-}
-
-async function deleteSupplier(recordId, actorUsername = "") {
-  return pgDeleteSupplier(recordId, actorUsername);
 }
 
 async function listRequests() {
@@ -857,26 +845,22 @@ const {
   getStorageLocationsAdmin: () => listStorageLocationsAdmin()
 });
 
-async function itemFormOptions() {
-  return pgItemFormOptions();
-}
-
 const handleSetupAdminApi = createSetupAdminApi({
   requireUser,
   requireRole,
   readJson,
   send,
-  itemFormOptions,
+  itemFormOptions: pgItemFormOptions,
   listStorageLocationsAdmin,
   listCategoriesAdmin,
-  listSuppliersAdmin,
+  listSuppliersAdmin: pgListSuppliersAdmin,
   listShelfCodesAdmin,
   saveStorageLocation,
   saveCategory,
   deleteCategory,
   saveShelfCode,
-  saveSupplier,
-  deleteSupplier
+  saveSupplier: pgSaveSupplier,
+  deleteSupplier: pgDeleteSupplier
 });
 
 const handleMutationApi = createMutationApi({
@@ -900,34 +884,6 @@ const handleMutationApi = createMutationApi({
   canDeleteRequest,
   deleteRequest
 });
-
-async function listStandingOrders() {
-  return pgListStandingOrders();
-}
-
-async function getDailyGuestCount(date) {
-  return pgGetDailyGuestCount(date);
-}
-
-async function saveDailyGuestCount(payload, user) {
-  return pgSaveDailyGuestCount(payload, user);
-}
-
-async function listStandingOrderRuns(limit = 50) {
-  return pgListStandingOrderRuns(limit);
-}
-
-async function updateStandingOrderRecord(recordId, payload, user) {
-  return pgUpdateStandingOrderRecord(recordId, payload, user);
-}
-
-async function saveStandingOrderDefinition(payload, user) {
-  return pgSaveStandingOrderDefinition(payload, user);
-}
-
-async function generateStandingOrdersForDate(selectedDate, userName = "System") {
-  return pgGenerateStandingOrdersForDate(selectedDate, userName);
-}
 
 async function getLookups() {
   return pgListLookups();

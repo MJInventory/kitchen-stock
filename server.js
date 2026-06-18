@@ -50,17 +50,14 @@ import { createHttpHelpers } from "./lib/http-helpers.js";
 import { createUserHelpers } from "./lib/user-helpers.js";
 import { createAuditLogHelpers } from "./lib/audit-log.js";
 import { createPostgresRowMappers } from "./lib/postgres-row-mappers.js";
+import { createServerApiHandlers } from "./lib/server-api-runtime.js";
+import { createHttpServer, createLookupRuntime } from "./lib/server-runtime.js";
 import { createSupplierDomain } from "./lib/supplier-domain.js";
 import { createInventoryDomain } from "./lib/inventory-domain.js";
 import { createLookupAdminDomain } from "./lib/lookup-admin-domain.js";
 import { createLegacySchemaDomain } from "./lib/legacy-schema-domain.js";
 import { createAppUserDomain } from "./lib/app-user-domain.js";
 import { createAppUserService } from "./lib/app-user-service.js";
-import { createAppUserApi } from "./lib/app-user-api.js";
-import { createSetupAdminApi } from "./lib/setup-admin-api.js";
-import { createOperationsApi } from "./lib/operations-api.js";
-import { createMutationApi } from "./lib/mutation-api.js";
-import { createWorkflowApi } from "./lib/workflow-api.js";
 import { createNotificationDomain } from "./lib/notification-domain.js";
 import { createReportSupportDomain } from "./lib/report-support-domain.js";
 import { createSheetDomain } from "./lib/sheet-domain.js";
@@ -535,106 +532,6 @@ const {
   pgEnsureDriverSheetLines
 });
 
-function publicUserForAdmin(user, actor = null) {
-  const editable = editableUserSources.has(user.source);
-  const canEditRole = actor ? canChangeAppUserRole(actor, user, user.role) : true;
-  return {
-    ...publicUser(user),
-    id: user.id || "",
-    lastLoginAt: user.lastLoginAt || "",
-    isDriver: Boolean(user.isDriver),
-    isPicker: Boolean(user.isPicker),
-    notifyOnNewOrders: Boolean(user.notifyOnNewOrders),
-    notifyOnDelivery: user.notifyOnDelivery !== false,
-    notifyAreas: {
-      bar: user.notifyAreas?.bar !== false,
-      foh: user.notifyAreas?.foh !== false,
-      kitchen: user.notifyAreas?.kitchen !== false,
-      general: user.notifyAreas?.general !== false
-    },
-    editable,
-    canEditRole,
-    canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
-    canDelete: actor ? canDeleteAppUserRecord(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
-  };
-}
-
-const handleAppUserApi = createAppUserApi({
-  bcrypt,
-  hasPostgres,
-  pushEnabled,
-  vapidPublicKey,
-  readJson,
-  send,
-  requireUser,
-  requireRole,
-  storeSession,
-  publicUser,
-  publicUserForAdmin,
-  canChangeAppUserRole,
-  canDeleteAppUserRecord,
-  findAppUserByName,
-  changeOwnPassword,
-  refreshUserFromDirectory,
-  pgRecordSuccessfulLogin,
-  pgGetOwnSettings,
-  pgUpdateOwnSettings,
-  pgSavePushSubscription,
-  pgRemovePushSubscription,
-  getAppUsers,
-  createAppUser,
-  findAppUserById,
-  updateAppUser,
-  deleteAppUser
-});
-const handleOperationsApi = createOperationsApi({
-  requireUser,
-  requireRole,
-  readJson,
-  send,
-  getItems,
-  listOpenRequests: pgListOpenRequests,
-  listStandingOrders: pgListStandingOrders,
-  pgListNotificationsForUser,
-  pgMarkNotificationsRead,
-  listDriverSheet,
-  assignDriverToSheet,
-  listReceivingSheet,
-  pgSaveSupplierDeliveryNote,
-  listOrderReport,
-  getDailyGuestCount: pgGetDailyGuestCount,
-  saveDailyGuestCount: pgSaveDailyGuestCount
-});
-const handleWorkflowApi = createWorkflowApi({
-  requireUser,
-  requireRole,
-  readJson,
-  send,
-  getItems: () => getItems(),
-  getRequests: () => getRequests(),
-  hasPostgres,
-  brevoApiKey,
-  mailFrom,
-  accountingInbox,
-  smtpHost,
-  smtpUser,
-  smtpPass,
-  isRender,
-  metrics,
-  cache,
-  createRequest,
-  createRequestsBatch,
-  pgListInternalOrders,
-  pgCreateInternalOrder,
-  pgUpdateInternalOrderRequest,
-  pgUpdateInternalOrderPicking,
-  createStandingOrder,
-  listStandingOrders: () => pgListStandingOrders(),
-  listStandingOrderRuns: () => pgListStandingOrderRuns(),
-  updateStandingOrderRecord: pgUpdateStandingOrderRecord,
-  pgDeleteStandingOrder
-});
-
 async function airtable(path, options = {}) {
   if (!token) {
     throw new Error("AIRTABLE_TOKEN is not set.");
@@ -845,11 +742,63 @@ const {
   getStorageLocationsAdmin: () => listStorageLocationsAdmin()
 });
 
-const handleSetupAdminApi = createSetupAdminApi({
-  requireUser,
-  requireRole,
+const {
+  getLookups,
+  findOrCreateLookupRecord
+} = createLookupRuntime({
+  airtable,
+  cache,
+  hasPostgres,
+  pgListLookups,
+  pgFindOrCreateLookupRecord
+});
+
+const {
+  handleAppUserApi,
+  handleOperationsApi,
+  handleSetupAdminApi,
+  handleMutationApi,
+  handleWorkflowApi
+} = createServerApiHandlers({
+  editableUserSources,
+  normalizeRole,
+  publicUser,
+  canChangeAppUserRole,
+  canDeleteAppUserRecord,
+  bcrypt,
+  hasPostgres,
+  pushEnabled,
+  vapidPublicKey,
   readJson,
   send,
+  requireUser,
+  requireRole,
+  storeSession,
+  findAppUserByName,
+  changeOwnPassword,
+  refreshUserFromDirectory,
+  pgRecordSuccessfulLogin,
+  pgGetOwnSettings,
+  pgUpdateOwnSettings,
+  pgSavePushSubscription,
+  pgRemovePushSubscription,
+  getAppUsers,
+  createAppUser,
+  findAppUserById,
+  updateAppUser,
+  deleteAppUser,
+  getItems,
+  listOpenRequests: pgListOpenRequests,
+  listStandingOrders: () => pgListStandingOrders(),
+  pgListNotificationsForUser,
+  pgMarkNotificationsRead,
+  listDriverSheet,
+  assignDriverToSheet,
+  listReceivingSheet,
+  pgSaveSupplierDeliveryNote,
+  listOrderReport,
+  getDailyGuestCount: pgGetDailyGuestCount,
+  saveDailyGuestCount: pgSaveDailyGuestCount,
   itemFormOptions: pgItemFormOptions,
   listStorageLocationsAdmin,
   listCategoriesAdmin,
@@ -860,14 +809,7 @@ const handleSetupAdminApi = createSetupAdminApi({
   deleteCategory,
   saveShelfCode,
   saveSupplier: pgSaveSupplier,
-  deleteSupplier: pgDeleteSupplier
-});
-
-const handleMutationApi = createMutationApi({
-  requireUser,
-  requireRole,
-  readJson,
-  send,
+  deleteSupplier: pgDeleteSupplier,
   updateItemSettings,
   deleteInventoryItem,
   createInventoryItem,
@@ -882,36 +824,28 @@ const handleMutationApi = createMutationApi({
   updateDriverLine,
   deliverDriverLine,
   canDeleteRequest,
-  deleteRequest
+  deleteRequest,
+  getRequests,
+  brevoApiKey,
+  mailFrom,
+  accountingInbox,
+  smtpHost,
+  smtpUser,
+  smtpPass,
+  isRender,
+  metrics,
+  cache,
+  createRequest,
+  createRequestsBatch,
+  pgListInternalOrders,
+  pgCreateInternalOrder,
+  pgUpdateInternalOrderRequest,
+  pgUpdateInternalOrderPicking,
+  createStandingOrder,
+  listStandingOrderRuns: () => pgListStandingOrderRuns(),
+  updateStandingOrderRecord: pgUpdateStandingOrderRecord,
+  pgDeleteStandingOrder
 });
-
-async function getLookups() {
-  return pgListLookups();
-}
-
-async function findOrCreateLookupRecord(lookupKey, value) {
-  const cleaned = String(value || "").trim();
-  if (!cleaned) return "";
-  if (hasPostgres()) {
-    return pgFindOrCreateLookupRecord(lookupKey, cleaned);
-  }
-
-  let lookups = await getLookups();
-  const lookup = lookups[lookupKey];
-  if (!lookup?.tableId) return "";
-
-  const existing = lookup.byName.get(cleaned.toLowerCase());
-  if (existing) return existing.id;
-
-  const record = await airtable(lookup.tableId, {
-    method: "POST",
-    body: JSON.stringify({ fields: { [lookup.primaryField]: cleaned } })
-  });
-
-  cache.lookups.expiresAt = 0;
-  cache.schema.expiresAt = 0;
-  return record.id;
-}
 
 const viewHelpers = createViewHelpers(viewsDir);
 const buildPageRoute = createPageRouteBuilder(viewHelpers);
@@ -924,32 +858,17 @@ const { renderView, serveStatic } = createRenderer({
   send
 });
 
-const server = http.createServer(async (req, res) => {
-  try {
-    if (req.method === "GET" && req.url === "/storage-locations.html") {
-      res.writeHead(302, { Location: "/shelf-codes.html" });
-      res.end();
-      return;
-    }
-
-    if (req.method === "GET") {
-      const pageRoute = await buildPageRoute(req.url);
-      if (pageRoute) {
-        await renderView(res, pageRoute.view, pageRoute.options);
-        return;
-      }
-    }
-
-    if (await handleAppUserApi(req, res)) return;
-    if (await handleSetupAdminApi(req, res)) return;
-    if (await handleOperationsApi(req, res)) return;
-    if (await handleMutationApi(req, res)) return;
-    if (await handleWorkflowApi(req, res)) return;
-
-    await serveStatic(req, res);
-  } catch (error) {
-    send(res, 400, { error: error.message });
-  }
+const server = createHttpServer({
+  http,
+  send,
+  renderView,
+  serveStatic,
+  buildPageRoute,
+  handleAppUserApi,
+  handleSetupAdminApi,
+  handleOperationsApi,
+  handleMutationApi,
+  handleWorkflowApi
 });
 
 async function startServer() {

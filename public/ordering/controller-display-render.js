@@ -54,6 +54,7 @@ export function createOrderingDisplayRender(options) {
     orderingRequestMatchesSummary,
     displayRoleMode,
     isStandingDue,
+    isOlderOpenRequest,
     filterItems,
     itemSearchScore,
     categoryStats,
@@ -152,7 +153,8 @@ export function createOrderingDisplayRender(options) {
       allItems: getAllItems(),
       sameUser,
       sessionPermissions: getSessionPermissions(),
-      sessionUser: getSessionUser()
+      sessionUser: getSessionUser(),
+      isOlderOpenRequest
     });
   }
 

@@ -1,7 +1,8 @@
 export function isStandingOrderRequest(request) {
   return Boolean(String(request?.standingRunId || "").trim())
-    || String(request?.requestedBy || "").toLowerCase().includes("standing order")
-    || String(request?.notes || "").toLowerCase().includes("standing order");
+    || Boolean(String(request?.standingRunLineId || "").trim())
+    || /^standing run id:/im.test(String(request?.notes || ""))
+    || /^standing run line id:/im.test(String(request?.notes || ""));
 }
 
 export function formatUserDisplay(value) {

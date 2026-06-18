@@ -102,7 +102,8 @@ export function renderDailyOrder({
   allItems,
   sameUser,
   sessionPermissions,
-  sessionUser
+  sessionUser,
+  isOlderOpenRequest
 }) {
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
@@ -134,7 +135,7 @@ export function renderDailyOrder({
             </thead>
             <tbody>
               ${categoryRequests.map((request) => `
-                <tr data-request-id="${escapeHtml(request.id)}" data-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">
+                <tr class="${request.partialReceipt ? "receiving-origin-partial" : (isOlderOpenRequest(request, today) ? "driver-overdue-row" : "")}" data-request-id="${escapeHtml(request.id)}" data-item-id="${escapeHtml(request.itemId)}" data-jump-category="${escapeHtml(categoryName)}">
                   <td><button class="deliver-order-button" type="button" data-deliver-id="${request.id}">Received</button></td>
                   <td>${sessionPermissions.canDeleteAnyOrder || sameUser(request.requestedBy, sessionUser) ? `<button class="delete-order-button" type="button" data-request-id="${request.id}">Remove</button>` : ""}</td>
                   <td>

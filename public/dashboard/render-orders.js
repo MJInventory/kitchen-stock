@@ -21,7 +21,6 @@ export function renderDailyOrder({
   const activeRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !request.standingRunId)
-    .filter((request) => !String(request?.requestedBy || "").toLowerCase().includes("standing order"))
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
     .filter((request) => requestDay(request) === today)
@@ -38,7 +37,7 @@ export function renderDailyOrder({
         </div>
         <div class="daily-order-group-list">
           ${requests.map((request) => `
-            <a class="daily-order-row daily-order-link" href="${escapeHtml(buildOrderJumpHref(request))}">
+            <a class="daily-order-row daily-order-link ${request.partialReceipt ? "overdue-order-row" : ""}" href="${escapeHtml(buildOrderJumpHref(request))}">
               <div>
                 <strong>${escapeHtml(itemNameFromRequest(request, allItems))}</strong>
                 <span>${escapeHtml([
@@ -99,7 +98,7 @@ export function renderOpenOrders({
         </div>
         <div class="daily-order-group-list">
           ${requests.map((request) => `
-              <a class="daily-order-row daily-order-link ${escapeHtml(overdueRowClass(request, today))}" href="${escapeHtml(buildOrderJumpHref(request))}">
+              <a class="daily-order-row daily-order-link ${escapeHtml(request.partialReceipt ? "overdue-order-row" : overdueRowClass(request, today))}" href="${escapeHtml(buildOrderJumpHref(request))}">
                 <div>
                   <strong>${escapeHtml(itemNameFromRequest(request, allItems))}</strong>
                   <span>${escapeHtml([

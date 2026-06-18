@@ -7,8 +7,10 @@ import {
 } from "./shared.js";
 
 export function isStandingOrder(request) {
-  return String(request?.requestedBy || "").toLowerCase().includes("standing order")
-    || String(request?.notes || "").toLowerCase().includes("standing order");
+  return Boolean(String(request?.standingRunId || "").trim())
+    || Boolean(String(request?.standingRunLineId || "").trim())
+    || /^standing run id:/im.test(String(request?.notes || ""))
+    || /^standing run line id:/im.test(String(request?.notes || ""));
 }
 
 export function requestUser(request) {
@@ -61,6 +63,7 @@ export function expectedDateFromRequest(request) {
 
 export function requestStatusChips(request, sessionUser, today = todayLocal()) {
   const chips = [];
+  if (request?.partialReceipt) chips.push(["Partial", "critical"]);
   if (hasFutureScheduledDelivery(request, today)) chips.push(["Scheduled", "deliver"]);
   else if (isOlderOpenRequest(request, today)) chips.push(["Older open", "older"]);
   else chips.push(["Today", "today"]);

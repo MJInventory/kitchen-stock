@@ -67,6 +67,7 @@ import {
   renderCategoriesBlock,
   renderDailyOrderBlock,
   renderNotificationsBlock,
+  renderOrderingPageBlock,
   renderOrderingSummaryBlock,
   renderProductListBlock,
   renderStandingOrdersBlock
@@ -273,6 +274,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     renderCategoriesView,
     renderProductListBlock,
     renderProductListView,
+    renderOrderingPageBlock,
     itemCategory,
     sameUser,
     requestUser,

@@ -202,7 +202,8 @@ const {
   pgResolveShelfCodeRecord,
   pgUpdateItemSettings,
   pgDeleteInventoryItem,
-  pgCreateInventoryItem
+  pgCreateInventoryItem,
+  pgItemFormOptions
 } = createInventoryDomain({
   db,
   cache,
@@ -210,7 +211,10 @@ const {
   allowedUnits,
   isValidId,
   auditChanged,
-  pgRecordAuditEntry
+  pgRecordAuditEntry,
+  getSuppliers: () => getSuppliers(),
+  getLookups: () => getLookups(),
+  listShelfCodesAdmin: () => listShelfCodesAdmin()
 });
 const {
   pgListStorageLocationsAdmin,
@@ -764,23 +768,7 @@ async function changeOwnPassword(userName, currentPassword, newPassword, options
 }
 
 async function itemFormOptions() {
-  const [suppliers, lookups, shelfCodes] = await Promise.all([getSuppliers(), getLookups(), listShelfCodesAdmin()]);
-  return {
-    suppliers,
-    categories: lookups.categories.records,
-    storageLocations: lookups.storageLocations.records,
-    inventoryAreas: lookups.inventoryAreas.records,
-    inventorySubgroups: lookups.categories.records,
-    shelfCodes: shelfCodes.map((shelf) => ({
-      id: shelf.id,
-      name: shelf.name,
-      storageLocation: shelf.storageLocation || "",
-      displayName: [shelf.storageLocation, shelf.name].filter(Boolean).join(" / ") || shelf.name
-    })),
-    units: lookups.unitOfMeasurement.records.length
-      ? lookups.unitOfMeasurement.records
-      : [...allowedUnits].map((name) => ({ id: name, name }))
-  };
+  return pgItemFormOptions();
 }
 
 async function listStandingOrders() {

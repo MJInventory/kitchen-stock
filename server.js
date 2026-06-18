@@ -59,6 +59,7 @@ import { createAppUserService } from "./lib/app-user-service.js";
 import { createAppUserApi } from "./lib/app-user-api.js";
 import { createSetupAdminApi } from "./lib/setup-admin-api.js";
 import { createOperationsApi } from "./lib/operations-api.js";
+import { createMutationApi } from "./lib/mutation-api.js";
 import { createNotificationDomain } from "./lib/notification-domain.js";
 import { createReportSupportDomain } from "./lib/report-support-domain.js";
 import { createSheetDomain } from "./lib/sheet-domain.js";
@@ -541,6 +542,27 @@ const handleOperationsApi = createOperationsApi({
   listOrderReport,
   getDailyGuestCount,
   saveDailyGuestCount
+});
+const handleMutationApi = createMutationApi({
+  requireUser,
+  requireRole,
+  readJson,
+  send,
+  updateItemSettings,
+  deleteInventoryItem,
+  createInventoryItem,
+  createStockCount,
+  createInvoiceCapture,
+  createInvoiceLine,
+  listOcrRules,
+  createOcrRule,
+  emailInvoicePicture,
+  ocrSpaceParseImage,
+  deliverRequest,
+  updateDriverLine,
+  deliverDriverLine,
+  canDeleteRequest,
+  deleteRequest
 });
 
 async function airtable(path, options = {}) {
@@ -1377,6 +1399,7 @@ const server = http.createServer(async (req, res) => {
     if (await handleAppUserApi(req, res)) return;
     if (await handleSetupAdminApi(req, res)) return;
     if (await handleOperationsApi(req, res)) return;
+    if (await handleMutationApi(req, res)) return;
 
     if (req.method === "GET" && req.url.startsWith("/api/items")) {
       if (!requireUser(req, res)) return;
@@ -1509,151 +1532,6 @@ const server = http.createServer(async (req, res) => {
       if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can delete standing orders.")) return;
       const recordId = req.url.split("/")[3];
       const result = await pgDeleteStandingOrder(recordId, user);
-      send(res, 200, { result });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/items/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can edit inventory setup.")) return;
-      const recordId = req.url.split("/")[3];
-      const item = await updateItemSettings(recordId, await readJson(req), user.name);
-      send(res, 200, { item });
-      return;
-    }
-
-    if (req.method === "DELETE" && req.url.startsWith("/api/items/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can delete inventory items.")) return;
-      const recordId = req.url.split("/")[3];
-      const result = await deleteInventoryItem(recordId, user.name);
-      send(res, 200, { result });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/items") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can add inventory items.")) return;
-      const item = await createInventoryItem(await readJson(req), user.name);
-      send(res, 201, { item });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/stock-counts") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      const result = await createStockCount(await readJson(req), user.name);
-      send(res, 201, result);
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/invoice-captures") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
-      const invoice = await createInvoiceCapture(await readJson(req), user.name);
-      send(res, 201, { invoice });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/invoice-lines") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
-      const invoiceLine = await createInvoiceLine(await readJson(req), user.name);
-      send(res, 201, { invoiceLine });
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/ocr-rules")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
-      const url = new URL(req.url, "http://localhost");
-      const rules = await listOcrRules(url.searchParams.get("supplier"));
-      send(res, 200, { rules });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/ocr-rules") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
-      const payload = await readJson(req);
-      const rule = await createOcrRule(payload, user.name);
-      send(res, 201, { rule });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/email-invoice") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canSendInvoiceToAccounting, "Only admins can send invoices to accounting.")) return;
-      const result = await emailInvoicePicture(await readJson(req), user.name);
-      send(res, 200, { result });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/ocr-invoice") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canUseInvoices, "Only admins and power users can use invoices.")) return;
-      const result = await ocrSpaceParseImage(await readJson(req));
-      send(res, 200, { result });
-      return;
-    }
-
-    if (req.method === "POST" && req.url.startsWith("/api/requests/") && req.url.endsWith("/receive")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      const recordId = req.url.split("/")[3];
-      const request = await deliverRequest(recordId, user.name);
-      send(res, 200, { request });
-      return;
-    }
-
-    if (req.method === "POST" && req.url.startsWith("/api/requests/") && req.url.endsWith("/deliver")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      const recordId = req.url.split("/")[3];
-      const request = await deliverRequest(recordId, user.name);
-      send(res, 200, { request });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/driver-lines/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      const recordId = req.url.split("/")[3];
-      const line = await updateDriverLine(recordId, await readJson(req), user.name);
-      send(res, 200, { line });
-      return;
-    }
-
-    if (req.method === "POST" && req.url.startsWith("/api/driver-lines/") && req.url.endsWith("/deliver")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      const recordId = req.url.split("/")[3];
-      const payload = await readJson(req);
-      const result = await deliverDriverLine(recordId, String(payload.requestId || ""), user.name, {
-        quantityReceived: payload.quantityReceived
-      });
-      send(res, 200, result);
-      return;
-    }
-
-    if (req.method === "DELETE" && req.url.startsWith("/api/requests/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      const recordId = req.url.split("/")[3];
-      if (!(await canDeleteRequest(recordId, user))) {
-        send(res, 403, { error: "Regular users can only remove order lines they added themselves." });
-        return;
-      }
-      const result = await deleteRequest(recordId, user.name);
       send(res, 200, { result });
       return;
     }

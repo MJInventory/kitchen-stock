@@ -47,15 +47,21 @@ import { createViewHelpers } from "./lib/view-helpers.js";
 import { createPageRouteBuilder } from "./lib/page-routes.js";
 import { createRenderer } from "./lib/rendering.js";
 import { createHttpHelpers } from "./lib/http-helpers.js";
+import { createAdminLookupRuntime } from "./lib/admin-lookup-runtime.js";
+import {
+  clampOpenOrderDays,
+  createServerCoreUtils,
+  normalizeHiddenMenuItems,
+  normalizeNotificationAreaName
+} from "./lib/server-core-utils.js";
 import { createUserHelpers } from "./lib/user-helpers.js";
 import { createAuditLogHelpers } from "./lib/audit-log.js";
 import { createPostgresRowMappers } from "./lib/postgres-row-mappers.js";
 import { createServerApiHandlers } from "./lib/server-api-runtime.js";
-import { createHttpServer, createLookupRuntime } from "./lib/server-runtime.js";
+import { createHttpServer } from "./lib/server-runtime.js";
+import { createRuntimeDataHelpers } from "./lib/runtime-data.js";
 import { createSupplierDomain } from "./lib/supplier-domain.js";
 import { createInventoryDomain } from "./lib/inventory-domain.js";
-import { createLookupAdminDomain } from "./lib/lookup-admin-domain.js";
-import { createLegacySchemaDomain } from "./lib/legacy-schema-domain.js";
 import { createAppUserDomain } from "./lib/app-user-domain.js";
 import { createAppUserService } from "./lib/app-user-service.js";
 import { createNotificationDomain } from "./lib/notification-domain.js";
@@ -98,61 +104,19 @@ const metrics = {
 };
 
 
-function db() {
-  return getPool();
-}
-
-function normalizeNotificationAreaName(value) {
-  const raw = String(value || "").trim().toLowerCase();
-  if (!raw) return "";
-  if (raw === "bar") return "bar";
-  if (raw === "foh" || raw === "front of house" || raw === "front-house") return "foh";
-  if (raw === "kitchen") return "kitchen";
-  if (raw === "general") return "general";
-  return "";
-}
-
-function clampOpenOrderDays(value) {
-  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
-  if (!Number.isFinite(parsed)) return 7;
-  return Math.min(30, Math.max(1, parsed));
-}
-
-function normalizeHiddenMenuItems(values, allowedValues) {
-  const allowed = new Set(allowedValues);
-  const list = Array.isArray(values)
-    ? values
-    : String(values || "")
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  return [...new Set(list.filter((entry) => allowed.has(entry)))];
-}
-
-function hasPostgres() {
-  return postgresEnabled();
-}
-
-async function ensurePostgresSchemaUpgrades() {
-  return applyPostgresSchemaUpgrades({ hasPostgres, db });
-}
-
-function isValidId(value) {
-  return /^[a-z0-9-]+$/i.test(String(value || "").trim());
-}
-
-function isoDate(value) {
-  return String(value || "").slice(0, 10);
-}
-
-function todayIso() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: appTimeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
-}
+const {
+  db,
+  hasPostgres,
+  ensurePostgresSchemaUpgrades,
+  isValidId,
+  isoDate,
+  todayIso
+} = createServerCoreUtils({
+  appTimeZone,
+  postgresEnabled,
+  applyPostgresSchemaUpgrades,
+  getPool
+});
 
 const {
   cleanAuditSnapshot,
@@ -532,141 +496,31 @@ const {
   pgEnsureDriverSheetLines
 });
 
-async function airtable(path, options = {}) {
-  if (!token) {
-    throw new Error("AIRTABLE_TOKEN is not set.");
-  }
-
-  metrics.airtableCalls += 1;
-
-  const url = options.meta
-    ? `https://api.airtable.com/v0/meta/bases/${baseId}/${path}`
-    : `https://api.airtable.com/v0/${baseId}/${path}`;
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
-
-  if (!response.ok) {
-    const message = data?.error?.message || response.statusText;
-    throw new Error(`${response.status} ${message}`);
-  }
-
-  return data;
-}
-
-async function listAirtableRecords(tableId, params = {}) {
-  const records = [];
-  let offset = "";
-
-  do {
-    const query = new URLSearchParams({
-      pageSize: "100",
-      ...params
-    });
-
-    if (offset) {
-      query.set("offset", offset);
-    }
-
-    const data = await airtable(`${tableId}?${query}`);
-    records.push(...(data.records || []));
-    offset = data.offset || "";
-  } while (offset);
-
-  return records;
-}
-
-async function listItems() {
-  return pgListItems();
-}
-
-function linkedValue(record, linkFieldName, fallbackFieldName, lookupMap) {
-  const linkedId = record.fields[linkFieldName]?.[0] || "";
-  return lookupMap?.byId?.get(linkedId)?.name || record.fields[fallbackFieldName] || "";
-}
-
-function normalizeItem(record, supplierById, lookups) {
-  const supplierId = record.fields["Supplier/Vendor"]?.[0] || "";
-  const supplier = supplierById.get(supplierId);
-
-  return {
-    id: record.id,
-    name: record.fields["Item Name"] || "",
-    category: linkedValue(record, "Category Link", "Category", lookups.categories) || record.fields.Category || "",
-    categoryId: record.fields["Category Link"]?.[0] || "",
-    storageLocation: linkedValue(record, "Storage Location Link", "Storage Location", lookups.storageLocations),
-    storageLocationId: record.fields["Storage Location Link"]?.[0] || "",
-    inventoryArea: linkedValue(record, "Inventory Area Link", "Inventory Area", lookups.inventoryAreas),
-    inventoryAreaId: record.fields["Inventory Area Link"]?.[0] || "",
-    inventorySubgroup: linkedValue(record, "Inventory Subgroup Link", "Inventory Subgroup", lookups.inventorySubgroups),
-    inventorySubgroupId: record.fields["Inventory Subgroup Link"]?.[0] || "",
-    shelfCode: linkedValue(record, "Shelf Code Link", "Shelf Code", lookups.shelfCodes),
-    shelfCodeId: record.fields["Shelf Code Link"]?.[0] || "",
-    supplierId,
-    supplierName: supplier?.name || "Unassigned Supplier",
-    supplierContact: supplier?.contact || "",
-    quantity: record.fields["Current Quantity"] ?? null,
-    unit: linkedValue(record, "Unit Of Measurement Link", "Unit of Measure", lookups.unitOfMeasurement),
-    minimum: record.fields["Minimum Threshold"] ?? null
-  };
-}
-
-async function listSuppliers() {
-  return pgListSuppliers();
-}
-
-async function listRequests() {
-  return pgListRequests();
-}
-
-async function listOpenRequests() {
-  return pgListOpenRequests();
-}
-
-async function cached(key, ttlMs, loader) {
-  const entry = cache[key];
-  const now = Date.now();
-
-  if (entry.value && entry.expiresAt > now) {
-    metrics.cacheHits[key] += 1;
-    return entry.value;
-  }
-
-  if (!entry.pending) {
-    entry.pending = loader()
-      .then((value) => {
-        entry.value = value;
-        entry.expiresAt = Date.now() + ttlMs;
-        return value;
-      })
-      .finally(() => {
-        entry.pending = null;
-      });
-  }
-
-  return entry.pending;
-}
-
-async function getItems() {
-  return cached("items", itemCacheMs, listItems);
-}
-
-async function getSuppliers() {
-  return cached("suppliers", Math.min(itemCacheMs, 60000), listSuppliers);
-}
-
-async function getRequests() {
-  return cached("requests", requestCacheMs, listRequests);
-}
+const {
+  airtable,
+  listAirtableRecords,
+  linkedValue,
+  normalizeItem,
+  listItems,
+  listSuppliers,
+  listRequests,
+  listOpenRequests,
+  cached,
+  getItems,
+  getSuppliers,
+  getRequests
+} = createRuntimeDataHelpers({
+  token,
+  baseId,
+  metrics,
+  cache,
+  itemCacheMs,
+  requestCacheMs,
+  pgListItems,
+  pgListSuppliers,
+  pgListRequests,
+  pgListOpenRequests
+});
 
 const {
   ocrSpaceParseImage,
@@ -702,15 +556,9 @@ const {
 const {
   listSchema,
   getSchema,
-  ensureShelfCodeStorageLocationField
-} = createLegacySchemaDomain({
-  airtable,
-  cache,
-  requestsTableId,
-  lookupConfigs
-});
-
-const {
+  ensureShelfCodeStorageLocationField,
+  getLookups,
+  findOrCreateLookupRecord,
   listStorageLocationsAdmin,
   listCategoriesAdmin,
   listShelfCodesAdmin,
@@ -726,31 +574,18 @@ const {
   pgSaveCategory,
   pgDeleteCategory,
   pgSaveShelfCode
-} = createLookupAdminDomain({
-  db,
+} = createAdminLookupRuntime({
+  airtable,
   cache,
+  requestsTableId,
+  lookupConfigs,
+  db,
   auditChanged,
   pgRecordAuditEntry,
-  pgFindOrCreateLookupRecord,
-  pgResolveShelfCodeRecord,
-  hasPostgres,
-  airtable,
-  getSchema: () => getSchema(),
-  ensureShelfCodeStorageLocationField: (schema) => ensureShelfCodeStorageLocationField(schema),
-  findOrCreateLookupRecord: (lookupKey, value) => findOrCreateLookupRecord(lookupKey, value),
-  getLookups: () => getLookups(),
-  getStorageLocationsAdmin: () => listStorageLocationsAdmin()
-});
-
-const {
-  getLookups,
-  findOrCreateLookupRecord
-} = createLookupRuntime({
-  airtable,
-  cache,
   hasPostgres,
   pgListLookups,
-  pgFindOrCreateLookupRecord
+  pgFindOrCreateLookupRecord,
+  pgResolveShelfCodeRecord
 });
 
 const {

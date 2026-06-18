@@ -1,3 +1,13 @@
+import {
+  formatUserDisplay
+} from "./stock-count/helpers.js";
+import {
+  renderFilters as renderStockFilters,
+  renderList as renderStockList,
+  syncLocationPicker,
+  updateCountSummary as updateStockCountSummary
+} from "./stock-count/render.js";
+
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -23,32 +33,6 @@ let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let items = [];
 let draftCounts = new Map();
 let draftNotes = new Map();
-
-function formatUserDisplay(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (raw !== raw.toLowerCase()) return raw;
-  return raw
-    .split(/\s+/)
-    .map((part) => part
-      .split("-")
-      .map((piece) => piece ? piece.charAt(0).toUpperCase() + piece.slice(1) : piece)
-      .join("-"))
-    .join(" ");
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function normalize(value) {
-  return String(value || "").trim().toLowerCase();
-}
 
 function message(target, text, isError = false) {
   target.textContent = text;
@@ -93,48 +77,6 @@ async function queueApi(path, options = {}, meta = {}) {
   });
 }
 
-function itemCategory(item) {
-  return item.category || "Unsorted";
-}
-
-function itemUnit(item) {
-  return item.unit || "item";
-}
-
-function shelfSortValue(item) {
-  return normalize(item.shelfCode || "TBD").replace(/^shelf\s+/i, "");
-}
-
-function populateSelect(select, values, firstLabel) {
-  const current = select.value;
-  select.innerHTML = [`<option value="">${escapeHtml(firstLabel)}</option>`]
-    .concat(values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`))
-    .join("");
-  if (values.includes(current)) select.value = current;
-}
-
-function syncLocationPicker(values, firstLabel) {
-  const current = locationFilter.value;
-  const options = [{ value: "", label: firstLabel }, ...values.map((value) => ({ value, label: value }))];
-
-  locationPickerButton.textContent = current || firstLabel;
-  locationPickerList.innerHTML = options
-    .map(
-      (option) => `
-        <button
-          class="location-picker-option${option.value === current ? " selected" : ""}"
-          type="button"
-          role="option"
-          aria-selected="${option.value === current ? "true" : "false"}"
-          data-value="${escapeHtml(option.value)}"
-        >
-          ${escapeHtml(option.label)}
-        </button>
-      `
-    )
-    .join("");
-}
-
 function closeLocationPicker() {
   locationPickerList.hidden = true;
   locationPickerButton.setAttribute("aria-expanded", "false");
@@ -145,92 +87,55 @@ function openLocationPicker() {
   locationPickerButton.setAttribute("aria-expanded", "true");
 }
 
-function selectedLocation() {
-  return locationFilter.value;
-}
-
-function filteredItems() {
-  return items
-    .filter((item) => !selectedLocation() || item.storageLocation === selectedLocation())
-    .filter((item) => !areaFilter.value || item.inventoryArea === areaFilter.value)
-    .filter((item) => !categoryFilter.value || itemCategory(item) === categoryFilter.value)
-    .sort((a, b) => {
-      const shelf = shelfSortValue(a).localeCompare(shelfSortValue(b), undefined, { numeric: true });
-      if (shelf) return shelf;
-      const category = itemCategory(a).localeCompare(itemCategory(b));
-      if (category) return category;
-      return a.name.localeCompare(b.name);
-    });
+function currentFilters() {
+  return {
+    location: locationFilter.value,
+    area: areaFilter.value,
+    category: categoryFilter.value
+  };
 }
 
 function renderFilters() {
-  const locations = [...new Set(items.map((item) => item.storageLocation).filter(Boolean))].sort();
-  const areas = [...new Set(items.map((item) => item.inventoryArea).filter(Boolean))].sort();
-  const categories = [...new Set(items.map(itemCategory).filter(Boolean))].sort();
-
-  populateSelect(locationFilter, locations, "Choose Storage Location");
-  populateSelect(areaFilter, areas, "All Areas");
-  populateSelect(categoryFilter, categories, "All Categories");
-
-  if (!locationFilter.value && locations.length) {
-    locationFilter.value = locations[0];
-  }
-
-  syncLocationPicker(locations, "Choose Storage Location");
-}
-
-function renderList() {
-  const visible = filteredItems();
-  const location = selectedLocation() || "All Storage Locations";
-
-  locationTitle.textContent = location;
-  updateCountSummary();
-
-  if (!visible.length) {
-    stockCountList.innerHTML = '<p class="empty-sheet">No items match this location.</p>';
-    return;
-  }
-
-  stockCountList.innerHTML = visible
-    .map((item) => {
-      const countValue = draftCounts.has(item.id) ? draftCounts.get(item.id) : "";
-      const notesValue = draftNotes.get(item.id) || "";
-      const low = item.minimum !== null && Number(item.quantity || 0) < Number(item.minimum || 0);
-      return `
-        <article class="product-row stock-count-row" data-item-id="${escapeHtml(item.id)}">
-          <div class="stock-count-marker">${escapeHtml(item.shelfCode || "TBD")}</div>
-          <div class="product-main stock-count-main">
-            <strong>${escapeHtml(item.name)}</strong>
-            <span>${escapeHtml([item.inventoryArea, item.storageLocation, itemCategory(item)].filter(Boolean).join(" / "))}</span>
-            <small>Current ${escapeHtml(item.quantity ?? 0)} ${escapeHtml(itemUnit(item))}${item.minimum !== null ? ` / min ${escapeHtml(item.minimum)}` : ""}</small>
-            ${low ? '<em>Below minimum</em>' : ""}
-          </div>
-          <div class="product-controls stock-count-controls">
-            <button class="step-count" type="button" data-step="-1">-</button>
-            <input class="count-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="${escapeHtml(item.quantity ?? 0)}" value="${escapeHtml(countValue)}" aria-label="Count ${escapeHtml(item.name)}">
-            <button class="step-count" type="button" data-step="1">+</button>
-            <span>${escapeHtml(itemUnit(item))}</span>
-          </div>
-          <label class="stock-count-note-wrap">
-            <span>Note</span>
-            <input class="count-note" type="text" placeholder="Add note for this count" value="${escapeHtml(notesValue)}" aria-label="Note for ${escapeHtml(item.name)}">
-          </label>
-        </article>
-      `;
-    })
-    .join("");
-}
-
-function updateCountSummary() {
-  const visible = filteredItems();
-  const changed = visible.filter((item) => draftCounts.has(item.id)).length;
-  locationMeta.textContent = `${visible.length} items${changed ? ` / ${changed} changed` : ""}`;
-  saveAllButton.textContent = changed ? `Save ${changed} Count${changed === 1 ? "" : "s"}` : "Save Counts";
+  renderFiltersModule();
 }
 
 function render() {
   renderFilters();
-  renderList();
+  renderListModule();
+}
+
+function renderFiltersModule() {
+  renderStockFilters({
+    items,
+    locationFilter,
+    areaFilter,
+    categoryFilter,
+    locationPickerButton,
+    locationPickerList
+  });
+}
+
+function renderListModule() {
+  renderStockList({
+    items,
+    filters: currentFilters(),
+    draftCounts,
+    draftNotes,
+    locationTitle,
+    locationMeta,
+    saveAllButton,
+    stockCountList
+  });
+}
+
+function updateCountSummaryModule() {
+  updateStockCountSummary({
+    items,
+    filters: currentFilters(),
+    draftCounts,
+    locationMeta,
+    saveAllButton
+  });
 }
 
 async function loadItems() {
@@ -279,7 +184,7 @@ async function saveAllCounts() {
       draftCounts.delete(itemId);
       draftNotes.delete(itemId);
     }
-    renderList();
+    renderListModule();
     message(countMessage, queuedOffline ? "Stock counts saved offline. They will sync automatically." : "Stock counts saved.");
   } catch (error) {
     message(countMessage, error.message, true);
@@ -336,7 +241,13 @@ locationPickerList.addEventListener("click", (event) => {
   locationFilter.value = option.dataset.value || "";
   closeLocationPicker();
   renderList();
-  syncLocationPicker([...new Set(items.map((item) => item.storageLocation).filter(Boolean))].sort(), "Choose Storage Location");
+  syncLocationPicker({
+    current: locationFilter.value,
+    values: [...new Set(items.map((item) => item.storageLocation).filter(Boolean))].sort(),
+    firstLabel: "Choose Storage Location",
+    button: locationPickerButton,
+    list: locationPickerList
+  });
 });
 
 document.addEventListener("click", (event) => {
@@ -363,7 +274,7 @@ stockCountList.addEventListener("input", (event) => {
     else draftNotes.set(itemId, event.target.value);
   }
 
-  updateCountSummary();
+  updateCountSummaryModule();
 });
 
 stockCountList.addEventListener("click", (event) => {
@@ -376,7 +287,7 @@ stockCountList.addEventListener("click", (event) => {
   const base = input.value === "" ? Number(item?.quantity || 0) : Number(input.value || 0);
   const next = Math.max(0, base + Number(button.dataset.step || 0));
   draftCounts.set(itemId, String(next));
-  renderList();
+  renderListModule();
 });
 
 if (sessionToken && sessionUser) {

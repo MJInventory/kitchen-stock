@@ -1,9 +1,18 @@
 import {
-  escapeHtml,
-  formatUserDisplay,
+  buildOrderJumpHref,
+  displayRoleMode,
+  isOperationalRole,
+  itemForRequest,
+  populateDailyAreaFilter,
+  populateDailyUserFilter,
+  renderPushStatus,
+  requestCategory,
+  requesterMatches,
+  requestMatchesDashboardFilter,
   sameUser,
+  selectedFilterValue,
   todayLocal
-} from "./ordering/shared.js";
+} from "./dashboard/helpers.js";
 import { logicalRequestCompare } from "./ordering/request-grouping.js";
 import {
   isOlderOpenRequest,
@@ -59,14 +68,6 @@ let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
 let dashboardFilter = "all";
-
-function itemForRequest(request) {
-  return allItems.find((item) => item.id === request?.itemId) || null;
-}
-
-function requestCategory(request) {
-  return itemForRequest(request)?.category || request?.category || "";
-}
 
 function requestArea(request) {
   return resolveRequestArea(request, allItems);
@@ -148,99 +149,6 @@ async function api(path, options) {
   return data;
 }
 
-function isOperationalRole() {
-  return Boolean(sessionPermissions.canAddInventoryItems || sessionPermissions.canAdminUsers);
-}
-
-function displayRoleMode() {
-  if (sessionRole === "god") return "God view";
-  if (sessionRole === "admin") return "Admin view";
-  if (sessionRole === "power-user") return "Power user view";
-  return "Team view";
-}
-
-function selectedDailyArea() {
-  return String(dailyAreaFilter?.value || "").trim();
-}
-
-function selectedDailyScope() {
-  return String(dailyScopeFilter?.value || "").trim();
-}
-
-function selectedDailyUser() {
-  return String(dailyUserFilter?.value || "").trim();
-}
-
-function buildOrderJumpHref(request) {
-  const item = itemForRequest(request);
-  const params = new URLSearchParams();
-  if (request?.itemId) params.set("itemId", String(request.itemId));
-  if (item?.category || requestCategory(request)) params.set("category", item?.category || requestCategory(request));
-  return `/ordering.html?${params.toString()}`;
-}
-
-function populateDailyAreaFilter() {
-  if (!dailyAreaFilter) return;
-  const areas = [...new Set(recentRequests.map((request) => requestArea(request)).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right));
-  const selected = selectedDailyArea();
-  dailyAreaFilter.innerHTML = [
-    '<option value="">All Areas</option>',
-    ...areas.map((area) => `<option value="${escapeHtml(area)}"${area === selected ? " selected" : ""}>${escapeHtml(area)}</option>`)
-  ].join("");
-  dailyAreaFilter.value = areas.includes(selected) ? selected : "";
-}
-
-function populateDailyUserFilter() {
-  if (!dailyUserFilter) return;
-  const users = [...new Set(recentRequests.map((request) => requestUser(request)).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
-  const selected = selectedDailyUser();
-  const defaultSelection = !selected && !isOperationalRole() ? "__mine__" : selected;
-  dailyUserFilter.innerHTML = [
-    '<option value="">All Users</option>',
-    `<option value="__mine__"${defaultSelection === "__mine__" ? " selected" : ""}>My Orders</option>`,
-    ...users.map((user) => `<option value="${escapeHtml(user)}"${user === defaultSelection ? " selected" : ""}>${escapeHtml(formatUserDisplay(user))}</option>`)
-  ].join("");
-  dailyUserFilter.value = defaultSelection === "__mine__" || users.includes(defaultSelection) ? defaultSelection : "";
-}
-
-function requesterMatches(request) {
-  const scope = selectedDailyScope();
-  if (scope === "__mine__") return sameUser(requestUser(request), sessionUser);
-  if (scope === "__team__") return !sameUser(requestUser(request), sessionUser);
-  const selectedUser = selectedDailyUser();
-  if (!selectedUser) return true;
-  if (selectedUser === "__mine__") return sameUser(requestUser(request), sessionUser);
-  return sameUser(requestUser(request), selectedUser);
-}
-
-function requestMatchesDashboardFilter(request, today = todayLocal()) {
-  if (dashboardFilter === "all") return true;
-  if (dashboardFilter === "today") return requestDay(request) === today && !isStandingOrderRequest(request);
-  if (dashboardFilter === "mine") return sameUser(requestUser(request), sessionUser);
-  if (dashboardFilter === "older") return isOlderOpenRequest(request, today);
-  if (dashboardFilter === "below") {
-    const item = itemForRequest(request);
-    return item ? Number(item.quantity || 0) < Number(item.minimum || 0) : false;
-  }
-  if (dashboardFilter === "standing" || dashboardFilter === "unread") return false;
-  return true;
-}
-
-function renderPushStatus(detail = {}) {
-  if (!enablePushButton) return;
-  const supported = Boolean(detail.supported);
-  const enabled = Boolean(detail.enabled);
-  const subscribed = Boolean(detail.subscribed);
-  const permission = detail.permission || "default";
-  const shouldShow = supported && enabled && (!subscribed || permission !== "granted");
-  enablePushButton.hidden = !shouldShow;
-  enablePushButton.disabled = permission === "denied";
-  if (permission === "denied") enablePushButton.textContent = "Notifications blocked in browser";
-  else if (subscribed) enablePushButton.textContent = "Phone notifications enabled";
-  else enablePushButton.textContent = "Enable phone notifications";
-}
 
 function renderAll() {
   const today = todayLocal();
@@ -254,8 +162,8 @@ function renderAll() {
   renderDashboardCards({
     dashboardCards,
     dashboardMode,
-    displayRoleMode,
-    isOperationalRole,
+    displayRoleMode: () => displayRoleMode(sessionRole),
+    isOperationalRole: () => isOperationalRole(sessionPermissions),
     recentRequests,
     requestUser,
     sameUser,
@@ -273,36 +181,36 @@ function renderAll() {
     dailyOrderCount,
     dailyOrderList,
     recentRequests,
-    selectedArea: selectedDailyArea(),
+    selectedArea: selectedFilterValue(dailyAreaFilter),
     requestArea,
-    requesterMatches,
+    requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
     requestDay,
     today,
-    requestMatchesDashboardFilter,
+    requestMatchesDashboardFilter: (request, currentToday) => requestMatchesDashboardFilter(request, { dashboardFilter, allItems, sessionUser, today: currentToday }),
     logicalRequestCompare: (left, right) => logicalRequestCompare(left, right, allItems),
     allItems,
-    requestCategory,
+    requestCategory: (request) => requestCategory(request, allItems),
     requestLocation,
     requestStatusChips: (request, currentToday) => requestStatusChips(request, sessionUser, currentToday),
-    buildOrderJumpHref
+    buildOrderJumpHref: (request) => buildOrderJumpHref(request, allItems)
   });
   renderOpenOrders({
     openOrderCount,
     openOrderList,
     recentRequests,
-    selectedArea: selectedDailyArea(),
+    selectedArea: selectedFilterValue(dailyAreaFilter),
     requestArea,
-    requesterMatches,
+    requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
     isOlderOpenRequest,
     today,
-    requestMatchesDashboardFilter,
+    requestMatchesDashboardFilter: (request, currentToday) => requestMatchesDashboardFilter(request, { dashboardFilter, allItems, sessionUser, today: currentToday }),
     logicalRequestCompare: (left, right) => logicalRequestCompare(left, right, allItems),
     allItems,
     requestDay,
-    requestCategory,
+    requestCategory: (request) => requestCategory(request, allItems),
     requestLocation,
     requestStatusChips: (request, currentToday) => requestStatusChips(request, sessionUser, currentToday),
-    buildOrderJumpHref
+    buildOrderJumpHref: (request) => buildOrderJumpHref(request, allItems)
   });
   renderStandingOrders({
     standingOrderCount,
@@ -321,8 +229,8 @@ async function refresh() {
   recentRequests = data.requests || [];
   standingOrders = data.standingOrders || [];
   notifications = data.notifications || [];
-  populateDailyAreaFilter();
-  populateDailyUserFilter();
+  populateDailyAreaFilter({ dailyAreaFilter, recentRequests, requestArea });
+  populateDailyUserFilter({ dailyUserFilter, recentRequests, sessionUser, sessionPermissions });
   renderAll();
   setMessage("");
 }
@@ -425,7 +333,7 @@ window.addEventListener("kitchen-push-status", (event) => {
 
 if (sessionToken && sessionUser) {
   showApp();
-  renderPushStatus(window.kitchenPushStatus || {});
+  renderPushStatus(enablePushButton, window.kitchenPushStatus || {});
   refresh().catch((error) => setMessage(error.message, true));
 } else {
   showLogin();

@@ -1,6 +1,7 @@
 import {
   buildOrderJumpHref,
   displayRoleMode,
+  formatUserDisplay,
   isOperationalRole,
   itemForRequest,
   populateDailyAreaFilter,

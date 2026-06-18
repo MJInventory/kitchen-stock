@@ -46,6 +46,7 @@ import { ensurePostgresSchemaUpgrades as applyPostgresSchemaUpgrades } from "./l
 import { createViewHelpers } from "./lib/view-helpers.js";
 import { createPageRouteBuilder } from "./lib/page-routes.js";
 import { createRenderer } from "./lib/rendering.js";
+import { createHttpHelpers } from "./lib/http-helpers.js";
 import { createUserHelpers } from "./lib/user-helpers.js";
 import { createAuditLogHelpers } from "./lib/audit-log.js";
 import { createPostgresRowMappers } from "./lib/postgres-row-mappers.js";
@@ -171,6 +172,16 @@ const {
   sessionMaxAgeMs,
   clampOpenOrderDays,
   normalizeHiddenMenuItems
+});
+
+const {
+  bearerUser,
+  requireUser,
+  requireRole,
+  send,
+  readJson
+} = createHttpHelpers({
+  verifySession
 });
 
 const {
@@ -431,46 +442,6 @@ function publicUserForAdmin(user, actor = null) {
     canSave: editable && (canEditRole || normalizeRole(user.role) === "user" || normalizeRole(user.role) === "power-user"),
     canDelete: actor ? canDeleteAppUserRecord(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
   };
-}
-
-function bearerUser(req) {
-  const header = req.headers.authorization || "";
-  const tokenValue = header.startsWith("Bearer ") ? header.slice(7) : "";
-  return verifySession(tokenValue);
-}
-
-function requireUser(req, res, options = {}) {
-  const user = bearerUser(req);
-  if (!user) {
-    send(res, 401, { error: "Login required." });
-    return null;
-  }
-  if (user.mustChangePassword && !options.allowPasswordChange) {
-    send(res, 403, { error: "Password change required.", code: "PASSWORD_CHANGE_REQUIRED" });
-    return null;
-  }
-  return user;
-}
-
-function requireRole(user, res, predicate, message) {
-  if (predicate(user)) return true;
-  send(res, 403, { error: message || "You do not have permission for this action." });
-  return false;
-}
-
-function send(res, status, body, contentType = "application/json; charset=utf-8") {
-  res.writeHead(status, { "Content-Type": contentType, "Cache-Control": "no-store" });
-  if (Buffer.isBuffer(body) || typeof body === "string") {
-    res.end(body);
-  } else {
-    res.end(JSON.stringify(body));
-  }
-}
-
-async function readJson(req) {
-  let body = "";
-  for await (const chunk of req) body += chunk;
-  return body ? JSON.parse(body) : {};
 }
 
 function requireEmailConfig() {

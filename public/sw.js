@@ -1,4 +1,4 @@
-const CACHE_NAME = "kitchen-stock-v2.014";
+const CACHE_NAME = "kitchen-stock-v2.015";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/offline-queue.js",

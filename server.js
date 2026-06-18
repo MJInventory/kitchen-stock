@@ -587,23 +587,6 @@ const handleAppUserApi = createAppUserApi({
   updateAppUser,
   deleteAppUser
 });
-const handleSetupAdminApi = createSetupAdminApi({
-  requireUser,
-  requireRole,
-  readJson,
-  send,
-  itemFormOptions,
-  listStorageLocationsAdmin,
-  listCategoriesAdmin,
-  listSuppliersAdmin,
-  listShelfCodesAdmin,
-  saveStorageLocation,
-  saveCategory,
-  deleteCategory,
-  saveShelfCode,
-  saveSupplier,
-  deleteSupplier
-});
 const handleOperationsApi = createOperationsApi({
   requireUser,
   requireRole,
@@ -621,27 +604,6 @@ const handleOperationsApi = createOperationsApi({
   listOrderReport,
   getDailyGuestCount,
   saveDailyGuestCount
-});
-const handleMutationApi = createMutationApi({
-  requireUser,
-  requireRole,
-  readJson,
-  send,
-  updateItemSettings,
-  deleteInventoryItem,
-  createInventoryItem,
-  createStockCount,
-  createInvoiceCapture,
-  createInvoiceLine,
-  listOcrRules,
-  createOcrRule,
-  emailInvoicePicture,
-  ocrSpaceParseImage,
-  deliverRequest,
-  updateDriverLine,
-  deliverDriverLine,
-  canDeleteRequest,
-  deleteRequest
 });
 const handleWorkflowApi = createWorkflowApi({
   requireUser,
@@ -898,6 +860,46 @@ const {
 async function itemFormOptions() {
   return pgItemFormOptions();
 }
+
+const handleSetupAdminApi = createSetupAdminApi({
+  requireUser,
+  requireRole,
+  readJson,
+  send,
+  itemFormOptions,
+  listStorageLocationsAdmin,
+  listCategoriesAdmin,
+  listSuppliersAdmin,
+  listShelfCodesAdmin,
+  saveStorageLocation,
+  saveCategory,
+  deleteCategory,
+  saveShelfCode,
+  saveSupplier,
+  deleteSupplier
+});
+
+const handleMutationApi = createMutationApi({
+  requireUser,
+  requireRole,
+  readJson,
+  send,
+  updateItemSettings,
+  deleteInventoryItem,
+  createInventoryItem,
+  createStockCount,
+  createInvoiceCapture,
+  createInvoiceLine,
+  listOcrRules,
+  createOcrRule,
+  emailInvoicePicture,
+  ocrSpaceParseImage,
+  deliverRequest,
+  updateDriverLine,
+  deliverDriverLine,
+  canDeleteRequest,
+  deleteRequest
+});
 
 async function listStandingOrders() {
   return pgListStandingOrders();

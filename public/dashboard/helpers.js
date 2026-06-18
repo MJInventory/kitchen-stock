@@ -91,7 +91,7 @@ export function requestMatchesDashboardFilter(request, {
   sessionUser,
   today = todayLocal()
 }) {
-  if (dashboardFilter === "all") return true;
+  if (!dashboardFilter || dashboardFilter === "all") return true;
   if (dashboardFilter === "today") return requestDay(request) === today && !isStandingOrderRequest(request);
   if (dashboardFilter === "mine") return sameUser(requestUser(request), sessionUser);
   if (dashboardFilter === "older") return isOlderOpenRequest(request, today);

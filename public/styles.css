@@ -1582,17 +1582,18 @@ body.order-app {
 
 .dashboard-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .dashboard-card {
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  align-items: start;
-  justify-items: start;
-  gap: 8px;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 148px;
   border: 1px solid var(--order-line);
   border-radius: 20px;
   padding: 16px 18px;
@@ -1627,10 +1628,11 @@ body.order-app {
   width: 100%;
   max-width: 100%;
   color: var(--order-ink);
-  font-size: 26px;
-  line-height: 1;
+  font-size: clamp(28px, 3.2vw, 34px);
+  line-height: 1.05;
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .dashboard-card span {
@@ -1644,7 +1646,8 @@ body.order-app {
   letter-spacing: 0.8px;
   text-transform: uppercase;
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .dashboard-card small {
@@ -1655,7 +1658,8 @@ body.order-app {
   color: var(--order-muted);
   font: 12px Arial, Helvetica, sans-serif;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .dashboard-panel {
@@ -2692,6 +2696,11 @@ body.order-app {
   padding: 12px 14px;
 }
 
+.daily-order-row.overdue-order-row {
+  border-color: rgba(255, 139, 127, 0.52);
+  background: rgba(255, 139, 127, 0.08);
+}
+
 .status-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -2975,6 +2984,11 @@ body.order-app {
   border-color: #d7c8ff;
 }
 
+:root[data-theme="light"] .daily-order-row.overdue-order-row {
+  border-color: #f1aaa1;
+  background: #fff1ef;
+}
+
 .deliver-order-button:hover {
   background: rgba(212, 173, 67, 0.2);
 }
@@ -3172,6 +3186,11 @@ body.order-app {
   background: #d4ad43;
   color: #11110f;
   border-color: #d4ad43;
+}
+
+:root[data-theme="dark"] .daily-order-row.overdue-order-row {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.2);
 }
 
 :root[data-theme="dark"] .sheet-shell .driver-supplier-select,

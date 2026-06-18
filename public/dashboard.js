@@ -68,7 +68,7 @@ let sessionToken = localStorage.getItem("kitchenStockToken") || "";
 let sessionUser = localStorage.getItem("kitchenStockUser") || "";
 let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
 let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-let dashboardFilter = "all";
+let dashboardFilter = "";
 
 function requestArea(request) {
   return resolveRequestArea(request, allItems);
@@ -211,7 +211,8 @@ function renderAll() {
     requestCategory: (request) => requestCategory(request, allItems),
     requestLocation,
     requestStatusChips: (request, currentToday) => requestStatusChips(request, sessionUser, currentToday),
-    buildOrderJumpHref: (request) => buildOrderJumpHref(request, allItems)
+    buildOrderJumpHref: (request) => buildOrderJumpHref(request, allItems),
+    overdueRowClass: (request, currentToday) => isOlderOpenRequest(request, currentToday) ? "overdue-order-row" : ""
   });
   renderStandingOrders({
     standingOrderCount,
@@ -276,7 +277,7 @@ loginForm.addEventListener("submit", async (event) => {
 dashboardCards?.addEventListener("click", (event) => {
   const card = event.target.closest("[data-dashboard-filter]");
   if (!card?.dataset.dashboardFilter) return;
-  dashboardFilter = card.dataset.dashboardFilter;
+  dashboardFilter = dashboardFilter === card.dataset.dashboardFilter ? "" : card.dataset.dashboardFilter;
   renderAll();
   if (dashboardFilter === "unread" && notificationPanel) {
     notificationPanel.scrollIntoView({ behavior: "smooth", block: "start" });

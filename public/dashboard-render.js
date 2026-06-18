@@ -78,7 +78,6 @@ export function renderDashboardCards({
 
   const cards = isOperationalRole()
     ? [
-      ["All lines", unresolved.length, "Every open order line still active", "all"],
       ["Today active", teamToday, "Open order lines still waiting today", "today"],
       ["My open", myOpen, "Items with your name still open", "mine"],
       ["Older open", olderOpen, "Still waiting from previous days", "older"],
@@ -87,7 +86,6 @@ export function renderDashboardCards({
       ["Unread", unread, "Notifications waiting for action", "unread"]
     ]
     : [
-      ["All lines", unresolved.length, "Every open order line still active", "all"],
       ["My open", myOpen, "Items you still have open", "mine"],
       ["Today active", teamToday, "Open order lines still waiting today", "today"],
       ["Older open", olderOpen, "Still waiting from previous days", "older"],
@@ -185,7 +183,8 @@ export function renderOpenOrders({
   requestCategory,
   requestLocation,
   requestStatusChips,
-  buildOrderJumpHref
+  buildOrderJumpHref,
+  overdueRowClass = () => ""
 }) {
   const openRequests = recentRequests
     .filter((request) => !request.received && request.status !== "Fulfilled")
@@ -206,7 +205,7 @@ export function renderOpenOrders({
         </div>
         <div class="daily-order-group-list">
           ${requests.map((request) => `
-              <a class="daily-order-row daily-order-link" href="${escapeHtml(buildOrderJumpHref(request))}">
+              <a class="daily-order-row daily-order-link ${escapeHtml(overdueRowClass(request, today))}" href="${escapeHtml(buildOrderJumpHref(request))}">
                 <div>
                   <strong>${escapeHtml(itemNameFromRequest(request, allItems))}</strong>
                   <span>${escapeHtml([

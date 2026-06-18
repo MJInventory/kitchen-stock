@@ -26,9 +26,7 @@ const backofficeItems = [
   { href: "/suppliers.html", label: "Suppliers", permission: "canAddInventoryItems" },
   { href: "/categories.html", label: "Categories", permission: "canAddInventoryItems" },
   { href: "/shelf-codes.html", label: "Storage & Shelves", permission: "canAddInventoryItems" },
-  { href: "/user-admin.html", label: "User Admin", permission: "canAdminUsers" },
-  { href: "/change-password.html", label: "Change Password", fixed: true },
-  { href: "__logout__", label: "Log Out", fixed: true }
+  { href: "/user-admin.html", label: "User Admin", permission: "canAdminUsers" }
 ];
 
 let auth = null;

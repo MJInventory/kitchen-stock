@@ -4,8 +4,7 @@ import {
   groupBySupplier,
   logicalRequestCompare,
   receivingOriginClass,
-  supplierNoteMap,
-  supplierOptions
+  supplierNoteMap
 } from "./helpers.js";
 
 export function renderReceivingSheet({
@@ -50,7 +49,6 @@ export function renderReceivingSheet({
             <tr>
               <th>Received</th>
               <th>Item</th>
-              <th>Supplier</th>
               <th>Ordered</th>
               <th>Receive qty</th>
               <th>Unit</th>
@@ -69,11 +67,6 @@ export function renderReceivingSheet({
                     </button>
                   </td>
                   <td>${escapeHtml(request.itemName)}</td>
-                  <td>
-                    <select class="driver-supplier-select receiving-supplier-select" ${request.driverLineId ? "" : "disabled"} aria-label="Supplier for ${escapeHtml(request.itemName)}">
-                      ${supplierOptions(request.supplierName, currentSheet.suppliers || [])}
-                    </select>
-                  </td>
                   <td>${escapeHtml(request.quantity ?? "")}</td>
                   <td>
                     <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(request.quantity ?? "")}" ${request.driverLineId ? "" : "disabled"} aria-label="Received quantity for ${escapeHtml(request.itemName)}">

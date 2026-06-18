@@ -217,7 +217,7 @@ function renderAll() {
     standingOrderCount,
     standingOrderList,
     standingOrders,
-    isOperationalRole: isOperationalRole(),
+    isOperationalRole: isOperationalRole(sessionPermissions),
     dashboardFilter,
     today
   });

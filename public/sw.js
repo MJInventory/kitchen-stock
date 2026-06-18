@@ -1,4 +1,5 @@
-const CACHE_NAME = "kitchen-stock-v2.015";
+const APP_VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
+const CACHE_NAME = `kitchen-stock-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/offline-queue.js",

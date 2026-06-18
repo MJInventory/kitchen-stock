@@ -963,6 +963,7 @@ const { renderView, serveStatic } = createRenderer({
   publicDir,
   viewsDir,
   appVersion,
+  assetWithVersion: viewHelpers.assetWithVersion,
   mimeTypes,
   send
 });

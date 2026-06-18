@@ -35,6 +35,7 @@ import {
 } from "./request-status.js";
 import {
   addItemHrefFromSearchValue,
+  buildSelectedFromRequests,
   computeCategoryStats,
   defaultQuantityForItem,
   filterOrderingItems,

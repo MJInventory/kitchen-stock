@@ -1,5 +1,5 @@
 (function () {
-  const APP_VERSION = "2.008";
+  const APP_VERSION = document.querySelector('meta[name="app-version"]')?.getAttribute("content") || "dev";
 
   function applyTheme(theme) {
     const normalized = theme === "light" ? "light" : "dark";

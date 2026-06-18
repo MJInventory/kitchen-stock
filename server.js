@@ -217,6 +217,14 @@ const {
   listShelfCodesAdmin: () => listShelfCodesAdmin()
 });
 const {
+  listStorageLocationsAdmin,
+  listCategoriesAdmin,
+  listShelfCodesAdmin,
+  resolveShelfCodeRecord,
+  saveStorageLocation,
+  saveCategory,
+  deleteCategory,
+  saveShelfCode,
   pgListStorageLocationsAdmin,
   pgListCategoriesAdmin,
   pgListShelfCodesAdmin,
@@ -229,7 +237,15 @@ const {
   cache,
   auditChanged,
   pgRecordAuditEntry,
-  pgFindOrCreateLookupRecord
+  pgFindOrCreateLookupRecord,
+  pgResolveShelfCodeRecord,
+  hasPostgres,
+  airtable,
+  getSchema: () => getSchema(),
+  ensureShelfCodeStorageLocationField: (schema) => ensureShelfCodeStorageLocationField(schema),
+  findOrCreateLookupRecord: (lookupKey, value) => findOrCreateLookupRecord(lookupKey, value),
+  getLookups: () => getLookups(),
+  getStorageLocationsAdmin: () => listStorageLocationsAdmin()
 });
 const {
   normalizeLegacyAppUser,
@@ -1012,210 +1028,6 @@ async function findOrCreateLookupRecord(lookupKey, value) {
   cache.lookups.expiresAt = 0;
   cache.schema.expiresAt = 0;
   return record.id;
-}
-
-function normalizeStorageLocation(record) {
-  return {
-    id: record.id,
-    name: String(record.fields["Storage Location"] || "").trim(),
-    active: record.fields.Active !== false
-  };
-}
-
-function normalizeCategory(record) {
-  return {
-    id: record.id,
-    name: String(record.fields.Category || "").trim()
-  };
-}
-
-function normalizeShelfCode(record) {
-  return {
-    id: record.id,
-    name: String(record.fields["Shelf Code"] || "").trim(),
-    storageLocation: String(record.fields["Storage Location"] || record.fields["Storage Locations"] || "").trim(),
-    storageLocationId: record.fields["Storage Location Link"]?.[0] || record.fields["Storage Locations Link"]?.[0] || record.fields["Storage Location Links"]?.[0] || "",
-    active: record.fields.Active !== false
-  };
-}
-
-async function listStorageLocationsAdmin() {
-  return pgListStorageLocationsAdmin();
-}
-
-async function listCategoriesAdmin() {
-  return pgListCategoriesAdmin();
-}
-
-async function listShelfCodesAdmin() {
-  return pgListShelfCodesAdmin();
-}
-
-async function findExistingShelfCodeRecordId(name, storageLocation, excludeRecordId = "") {
-  let schema = await getSchema();
-  schema = await ensureShelfCodeStorageLocationField(schema);
-  const tableId = schema.tables.shelfCodes;
-  if (!tableId) return "";
-
-  const wantedName = String(name || "").trim().toLowerCase();
-  const wantedLocation = String(storageLocation || "").trim().toLowerCase();
-  if (!wantedName) return "";
-
-  const records = await listAirtableRecords(tableId, {
-    "sort[0][field]": "Shelf Code",
-    "sort[0][direction]": "asc"
-  });
-  const locations = await listStorageLocationsAdmin();
-  const locationById = new Map(locations.map((location) => [location.id, location.name]));
-  const match = records
-    .map(normalizeShelfCode)
-    .map((shelf) => ({
-      ...shelf,
-      storageLocation: shelf.storageLocation || locationById.get(shelf.storageLocationId) || ""
-    }))
-    .find((shelf) =>
-      shelf.id !== excludeRecordId &&
-      String(shelf.name || "").trim().toLowerCase() === wantedName &&
-      String(shelf.storageLocation || "").trim().toLowerCase() === wantedLocation
-    );
-  return match?.id || "";
-}
-
-async function findExistingCategoryRecordId(name, excludeRecordId = "") {
-  if (hasPostgres()) return "";
-  const wantedName = String(name || "").trim().toLowerCase();
-  if (!wantedName) return "";
-  const categories = await listCategoriesAdmin();
-  const match = categories.find((category) =>
-    category.id !== excludeRecordId &&
-    String(category.name || "").trim().toLowerCase() === wantedName
-  );
-  return match?.id || "";
-}
-
-async function resolveShelfCodeRecord(name, storageLocation) {
-  if (hasPostgres()) {
-    return pgResolveShelfCodeRecord(name, storageLocation);
-  }
-  const shelfName = String(name || "").trim();
-  const locationName = String(storageLocation || "").trim();
-  if (!shelfName) return "";
-
-  const shelves = await listShelfCodesAdmin();
-  const match = shelves.find((shelf) =>
-    shelf.name.toLowerCase() === shelfName.toLowerCase() &&
-    (!locationName || String(shelf.storageLocation || "").toLowerCase() === locationName.toLowerCase())
-  );
-  if (match) return match.id;
-
-  const created = await saveShelfCode({
-    name: shelfName,
-    storageLocation: locationName,
-    active: true
-  });
-  return created.id;
-}
-
-async function saveStorageLocation(payload, recordId = "", actorUsername = "") {
-  if (hasPostgres()) {
-    return pgSaveStorageLocation(payload, recordId, actorUsername);
-  }
-  const schema = await getSchema();
-  const tableId = schema.tables.storageLocations;
-  if (!tableId) throw new Error("Storage Locations table was not found.");
-  const name = String(payload.name || payload.storageLocation || "").trim();
-  const active = payload.active !== false;
-  if (!name) throw new Error("Storage location name is required.");
-  const fields = { "Storage Location": name };
-  if (schema.lookupFields.storageLocations.hasActive) fields.Active = active;
-
-  const record = recordId
-    ? await airtable(`${tableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
-    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
-  cache.lookups.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  return normalizeStorageLocation(record);
-}
-
-async function saveCategory(payload, recordId = "", actorUsername = "") {
-  if (hasPostgres()) {
-    return pgSaveCategory(payload, recordId, actorUsername);
-  }
-  const schema = await getSchema();
-  const tableId = schema.tables.categories;
-  if (!tableId) throw new Error("Categories table was not found.");
-  const name = String(payload.name || payload.category || "").trim();
-  if (!name) throw new Error("Category name is required.");
-
-  const duplicateId = await findExistingCategoryRecordId(name, recordId);
-  if (duplicateId && !recordId) {
-    recordId = duplicateId;
-  } else if (duplicateId && recordId && duplicateId !== recordId) {
-    throw new Error(`Category "${name}" already exists.`);
-  }
-
-  const fields = { Category: name };
-  const record = recordId
-    ? await airtable(`${tableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
-    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
-  cache.lookups.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  return normalizeCategory(record);
-}
-
-async function deleteCategory(recordId, actorUsername = "") {
-  if (hasPostgres()) {
-    return pgDeleteCategory(recordId, actorUsername);
-  }
-  const schema = await getSchema();
-  const tableId = schema.tables.categories;
-  if (!tableId) throw new Error("Categories table was not found.");
-  if (!/^rec[a-zA-Z0-9]+$/.test(recordId || "")) {
-    throw new Error("Invalid category record.");
-  }
-  await airtable(`${tableId}/${recordId}`, { method: "DELETE" });
-  cache.lookups.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  return { ok: true, recordId };
-}
-
-async function saveShelfCode(payload, recordId = "", actorUsername = "") {
-  if (hasPostgres()) {
-    return pgSaveShelfCode(payload, recordId, actorUsername);
-  }
-  let schema = await getSchema();
-  schema = await ensureShelfCodeStorageLocationField(schema);
-  const tableId = schema.tables.shelfCodes;
-  if (!tableId) throw new Error("Shelf Codes table was not found.");
-  const name = String(payload.name || payload.shelfCode || "").trim();
-  const storageLocation = String(payload.storageLocation || "").trim();
-  const active = payload.active !== false;
-  if (!name) throw new Error("Shelf code is required.");
-  const duplicateId = await findExistingShelfCodeRecordId(name, storageLocation, recordId);
-  if (duplicateId && !recordId) {
-    recordId = duplicateId;
-  } else if (duplicateId && recordId && duplicateId !== recordId) {
-    throw new Error(`Shelf code "${name}" already exists for ${storageLocation}.`);
-  }
-  const fields = { "Shelf Code": name };
-  if (schema.lookupFields.shelfCodes.hasActive) fields.Active = active;
-  if (storageLocation) {
-    if (schema.lookupFields.shelfCodes.hasStorageLocationLink) {
-      const locationId = await findOrCreateLookupRecord("storageLocations", storageLocation);
-      fields[schema.lookupFields.shelfCodes.storageLocationLinkFieldName || "Storage Location Link"] = locationId ? [locationId] : [];
-    } else if (schema.lookupFields.shelfCodes.hasStorageLocation) {
-      fields[schema.lookupFields.shelfCodes.storageLocationFieldName || "Storage Location"] = storageLocation;
-    } else {
-      throw new Error("Add Storage Location or Storage Location Link to the Shelf Codes table first.");
-    }
-  }
-
-  const record = recordId
-    ? await airtable(`${tableId}/${recordId}`, { method: "PATCH", body: JSON.stringify({ fields }) })
-    : await airtable(tableId, { method: "POST", body: JSON.stringify({ fields }) });
-  cache.lookups.expiresAt = 0;
-  cache.items.expiresAt = 0;
-  return normalizeShelfCode(record);
 }
 
 function normalizeCreatedRequest(record) {

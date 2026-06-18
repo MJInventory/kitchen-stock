@@ -9,19 +9,13 @@
   "theme_color": "#0f766e",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/mjordering-icon-192.png",
+      "src": "/mjstock-icon-192-v2011.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/mjordering-icon-512.png",
+      "src": "/mjstock-icon-512-v2011.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

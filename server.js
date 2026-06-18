@@ -56,6 +56,7 @@ import { createLookupAdminDomain } from "./lib/lookup-admin-domain.js";
 import { createLegacySchemaDomain } from "./lib/legacy-schema-domain.js";
 import { createAppUserDomain } from "./lib/app-user-domain.js";
 import { createAppUserService } from "./lib/app-user-service.js";
+import { createAppUserApi } from "./lib/app-user-api.js";
 import { createNotificationDomain } from "./lib/notification-domain.js";
 import { createReportSupportDomain } from "./lib/report-support-domain.js";
 import { createSheetDomain } from "./lib/sheet-domain.js";
@@ -475,6 +476,35 @@ function publicUserForAdmin(user, actor = null) {
     canDelete: actor ? canDeleteAppUserRecord(actor, user) && String(actor.name || "").toLowerCase() !== String(user.name || "").toLowerCase() : false
   };
 }
+
+const handleAppUserApi = createAppUserApi({
+  bcrypt,
+  hasPostgres,
+  pushEnabled,
+  vapidPublicKey,
+  readJson,
+  send,
+  requireUser,
+  requireRole,
+  storeSession,
+  publicUser,
+  publicUserForAdmin,
+  canChangeAppUserRole,
+  canDeleteAppUserRecord,
+  findAppUserByName,
+  changeOwnPassword,
+  refreshUserFromDirectory,
+  pgRecordSuccessfulLogin,
+  pgGetOwnSettings,
+  pgUpdateOwnSettings,
+  pgSavePushSubscription,
+  pgRemovePushSubscription,
+  getAppUsers,
+  createAppUser,
+  findAppUserById,
+  updateAppUser,
+  deleteAppUser
+});
 
 async function airtable(path, options = {}) {
   if (!token) {
@@ -1307,171 +1337,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    if (req.method === "POST" && req.url === "/api/login") {
-      const payload = await readJson(req);
-      const name = String(payload.username || "").trim();
-      const password = String(payload.password || "").trim();
-      const user = await findAppUserByName(name);
-
-      let validPassword = false;
-      if (user) {
-        if (user.passwordHash) {
-          validPassword = await bcrypt.compare(password, user.passwordHash);
-        } else {
-          validPassword = user.password === password;
-        }
-      }
-
-      if (!user || !validPassword) {
-        send(res, 401, { error: "Invalid username or password." });
-        return;
-      }
-
-      if (hasPostgres() && user.id) {
-        user.lastLoginAt = await pgRecordSuccessfulLogin(user.id);
-      }
-
-      send(res, 200, storeSession(user));
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/change-password") {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      const payload = await readJson(req);
-      const updatedUser = await changeOwnPassword(user.name, payload.currentPassword, payload.newPassword, {
-        forceChange: Boolean(user.mustChangePassword)
-      });
-      send(res, 200, storeSession(updatedUser));
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/me")) {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      const freshUser = await refreshUserFromDirectory(user);
-      if (freshUser.active === false) {
-        send(res, 403, { error: "This user is no longer active." });
-        return;
-      }
-      send(res, 200, storeSession(freshUser));
-      return;
-    }
-
-    if (req.method === "GET" && req.url === "/api/user-settings") {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      const settings = hasPostgres()
-        ? await pgGetOwnSettings(user.name)
-        : publicUser(user).settings;
-      send(res, 200, { settings });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url === "/api/user-settings") {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      const payload = await readJson(req);
-      const settings = hasPostgres()
-        ? await pgUpdateOwnSettings(user.name, payload)
-        : publicUser(user).settings;
-      send(res, 200, { settings });
-      return;
-    }
-
-    if (req.method === "GET" && req.url === "/api/push/public-key") {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      send(res, 200, { enabled: pushEnabled, publicKey: pushEnabled ? vapidPublicKey : "" });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/push/subscribe") {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      const payload = await readJson(req);
-      const result = hasPostgres()
-        ? await pgSavePushSubscription(user.name, payload.subscription || {}, req.headers["user-agent"] || "")
-        : { ok: false };
-      send(res, 200, result);
-      return;
-    }
-
-    if (req.method === "DELETE" && req.url === "/api/push/subscribe") {
-      const user = requireUser(req, res, { allowPasswordChange: true });
-      if (!user) return;
-      const payload = await readJson(req);
-      const result = hasPostgres()
-        ? await pgRemovePushSubscription(user.name, payload.endpoint || "")
-        : { ok: false, removed: 0 };
-      send(res, 200, result);
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/app-users")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
-      send(res, 200, { users: (await getAppUsers()).map((appUser) => publicUserForAdmin(appUser, user)) });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/app-users") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
-      const payload = await readJson(req);
-      if (!canChangeAppUserRole(user, { role: "user" }, payload.role)) {
-        send(res, 403, { error: "Only God can create admin or god users." });
-        return;
-      }
-      const created = await createAppUser(payload, user.name);
-      send(res, 201, { user: publicUserForAdmin(created, user) });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/app-users/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
-      const recordId = req.url.split("/")[3];
-      const payload = await readJson(req);
-      const target = await findAppUserById(recordId);
-      if (!target) {
-        send(res, 404, { error: "User was not found." });
-        return;
-      }
-      if (!canChangeAppUserRole(user, target, payload.role)) {
-        send(res, 403, { error: "Only God can change admin roles. Admins can manage power users and users only." });
-        return;
-      }
-      const updated = await updateAppUser(recordId, payload, user.name);
-      send(res, 200, { user: publicUserForAdmin(updated, user) });
-      return;
-    }
-
-    if (req.method === "DELETE" && req.url.startsWith("/api/app-users/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAdminUsers, "Only admins can manage users.")) return;
-      const recordId = req.url.split("/")[3];
-      const target = await findAppUserById(recordId);
-      if (!target) {
-        send(res, 404, { error: "User was not found." });
-        return;
-      }
-      if (String(target.name || "").toLowerCase() === String(user.name || "").toLowerCase()) {
-        send(res, 403, { error: "You cannot delete your own user." });
-        return;
-      }
-      if (!canDeleteAppUserRecord(user, target)) {
-        send(res, 403, { error: "Only God can delete admin users. Admins can delete power users and users only." });
-        return;
-      }
-      const result = await deleteAppUser(recordId, user.name);
-      send(res, 200, { result });
-      return;
-    }
+    if (await handleAppUserApi(req, res)) return;
 
     if (req.method === "GET" && req.url.startsWith("/api/items")) {
       if (!requireUser(req, res)) return;

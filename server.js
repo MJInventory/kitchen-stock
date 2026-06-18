@@ -57,6 +57,7 @@ import { createLegacySchemaDomain } from "./lib/legacy-schema-domain.js";
 import { createAppUserDomain } from "./lib/app-user-domain.js";
 import { createAppUserService } from "./lib/app-user-service.js";
 import { createAppUserApi } from "./lib/app-user-api.js";
+import { createSetupAdminApi } from "./lib/setup-admin-api.js";
 import { createNotificationDomain } from "./lib/notification-domain.js";
 import { createReportSupportDomain } from "./lib/report-support-domain.js";
 import { createSheetDomain } from "./lib/sheet-domain.js";
@@ -504,6 +505,23 @@ const handleAppUserApi = createAppUserApi({
   findAppUserById,
   updateAppUser,
   deleteAppUser
+});
+const handleSetupAdminApi = createSetupAdminApi({
+  requireUser,
+  requireRole,
+  readJson,
+  send,
+  itemFormOptions,
+  listStorageLocationsAdmin,
+  listCategoriesAdmin,
+  listSuppliersAdmin,
+  listShelfCodesAdmin,
+  saveStorageLocation,
+  saveCategory,
+  deleteCategory,
+  saveShelfCode,
+  saveSupplier,
+  deleteSupplier
 });
 
 async function airtable(path, options = {}) {
@@ -1338,149 +1356,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (await handleAppUserApi(req, res)) return;
+    if (await handleSetupAdminApi(req, res)) return;
 
     if (req.method === "GET" && req.url.startsWith("/api/items")) {
       if (!requireUser(req, res)) return;
       send(res, 200, { items: await getItems() });
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/item-form-options")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can add inventory items.")) return;
-      send(res, 200, await itemFormOptions());
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/setup/storage-locations")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      send(res, 200, { storageLocations: await listStorageLocationsAdmin() });
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/setup/categories")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      send(res, 200, { categories: await listCategoriesAdmin() });
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/setup/suppliers")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      send(res, 200, { suppliers: await listSuppliersAdmin() });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/setup/categories") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const category = await saveCategory(await readJson(req), "", user.name);
-      send(res, 201, { category });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/setup/suppliers") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const supplier = await saveSupplier(await readJson(req), "", user.name);
-      send(res, 201, { supplier });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/setup/categories/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const recordId = req.url.split("/")[4];
-      const category = await saveCategory(await readJson(req), recordId, user.name);
-      send(res, 200, { category });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/setup/suppliers/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const recordId = req.url.split("/")[4];
-      const supplier = await saveSupplier(await readJson(req), recordId, user.name);
-      send(res, 200, { supplier });
-      return;
-    }
-
-    if (req.method === "DELETE" && req.url.startsWith("/api/setup/suppliers/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const recordId = req.url.split("/")[4];
-      const result = await deleteSupplier(recordId, user.name);
-      send(res, 200, { result });
-      return;
-    }
-
-    if (req.method === "DELETE" && req.url.startsWith("/api/setup/categories/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const recordId = req.url.split("/")[4];
-      const result = await deleteCategory(recordId, user.name);
-      send(res, 200, { result });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/setup/storage-locations") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const storageLocation = await saveStorageLocation(await readJson(req), "", user.name);
-      send(res, 201, { storageLocation });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/setup/storage-locations/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const recordId = req.url.split("/")[4];
-      const storageLocation = await saveStorageLocation(await readJson(req), recordId, user.name);
-      send(res, 200, { storageLocation });
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/api/setup/shelf-codes")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      send(res, 200, {
-        shelfCodes: await listShelfCodesAdmin(),
-        storageLocations: await listStorageLocationsAdmin()
-      });
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/api/setup/shelf-codes") {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const shelfCode = await saveShelfCode(await readJson(req), "", user.name);
-      send(res, 201, { shelfCode });
-      return;
-    }
-
-    if (req.method === "PATCH" && req.url.startsWith("/api/setup/shelf-codes/")) {
-      const user = requireUser(req, res);
-      if (!user) return;
-      if (!requireRole(user, res, (candidate) => candidate.permissions.canAddInventoryItems, "Only admins and power users can manage setup.")) return;
-      const recordId = req.url.split("/")[4];
-      const shelfCode = await saveShelfCode(await readJson(req), recordId, user.name);
-      send(res, 200, { shelfCode });
       return;
     }
 

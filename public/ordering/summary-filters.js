@@ -55,6 +55,7 @@ export function orderingItemMatchesSummary(item, {
   selected,
   recentRequests,
   isStandingOrder,
+  isOpenAttentionRequest,
   isOlderOpenRequest,
   standingOrders
 }) {
@@ -70,7 +71,7 @@ export function orderingItemMatchesSummary(item, {
       && request.status !== "Fulfilled"
       && !request.standingRunId
       && !isStandingOrder(request)
-      && isOlderOpenRequest(request, today)
+      && isOpenAttentionRequest(request, today)
     );
   }
   if (orderingSummaryFilter === "below") {
@@ -93,6 +94,7 @@ export function orderingRequestMatchesSummary(request, {
   sameUser,
   sessionUser,
   requestUser,
+  isOpenAttentionRequest,
   isOlderOpenRequest
 }) {
   if (orderingSummaryFilter === "all") return true;
@@ -101,7 +103,7 @@ export function orderingRequestMatchesSummary(request, {
   if (orderingSummaryFilter === "saved") return selected.has(item.id);
   if (orderingSummaryFilter === "mine") return sameUser(requestUser(request), sessionUser);
   if (orderingSummaryFilter === "team") return !sameUser(requestUser(request), sessionUser);
-  if (orderingSummaryFilter === "older") return isOlderOpenRequest(request, today);
+  if (orderingSummaryFilter === "older") return isOpenAttentionRequest(request, today);
   if (orderingSummaryFilter === "below") return Number(item.quantity || 0) < Number(item.minimum || 0);
   if (orderingSummaryFilter === "standing") return false;
   return true;

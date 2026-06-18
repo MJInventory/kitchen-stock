@@ -67,6 +67,7 @@ export function renderOpenOrders({
   selectedArea,
   requestArea,
   requesterMatches,
+  isOpenAttentionRequest,
   isOlderOpenRequest,
   today,
   requestMatchesDashboardFilter,
@@ -83,7 +84,7 @@ export function renderOpenOrders({
     .filter((request) => !request.received && request.status !== "Fulfilled")
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
-    .filter((request) => isOlderOpenRequest(request, today))
+    .filter((request) => isOpenAttentionRequest(request, today))
     .filter((request) => requestMatchesDashboardFilter(request, today))
     .sort(logicalRequestCompare);
 

@@ -44,6 +44,7 @@ export function renderDashboardCards({
   requestDay,
   today,
   isStandingOrderRequest,
+  isOpenAttentionRequest,
   isOlderOpenRequest,
   allItems,
   standingOrders,
@@ -55,7 +56,7 @@ export function renderDashboardCards({
   const unresolved = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
   const myOpen = unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
   const teamToday = unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
-  const olderOpen = unresolved.filter((request) => isOlderOpenRequest(request, today)).length;
+  const olderOpen = unresolved.filter((request) => isOpenAttentionRequest(request, today)).length;
   const belowMin = allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
   const standingDue = standingOrders.filter((order) => {
     const expected = String(order.expectedDate || "").trim();

@@ -1,5 +1,17 @@
 import { esc, scheduleOptions, sortByLabel, todayLocal } from "./helpers.js";
 
+function standingStatusLabel(order) {
+  const expected = String(order?.expectedDate || "").trim();
+  const today = todayLocal();
+  if (order?.active) {
+    return expected && expected <= today ? "Due" : "Scheduled";
+  }
+  if (expected && expected >= today) {
+    return "Scheduled";
+  }
+  return "Inactive";
+}
+
 export function renderSelectedItems({ selectedItems, standingItems, itemById }) {
   if (!selectedItems.length) {
     standingItems.innerHTML = '<p class="empty-sheet">No items added yet.</p>';
@@ -88,7 +100,7 @@ export function renderStandingOrders({
         <span class="standing-summary-meta">
           <span><b>Frequency</b> ${esc(order.schedule || "Other")}</span>
           <span><b>Expected</b> ${esc(order.expectedDate || "not set")}</span>
-          <span><b>Status</b> ${order.active ? "Active" : "Inactive"}</span>
+          <span><b>Status</b> ${esc(standingStatusLabel(order))}</span>
         </span>
       </button>
       <div class="standing-order-body">

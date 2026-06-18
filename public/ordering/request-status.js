@@ -47,6 +47,10 @@ export function isOlderOpenRequest(request, today = todayLocal()) {
   return diffDays >= openOrderThresholdDays();
 }
 
+export function isOpenAttentionRequest(request, today = todayLocal()) {
+  return Boolean(request?.partialReceipt) || isOlderOpenRequest(request, today);
+}
+
 export function isInternalShortageRequest(request) {
   return String(request?.notes || "").toLowerCase().includes("internal order shortage");
 }

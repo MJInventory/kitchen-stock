@@ -28,6 +28,7 @@ import {
 import {
   duplicateSourceLabel,
   expectedDateFromRequest,
+  isOpenAttentionRequest,
   isOlderOpenRequest,
   isStandingOrder,
   requestDay,
@@ -252,6 +253,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     expectedDateFromRequest,
     duplicateSourceLabel,
     isStandingOrder,
+    isOpenAttentionRequest,
     isOlderOpenRequest,
     addItemHrefFromSearchValue,
     defaultQuantityForItem,

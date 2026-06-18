@@ -236,33 +236,6 @@ const {
   todayIso
 });
 const {
-  getAppUsersTableId,
-  listAppUsers,
-  getAppUsers,
-  findAppUserByName,
-  refreshUserFromDirectory,
-  findAppUserById,
-  createAppUser,
-  changeOwnPassword,
-  updateAppUser,
-  deleteAppUser
-} = createAppUserService({
-  appUsersTableIdFromEnv,
-  airtable,
-  cache,
-  cached,
-  getSchema: () => getSchema(),
-  hasPostgres,
-  normalizeLegacyAppUser,
-  legacyAppUserUpdateFields,
-  pgListAppUsers,
-  pgFindAppUserByName,
-  pgCreateAppUser,
-  pgUpdateAppUser,
-  pgDeleteAppUser,
-  pgChangeOwnPassword
-});
-const {
   pgListNotificationsForUser,
   pgMarkNotificationsRead,
   pgCreateNotificationsForUsers,
@@ -393,6 +366,32 @@ function deliverRequest(...args) {
 }
 
 const {
+  airtable,
+  listAirtableRecords,
+  linkedValue,
+  normalizeItem,
+  listItems,
+  listSuppliers,
+  listRequests,
+  listOpenRequests,
+  cached,
+  getItems,
+  getSuppliers,
+  getRequests
+} = createRuntimeDataHelpers({
+  token,
+  baseId,
+  metrics,
+  cache,
+  itemCacheMs,
+  requestCacheMs,
+  pgListItems,
+  pgListSuppliers,
+  pgListRequests,
+  pgListOpenRequests
+});
+
+const {
   assignLegacyDriverToSheet,
   persistLegacyDriverSheetLines,
   listLegacyDriverSheetLines,
@@ -490,36 +489,10 @@ const {
   normalizeRole,
   presentUserName,
   todayIso,
-  getAppUsers,
+  getAppUsers: (...args) => getAppUsers(...args),
   pgCreateNotificationsForUsers,
   pgRecordAuditEntry,
   pgEnsureDriverSheetLines
-});
-
-const {
-  airtable,
-  listAirtableRecords,
-  linkedValue,
-  normalizeItem,
-  listItems,
-  listSuppliers,
-  listRequests,
-  listOpenRequests,
-  cached,
-  getItems,
-  getSuppliers,
-  getRequests
-} = createRuntimeDataHelpers({
-  token,
-  baseId,
-  metrics,
-  cache,
-  itemCacheMs,
-  requestCacheMs,
-  pgListItems,
-  pgListSuppliers,
-  pgListRequests,
-  pgListOpenRequests
 });
 
 const {
@@ -586,6 +559,34 @@ const {
   pgListLookups,
   pgFindOrCreateLookupRecord,
   pgResolveShelfCodeRecord
+});
+
+const {
+  getAppUsersTableId,
+  listAppUsers,
+  getAppUsers,
+  findAppUserByName,
+  refreshUserFromDirectory,
+  findAppUserById,
+  createAppUser,
+  changeOwnPassword,
+  updateAppUser,
+  deleteAppUser
+} = createAppUserService({
+  appUsersTableIdFromEnv,
+  airtable,
+  cache,
+  cached,
+  getSchema: () => getSchema(),
+  hasPostgres,
+  normalizeLegacyAppUser,
+  legacyAppUserUpdateFields,
+  pgListAppUsers,
+  pgFindAppUserByName,
+  pgCreateAppUser,
+  pgUpdateAppUser,
+  pgDeleteAppUser,
+  pgChangeOwnPassword
 });
 
 const {

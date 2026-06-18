@@ -15,6 +15,7 @@ import {
 } from "./helpers.js";
 import { logicalRequestCompare } from "../ordering/request-grouping.js";
 import {
+  isOpenAttentionRequest,
   isOlderOpenRequest,
   isStandingOrder as isStandingOrderRequest,
   requestArea as resolveRequestArea,
@@ -171,6 +172,7 @@ export function initDashboardPage() {
       requestDay,
       today,
       isStandingOrderRequest,
+      isOpenAttentionRequest,
       isOlderOpenRequest,
       allItems,
       standingOrders,
@@ -201,6 +203,7 @@ export function initDashboardPage() {
       selectedArea: selectedFilterValue(dailyAreaFilter),
       requestArea,
       requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
+      isOpenAttentionRequest,
       isOlderOpenRequest,
       today,
       requestMatchesDashboardFilter: (request, currentToday) => requestMatchesDashboardFilter(request, { dashboardFilter, allItems, sessionUser, today: currentToday }),

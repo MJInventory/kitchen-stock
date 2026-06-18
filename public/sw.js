@@ -3,10 +3,10 @@ const CACHE_NAME = `kitchen-stock-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/offline-queue.js",
-  "/madame-janette-logo.png",
-  "/mjstock-icon-192-v2011.png",
-  "/mjstock-icon-512-v2011.png",
-  "/mjstock-apple-touch-v2011.png"
+  "/mjstock-logo.png",
+  "/mjstock-icon-192.png",
+  "/mjstock-icon-512.png",
+  "/mjstock-apple-touch.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -71,8 +71,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "MJ Stock Magic";
   const options = {
     body: payload.body || "",
-    icon: "/mjstock-icon-192-v2011.png",
-    badge: "/mjstock-icon-192-v2011.png",
+    icon: "/mjstock-icon-192.png",
+    badge: "/mjstock-icon-192.png",
     tag: payload.tag || "mj-stock-magic",
     data: payload.data || { url: payload.url || "/" }
   };

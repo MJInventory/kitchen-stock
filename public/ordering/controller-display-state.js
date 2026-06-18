@@ -25,6 +25,7 @@ export function createOrderingDisplayState(options) {
     expectedDateFromRequest,
     duplicateSourceLabel,
     isStandingOrder,
+    isOpenAttentionRequest,
     isOlderOpenRequest,
     addItemHrefFromSearchValue,
     defaultQuantityForItem,
@@ -84,6 +85,7 @@ export function createOrderingDisplayState(options) {
       selected: getSelected(),
       recentRequests: getRecentRequests(),
       isStandingOrder,
+      isOpenAttentionRequest,
       isOlderOpenRequest,
       standingOrders: getStandingOrders()
     });
@@ -98,6 +100,7 @@ export function createOrderingDisplayState(options) {
       sameUser,
       sessionUser: getSessionUser(),
       requestUser,
+      isOpenAttentionRequest,
       isOlderOpenRequest
     });
   }

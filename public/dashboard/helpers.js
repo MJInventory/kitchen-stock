@@ -5,6 +5,7 @@ import {
   todayLocal
 } from "../ordering/shared.js";
 import {
+  isOpenAttentionRequest,
   isOlderOpenRequest,
   isStandingOrder as isStandingOrderRequest,
   requestDay,
@@ -94,7 +95,7 @@ export function requestMatchesDashboardFilter(request, {
   if (!dashboardFilter || dashboardFilter === "all") return true;
   if (dashboardFilter === "today") return requestDay(request) === today && !isStandingOrderRequest(request);
   if (dashboardFilter === "mine") return sameUser(requestUser(request), sessionUser);
-  if (dashboardFilter === "older") return isOlderOpenRequest(request, today);
+  if (dashboardFilter === "older") return isOpenAttentionRequest(request, today);
   if (dashboardFilter === "below") {
     const item = itemForRequest(request, allItems);
     return item ? Number(item.quantity || 0) < Number(item.minimum || 0) : false;

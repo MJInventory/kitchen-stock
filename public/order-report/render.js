@@ -10,6 +10,42 @@ import {
   reportRowsForFilter
 } from "./helpers.js";
 
+function standingStatusLabel(order) {
+  const expected = String(order?.expectedDate || "").trim();
+  const today = new Date().toISOString().slice(0, 10);
+  if (order?.active) {
+    return expected && expected <= today ? "Due" : "Scheduled";
+  }
+  if (expected && expected >= today) {
+    return "Scheduled";
+  }
+  return "Inactive";
+}
+
+function requestOwnerFromAudit(entry) {
+  return String(
+    entry?.after?.requestedBy
+    || entry?.before?.requestedBy
+    || entry?.after?.requested_by
+    || entry?.before?.requested_by
+    || entry?.after?.requestedByUsername
+    || entry?.before?.requestedByUsername
+    || ""
+  ).trim();
+}
+
+function activityActorLabel(entry) {
+  const actor = String(entry?.actorUsername || "").trim();
+  const requestOwner = requestOwnerFromAudit(entry);
+  if (actor && actor.toLowerCase() !== "system") {
+    return `By ${formatUserDisplay(actor)}`;
+  }
+  if (requestOwner) {
+    return `For ${formatUserDisplay(requestOwner)}`;
+  }
+  return "By System";
+}
+
 export function renderSummary({ reportSummary, summary, activeReportFilter }) {
   const cards = [
     ["Guests", summary.guests ?? "-", ""],
@@ -54,7 +90,7 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
             <span><b>Expected</b> ${escapeHtml(order.expectedDate || "not set")}</span>
             <span><b>Schedule</b> ${escapeHtml(order.schedule || "Other")}</span>
             <span><b>Items</b> ${escapeHtml(items.length)}</span>
-            <span><b>Status</b> ${escapeHtml(order.active ? "Scheduled" : "Inactive")}</span>
+            <span><b>Status</b> ${escapeHtml(standingStatusLabel(order))}</span>
           </div>
         </article>
       `;
@@ -73,7 +109,7 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
             <pre>${escapeHtml([
               order.expectedDate ? `Expected: ${order.expectedDate}` : "",
               order.schedule || "",
-              order.active ? "Active" : "Inactive"
+              standingStatusLabel(order)
             ].filter(Boolean).join(" / "))}</pre>
           </div>
           <table class="order-report-table">
@@ -98,7 +134,7 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
                   <td>${escapeHtml(line.quantity ?? order.quantity ?? "")}</td>
                   <td>${escapeHtml(order.expectedDate || "")}</td>
                   <td>${escapeHtml(order.schedule || "")}</td>
-                  <td>${escapeHtml(order.active ? "Scheduled" : "Inactive")}</td>
+                  <td>${escapeHtml(standingStatusLabel(order))}</td>
                 </tr>
               `).join("")}
             </tbody>
@@ -147,7 +183,7 @@ export function renderActivity({ entries, activitySummary, activityReportList, a
         <div class="activity-row-meta">
           <span>${escapeHtml(labelForActionType(entry.actionType))}</span>
           <span>${escapeHtml(labelForEntityType(entry.entityType))}</span>
-          <span>${escapeHtml(`By ${formatUserDisplay(entry.actorUsername || "System")}`)}</span>
+          <span>${escapeHtml(activityActorLabel(entry))}</span>
           ${entry.reasonCode ? `<span>${escapeHtml(labelForReasonCode(entry.reasonCode))}</span>` : ""}
         </div>
         ${entry.note ? `<p class="activity-note">${escapeHtml(entry.note)}</p>` : ""}

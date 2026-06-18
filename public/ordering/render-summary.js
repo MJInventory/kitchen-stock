@@ -1,7 +1,7 @@
 import { escapeHtml } from "./shared.js";
 import { renderStatusChips, formatNotificationDate } from "./render-shared.js";
 import { groupRequestsByCategory, itemNameFromRequest, logicalRequestCompare } from "./request-grouping.js";
-import { isOlderOpenRequest, requestStatusChips, requestUser, isStandingOrder } from "./request-status.js";
+import { isOlderOpenRequest, isOpenAttentionRequest, requestStatusChips, requestUser, isStandingOrder } from "./request-status.js";
 
 export function renderOrderingSummary({
   orderingSummaryCards,
@@ -28,7 +28,7 @@ export function renderOrderingSummary({
     ["Saved by me", selected.size, "Items you are actively editing right now", "saved"],
     ["My open", unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length, "Still open with your name on them", "mine"],
     ["Team open", unresolved.filter((request) => !sameUser(requestUser(request), sessionUser)).length, "Open lines from everybody else", "team"],
-    ["Older open", unresolved.filter((request) => isOlderOpenRequest(request, today)).length, "Still waiting from previous days", "older"],
+    ["Older open", unresolved.filter((request) => isOpenAttentionRequest(request, today)).length, "Still waiting from previous days", "older"],
     ["Below minimum", allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length, "Items already below their minimum", "below"],
     ["Standing due", standingOrders.filter((order) => isStandingDue(order, today)).length, "Standing orders due now or overdue", "standing"]
   ];

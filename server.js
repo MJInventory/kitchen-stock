@@ -60,6 +60,12 @@ import { createReportSupportDomain } from "./lib/report-support-domain.js";
 import { createSheetDomain } from "./lib/sheet-domain.js";
 import { createLegacySheetDomain } from "./lib/legacy-sheet-domain.js";
 import { createStandingOrderDomain } from "./lib/standing-order-domain.js";
+import {
+  standingSupplierFromNotes,
+  standingRunIdFromNotes,
+  standingRunLineIdFromNotes,
+  isStandingOrderRequestRow
+} from "./lib/standing-order-helpers.js";
 import { createRequestDomain } from "./lib/request-domain.js";
 import { createInternalOrderDomain } from "./lib/internal-order-domain.js";
 import { createInvoiceDomain } from "./lib/invoice-domain.js";
@@ -191,10 +197,7 @@ const {
   pgRequestFromRow,
   pgDriverLineFromRow,
   pgStandingOrderFromRow
-} = createPostgresRowMappers({
-  standingRunIdFromNotes,
-  standingRunLineIdFromNotes
-});
+} = createPostgresRowMappers();
 const {
   pgListSuppliers,
   pgListSuppliersAdmin,
@@ -720,28 +723,6 @@ async function getDailyGuestCount(date) {
 
 async function saveDailyGuestCount(payload, user) {
   return pgSaveDailyGuestCount(payload, user);
-}
-
-function standingSupplierFromNotes(notes) {
-  const match = String(notes || "").match(/^Standing supplier:\s*(.+?)\.?$/im);
-  return match ? match[1].trim().replace(/\.$/, "") : "";
-}
-
-function standingRunIdFromNotes(notes) {
-  const match = String(notes || "").match(/^Standing run id:\s*(rec[a-zA-Z0-9]+)\.?$/im);
-  return match ? match[1].trim() : "";
-}
-
-function standingRunLineIdFromNotes(notes) {
-  const match = String(notes || "").match(/^Standing run line id:\s*(rec[a-zA-Z0-9]+)\.?$/im);
-  return match ? match[1].trim() : "";
-}
-
-function isStandingOrderRequestRow(row) {
-  return Boolean(String(row?.standingRunId || "").trim())
-    || Boolean(String(row?.standingRunLineId || "").trim())
-    || String(row?.requestedBy || "").toLowerCase().includes("standing order")
-    || String(row?.notes || "").toLowerCase().includes("standing order");
 }
 
 async function listStandingOrderRuns(limit = 50) {

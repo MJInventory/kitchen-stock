@@ -1281,6 +1281,10 @@ td small {
   background: #fff8e1;
 }
 
+.report-overdue td {
+  background: #fee2e2;
+}
+
 .report-delivered td {
   background: #f7fff7;
 }
@@ -3170,6 +3174,10 @@ body.order-app {
 
 :root[data-theme="dark"] .sheet-shell .report-waiting td {
   background: rgba(212, 173, 67, 0.12);
+}
+
+:root[data-theme="dark"] .sheet-shell .report-overdue td {
+  background: rgba(248, 113, 113, 0.18);
 }
 
 :root[data-theme="dark"] .sheet-shell .report-delivered td {

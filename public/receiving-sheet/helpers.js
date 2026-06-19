@@ -57,6 +57,21 @@ export function receivingOriginClass(request) {
   }
 }
 
+export function receivingOriginTitle(request) {
+  const originType = String(request.originType || "").trim();
+  if (originType === "standing") return "Standing order";
+  if (originType === "automatic") return "Automatic minimum-stock order";
+  if (originType === "partial") return "Partial remainder from an earlier delivery";
+
+  const requestedBy = String(
+    request.requestedBy
+    || request.requestedByUsername
+    || request.owner
+    || ""
+  ).trim();
+  return requestedBy ? `User order by ${formatUserDisplay(requestedBy)}` : "User order";
+}
+
 export function supplierNoteMap(supplierNotes) {
   return new Map((supplierNotes || []).map((note) => [String(note.supplierName || "").trim().toLowerCase(), note]));
 }

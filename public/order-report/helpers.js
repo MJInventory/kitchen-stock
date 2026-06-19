@@ -1,3 +1,5 @@
+import { openOrderThresholdDays } from "../ordering/shared.js";
+
 export function formatUserDisplay(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -63,6 +65,34 @@ export function reportRowsForFilter(rows = [], filter = "all") {
   if (filter === "delivered") return rows.filter((row) => row.delivered);
   if (filter === "waiting") return rows.filter((row) => row.waiting);
   return rows;
+}
+
+function dateOnly(value) {
+  const raw = String(value || "").trim();
+  return raw ? raw.slice(0, 10) : "";
+}
+
+export function reportRowIsOlderOpen(row, today = todayLocal()) {
+  if (!row?.waiting || row?.delivered) return false;
+
+  const scheduledDay = dateOnly(row?.deliveryDay);
+  if (scheduledDay && scheduledDay > today) return false;
+
+  const requestedDay = dateOnly(row?.requestedAt);
+  if (!requestedDay) return false;
+
+  const created = new Date(`${requestedDay}T00:00:00`);
+  const todayDate = new Date(`${today}T00:00:00`);
+  if (Number.isNaN(created.getTime()) || Number.isNaN(todayDate.getTime())) return false;
+
+  const ageDays = Math.floor((todayDate - created) / 86400000);
+  return ageDays >= openOrderThresholdDays();
+}
+
+export function reportRowToneClass(row, today = todayLocal()) {
+  if (row?.delivered) return "report-delivered";
+  if (row?.partialReceipt || reportRowIsOlderOpen(row, today)) return "report-overdue";
+  return "report-waiting";
 }
 
 export function labelForActionType(value) {

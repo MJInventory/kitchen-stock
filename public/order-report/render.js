@@ -7,6 +7,7 @@ import {
   labelForEntityType,
   labelForReasonCode,
   logicalRowCompare,
+  reportRowToneClass,
   reportRowsForFilter
 } from "./helpers.js";
 
@@ -216,6 +217,7 @@ export function renderReport({
   renderStandingOrders({ orders: standingOrders, standingReportSummaryList, standingReportList });
   renderActivity({ entries: data.activity || [], activitySummary, activityReportList, activeActivityFilter });
 
+  const today = String(data.date || "").trim();
   const visibleRows = reportRowsForFilter(rows, activeReportFilter);
   if (!visibleRows.length) {
     reportList.innerHTML = '<p class="empty-sheet">No order lines found for this date.</p>';
@@ -250,7 +252,7 @@ export function renderReport({
                 return logicalRowCompare(a, b);
               })
               .map((row) => `
-                <tr class="${row.waiting ? "report-waiting" : "report-delivered"}">
+                <tr class="${reportRowToneClass(row, today)}">
                   <td>
                     ${escapeHtml(row.itemName)}
                     <small>${escapeHtml([row.inventoryArea, row.storageLocation, row.shelfCode].filter(Boolean).join(" / "))}</small>

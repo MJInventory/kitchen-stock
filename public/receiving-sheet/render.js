@@ -4,8 +4,57 @@ import {
   groupBySupplier,
   logicalRequestCompare,
   receivingOriginClass,
+  receivingOriginTitle,
   supplierNoteMap
 } from "./helpers.js";
+
+function groupedReceivingKey(request) {
+  return [
+    String(request.supplierName || "").trim().toLowerCase(),
+    String(request.itemId || request.itemName || "").trim().toLowerCase(),
+    String(request.unit || "").trim().toLowerCase(),
+    String(request.shelfCode || "").trim().toLowerCase(),
+    String(request.inventoryArea || "").trim().toLowerCase(),
+    String(request.storageLocation || "").trim().toLowerCase(),
+    receivingOriginClass(request)
+  ].join("|");
+}
+
+function buildReceivingDisplayRows(requests = []) {
+  const rows = [];
+  const grouped = new Map();
+  const sorted = [...requests].sort(logicalRequestCompare);
+
+  sorted.forEach((request) => {
+    const key = groupedReceivingKey(request);
+    const existing = grouped.get(key);
+    if (!existing) {
+      const row = {
+        key: `group-${rows.length + 1}`,
+        rowClass: receivingOriginClass(request),
+        supplierName: request.supplierName || "",
+        itemName: request.itemName || "",
+        orderedQuantity: Number(request.quantity || 0),
+        receiveQuantity: Number(request.quantity || 0),
+        unit: request.unit || "",
+        shelfCode: request.shelfCode || "",
+        inventoryArea: request.inventoryArea || "",
+        storageLocation: request.storageLocation || "",
+        originTitle: receivingOriginTitle(request),
+        requests: [request]
+      };
+      grouped.set(key, row);
+      rows.push(row);
+      return;
+    }
+
+    existing.orderedQuantity += Number(request.quantity || 0);
+    existing.receiveQuantity += Number(request.quantity || 0);
+    existing.requests.push(request);
+  });
+
+  return rows;
+}
 
 export function renderReceivingSheet({
   data,
@@ -19,6 +68,7 @@ export function renderReceivingSheet({
   currentSheet.requests = data.requests || [];
   currentSheet.suppliers = data.suppliers || [];
   currentSheet.supplierNotes = data.supplierNotes || [];
+  currentSheet.displayRows = new Map();
 
   printDate.textContent = `Date: ${data.date}`;
   printReceiver.textContent = `Receiver: ${formatUserDisplay(sessionUser) || "________________"}`;
@@ -32,7 +82,10 @@ export function renderReceivingSheet({
   const notesBySupplier = supplierNoteMap(currentSheet.supplierNotes);
   receivingList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([supplier, requests]) => `
+    .map(([supplier, requests]) => {
+      const displayRows = buildReceivingDisplayRows(requests);
+      displayRows.forEach((row) => currentSheet.displayRows.set(row.key, row));
+      return `
       <section class="sheet-group">
         <div class="supplier-heading">
           <h2>${escapeHtml(supplier)}</h2>
@@ -56,30 +109,30 @@ export function renderReceivingSheet({
               <th>Area / Location</th>
             </tr>
           </thead>
-          <tbody>
-            ${requests
-              .sort(logicalRequestCompare)
-              .map((request) => `
-                <tr class="${receivingOriginClass(request)}" data-line-id="${escapeHtml(request.driverLineId || "")}" data-request-id="${escapeHtml(request.id || "")}">
+            <tbody>
+            ${displayRows
+              .map((row) => `
+                <tr class="${row.rowClass}" data-display-key="${escapeHtml(row.key)}" title="${escapeHtml(row.originTitle || "")}">
                   <td>
-                    <button class="driver-check-button${request.delivered ? " checked" : ""}" type="button" data-action="received" ${request.driverLineId ? "" : "disabled"} aria-label="Mark received">
-                      ${request.delivered ? "&#10003;" : ""}
+                    <button class="driver-check-button" type="button" data-action="received" ${row.requests.every((request) => request.driverLineId) ? "" : "disabled"} aria-label="Mark ${escapeHtml(row.itemName)} received">
+                      &nbsp;
                     </button>
                   </td>
-                  <td>${escapeHtml(request.itemName)}</td>
-                  <td>${escapeHtml(request.quantity ?? "")}</td>
+                  <td>${escapeHtml(row.itemName)}</td>
+                  <td>${escapeHtml(row.orderedQuantity)}</td>
                   <td>
-                    <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(request.quantity ?? "")}" ${request.driverLineId ? "" : "disabled"} aria-label="Received quantity for ${escapeHtml(request.itemName)}">
+                    <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" ${row.requests.every((request) => request.driverLineId) ? "" : "disabled"} aria-label="Received quantity for ${escapeHtml(row.itemName)}">
                   </td>
-                  <td>${escapeHtml(request.unit || "")}</td>
-                  <td>${escapeHtml(request.shelfCode || "")}</td>
-                  <td>${escapeHtml([request.inventoryArea, request.storageLocation].filter(Boolean).join(" / "))}</td>
+                  <td>${escapeHtml(row.unit || "")}</td>
+                  <td>${escapeHtml(row.shelfCode || "")}</td>
+                  <td>${escapeHtml([row.inventoryArea, row.storageLocation].filter(Boolean).join(" / "))}</td>
                 </tr>
               `)
               .join("")}
-          </tbody>
+            </tbody>
         </table>
       </section>
-    `)
+    `;
+    })
     .join("");
 }

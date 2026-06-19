@@ -18,7 +18,7 @@ export function initReceivingSheetPage() {
 
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let currentSheet = { date: "", requests: [], suppliers: [], supplierNotes: [] };
+  let currentSheet = { date: "", requests: [], suppliers: [], supplierNotes: [], displayRows: new Map() };
 
   function setMessage(text, isError = false) {
     sheetMessage.textContent = text;
@@ -84,18 +84,42 @@ export function initReceivingSheetPage() {
   }
 
   async function markReceived(row, button) {
-    const lineId = row.dataset.lineId;
-    const requestId = row.dataset.requestId;
+    const displayKey = row.dataset.displayKey || "";
+    const displayRow = currentSheet.displayRows?.get(displayKey);
+    const requests = Array.isArray(displayRow?.requests) ? displayRow.requests : [];
     if (button.classList.contains("checked")) return;
+    if (!requests.length) {
+      setMessage("Could not find the receiving line to update.", true);
+      return;
+    }
     const quantityInput = row.querySelector(".receive-qty-input");
-    const quantityReceived = quantityInput?.value || "";
+    let remainingQty = Number(quantityInput?.value || 0);
+    if (!Number.isFinite(remainingQty) || remainingQty <= 0) {
+      setMessage("Receive quantity must be greater than zero.", true);
+      return;
+    }
     button.disabled = true;
     setMessage("Receiving item and updating stock...");
     try {
-      await api(`/api/driver-lines/${lineId}/deliver`, {
-        method: "POST",
-        body: JSON.stringify({ requestId, quantityReceived })
+      const orderedRequests = [...requests].sort((left, right) => {
+        const leftTime = new Date(left.requestedAt || 0).getTime();
+        const rightTime = new Date(right.requestedAt || 0).getTime();
+        return leftTime - rightTime;
       });
+      for (const request of orderedRequests) {
+        if (remainingQty <= 0) break;
+        const requestQty = Number(request.quantity || 0);
+        if (!Number.isFinite(requestQty) || requestQty <= 0) continue;
+        const applyQty = Math.min(remainingQty, requestQty);
+        await api(`/api/driver-lines/${request.driverLineId}/deliver`, {
+          method: "POST",
+          body: JSON.stringify({
+            requestId: request.id,
+            quantityReceived: applyQty
+          })
+        });
+        remainingQty -= applyQty;
+      }
       await loadSheet();
       setMessage(`Delivery updated for ${formatUserDisplay(sessionUser)}. Stock updated.`);
     } catch (error) {
@@ -134,7 +158,7 @@ export function initReceivingSheetPage() {
     const button = event.target.closest(".driver-check-button");
     if (button) {
       const row = button.closest("tr");
-      if (!row?.dataset.lineId) return;
+      if (!row?.dataset.displayKey) return;
       markReceived(row, button);
       return;
     }

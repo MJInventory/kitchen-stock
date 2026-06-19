@@ -1523,6 +1523,17 @@ body.order-app {
   color: #100d05;
 }
 
+.login-release {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.order-app .login-release {
+  color: var(--order-muted);
+}
+
 .order-shell {
   min-height: 100vh;
   padding-bottom: 28px;

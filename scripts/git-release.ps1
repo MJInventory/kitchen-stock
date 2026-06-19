@@ -2,10 +2,20 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Message,
 
-  [switch]$NoPush
+  [switch]$NoPush,
+
+  [switch]$SkipHealth
 )
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
+
+if (-not $SkipHealth) {
+  Write-Host "Running app health check..."
+  & (Join-Path $PSScriptRoot "check-health.ps1")
+  if ($LASTEXITCODE -ne 0) {
+    throw "App health check failed. Commit aborted."
+  }
+}
 
 function Invoke-GitChecked([string[]]$Arguments) {
   & git -C $repoRoot @Arguments

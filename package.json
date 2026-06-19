@@ -8,7 +8,8 @@
     "db:check": "node scripts/check-postgres.mjs",
     "db:setup": "node scripts/setup-postgres.mjs",
     "db:import:airtable": "node scripts/import-airtable-to-postgres.mjs",
-    "check:startup": "node scripts/check-startup.mjs"
+    "check:startup": "node scripts/check-startup.mjs",
+    "check:health": "node scripts/app-health.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -396,7 +396,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     render,
     backButton,
     productList,
-    toggleProduct: toggleOrderingProduct,
+    toggleProduct,
     updateCurrentStock,
     ensureRowSelection,
     allItemsRef: () => allItems,

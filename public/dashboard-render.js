@@ -37,6 +37,7 @@ export function renderDashboardCards({
   dashboardMode,
   displayRoleMode,
   isOperationalRole,
+  dashboardSummary,
   recentRequests,
   requestUser,
   sameUser,
@@ -54,15 +55,15 @@ export function renderDashboardCards({
   if (!dashboardCards || !dashboardMode) return;
   dashboardMode.textContent = displayRoleMode();
   const unresolved = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
-  const myOpen = unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
-  const teamToday = unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
-  const olderOpen = unresolved.filter((request) => isOpenAttentionRequest(request, today)).length;
-  const belowMin = allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
-  const standingDue = standingOrders.filter((order) => {
+  const myOpen = dashboardSummary?.dashboard?.mine ?? unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
+  const teamToday = dashboardSummary?.dashboard?.today ?? unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
+  const olderOpen = dashboardSummary?.dashboard?.older ?? unresolved.filter((request) => isOpenAttentionRequest(request, today)).length;
+  const belowMin = dashboardSummary?.dashboard?.below ?? allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
+  const standingDue = dashboardSummary?.dashboard?.standing ?? standingOrders.filter((order) => {
     const expected = String(order.expectedDate || "").trim();
     return expected && expected <= today;
   }).length;
-  const unread = notifications.filter((note) => !note.isRead).length;
+  const unread = dashboardSummary?.dashboard?.unread ?? notifications.filter((note) => !note.isRead).length;
 
   const cards = isOperationalRole()
     ? [

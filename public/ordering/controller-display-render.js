@@ -23,6 +23,7 @@ export function createOrderingDisplayRender(options) {
     getRecentRequests,
     getStandingOrders,
     getNotifications,
+    getSummary,
     getSelected,
     getSessionUser,
     getSessionPermissions,
@@ -136,6 +137,7 @@ export function createOrderingDisplayRender(options) {
       sameUser,
       allItems: getAllItems(),
       standingOrders: getStandingOrders(),
+      orderingSummary: getSummary(),
       isStandingDue,
       orderingSummaryFilter: getOrderingSummaryFilter()
     });

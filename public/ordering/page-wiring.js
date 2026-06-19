@@ -133,6 +133,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     recentRequests,
     standingOrders,
     notifications,
+    summary,
     activeCategory,
     selected,
     sessionToken,
@@ -224,6 +225,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     getRecentRequests: () => recentRequests,
     getStandingOrders: () => standingOrders,
     getNotifications: () => notifications,
+    getSummary: () => summary,
     getSelected: () => selected,
     getSessionUser: () => sessionUser,
     getSessionRole: () => sessionRole,
@@ -298,6 +300,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
       recentRequests = requests;
       standingOrders = runs;
       notifications = messages;
+      summary = data.summary || null;
     });
     selected = buildSelectedFromRecentRequests();
     render();

@@ -46,6 +46,7 @@ export function createOrderingBootstrapContext({
     recentRequests: [],
     standingOrders: [],
     notifications: [],
+    summary: null,
     activeCategory: "",
     selected: new Map(),
     sessionToken: localStorage.getItem("kitchenStockToken") || "",

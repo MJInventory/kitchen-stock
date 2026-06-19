@@ -13,6 +13,7 @@ export function saveOrderingBootstrapCache(cacheKey, data) {
       requests: data.requests || [],
       standingOrders: data.standingOrders || [],
       notifications: data.notifications || [],
+      summary: data.summary || null,
       cachedAt: new Date().toISOString()
     }));
   } catch {
@@ -25,6 +26,7 @@ export function applyOrderingBootstrapData(data = {}, applyState) {
     items: Array.isArray(data.items) ? data.items : [],
     requests: Array.isArray(data.requests) ? data.requests : [],
     standingOrders: Array.isArray(data.standingOrders) ? data.standingOrders : [],
-    notifications: Array.isArray(data.notifications) ? data.notifications : []
+    notifications: Array.isArray(data.notifications) ? data.notifications : [],
+    summary: data.summary || null
   });
 }

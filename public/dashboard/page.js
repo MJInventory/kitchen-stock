@@ -65,6 +65,7 @@ export function initDashboardPage() {
   let recentRequests = [];
   let standingOrders = [];
   let notifications = [];
+  let summary = null;
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
@@ -177,6 +178,7 @@ export function initDashboardPage() {
       allItems,
       standingOrders,
       notifications,
+      dashboardSummary: summary,
       dashboardFilter
     });
     renderDailyOrder({
@@ -233,6 +235,7 @@ export function initDashboardPage() {
     recentRequests = data.requests || [];
     standingOrders = data.standingOrders || [];
     notifications = data.notifications || [];
+    summary = data.summary || null;
     populateDailyAreaFilter({ dailyAreaFilter, recentRequests, requestArea });
     populateDailyUserFilter({ dailyUserFilter, recentRequests, sessionUser, sessionPermissions });
     renderAll();

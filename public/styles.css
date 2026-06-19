@@ -2285,19 +2285,31 @@ body.order-app {
 }
 
 .stock-adjust {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "label label"
+    "input button";
   gap: 6px;
   color: var(--order-muted);
   font-size: 10px;
   text-transform: uppercase;
+  align-items: center;
+}
+
+.stock-adjust-label {
+  grid-area: label;
+  display: block;
+  line-height: 1;
 }
 
 .stock-adjust input {
+  grid-area: input;
   width: 58px;
 }
 
 .stock-adjust button {
+  grid-area: button;
   width: auto;
   min-width: 38px;
   padding: 0 8px;
@@ -2365,6 +2377,9 @@ body.order-app {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: auto 72px auto;
+    grid-template-areas:
+      "label label label"
+      "input button .";
     align-items: center;
     justify-content: start;
     gap: 8px;
@@ -3600,6 +3615,10 @@ body.order-app {
 
   .order-app .product-row.selected .stock-adjust {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "label"
+      "input"
+      "button";
   }
 
   .order-app .product-row.selected .stock-adjust input,

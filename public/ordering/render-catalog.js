@@ -107,7 +107,7 @@ export function renderProductList({
           </div>
           <div class="product-controls">
             <label class="stock-adjust">
-              Stock
+              <span class="stock-adjust-label">Stock</span>
               <input class="stock-input" type="number" min="0" step="0.01" value="${item.quantity ?? 0}">
               <button class="stock-save" type="button">Set</button>
             </label>

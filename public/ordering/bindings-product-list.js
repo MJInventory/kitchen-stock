@@ -19,7 +19,12 @@ export function bindOrderingProductList({
     const clickedInteractive = event.target.closest("button, input, select, label, a");
 
     if (event.target.closest(".product-check")) {
-      toggleProduct(row);
+      const item = ensureRowSelection(row);
+      if (!item) {
+        setMessage("Choose a valid item first.", true);
+        return;
+      }
+      render();
       return;
     }
 
@@ -74,7 +79,12 @@ export function bindOrderingProductList({
     }
 
     if (!clickedInteractive) {
-      toggleProduct(row);
+      const item = ensureRowSelection(row);
+      if (!item) {
+        setMessage("Choose a valid item first.", true);
+        return;
+      }
+      render();
     }
   });
 

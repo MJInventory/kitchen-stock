@@ -72,7 +72,7 @@ export function renderSheet(data, elements) {
                         <td>${escapeHtml(request.itemName)}</td>
                         <td>
                           <select class="driver-supplier-select" ${request.driverLineId ? "" : "disabled"} aria-label="Supplier for ${escapeHtml(request.itemName)}">
-                            ${supplierOptions(request.supplierName)}
+                            ${supplierOptions(request.supplierName, currentSheet.suppliers || [])}
                           </select>
                           <span class="print-value">${escapeHtml(request.supplierName || "Unassigned Supplier")}</span>
                         </td>

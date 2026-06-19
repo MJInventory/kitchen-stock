@@ -304,6 +304,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
 
   const {
     selectItem,
+    toggleProduct,
     buildSelectedFromRecentRequests,
     syncProductRow,
     refresh,

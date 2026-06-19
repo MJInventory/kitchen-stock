@@ -185,6 +185,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     hasSearchTerm,
     renderOrderingSummary,
     defaultQuantity,
+    confirmDuplicateSave,
     updateSaveButton,
     renderNotifications,
     jumpToItem,

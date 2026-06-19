@@ -1,0 +1,49 @@
+<section class="panel no-print">
+  <div class="row">
+    <label>
+      Period
+      <select id="managementMode">
+        <option value="day">Day</option>
+        <option value="week">Week</option>
+        <option value="month">Month</option>
+        <option value="custom">Custom range</option>
+      </select>
+    </label>
+    <label>
+      Anchor date
+      <input id="managementDate" type="date">
+    </label>
+  </div>
+
+  <div id="managementCustomRange" class="row" hidden>
+    <label>
+      From
+      <input id="managementFrom" type="date">
+    </label>
+    <label>
+      To
+      <input id="managementTo" type="date">
+    </label>
+  </div>
+
+  <div class="sheet-actions">
+    <button id="loadManagementButton" type="button">Load Management Report</button>
+    <button id="printManagementButton" type="button">Print / Save PDF</button>
+  </div>
+  <p id="managementMessage" role="status"></p>
+</section>
+
+<section class="print-sheet order-report-sheet">
+  <div class="sheet-header">
+    <div>
+      <p class="eyebrow">Management Totals</p>
+      <h1>Management Report</h1>
+    </div>
+    <div class="sheet-meta">
+      <span id="managementPrintLabel"></span>
+    </div>
+  </div>
+
+  <div id="managementSummary" class="report-summary report-summary-compact"></div>
+  <div id="managementList" class="sheet-list"></div>
+</section>

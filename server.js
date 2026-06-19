@@ -259,7 +259,8 @@ const {
   pgListSupplierDeliveryNotes,
   pgSaveSupplierDeliveryNote,
   pgGetDailyGuestCount,
-  pgSaveDailyGuestCount
+  pgSaveDailyGuestCount,
+  pgGetManagementReport
 } = createReportSupportDomain({
   ensurePostgresSchemaUpgrades,
   db,
@@ -636,6 +637,7 @@ const {
   listOrderReport,
   getDailyGuestCount: pgGetDailyGuestCount,
   saveDailyGuestCount: pgSaveDailyGuestCount,
+  getManagementReport: pgGetManagementReport,
   itemFormOptions: pgItemFormOptions,
   listStorageLocationsAdmin,
   listCategoriesAdmin,

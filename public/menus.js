@@ -18,6 +18,7 @@
 
   const backofficeItems = [
     { label: "Settings", href: "/settings.html" },
+    { label: "Management Report", href: "/management-report.html", permission: "canAddInventoryItems" },
     { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
     { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
     { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },

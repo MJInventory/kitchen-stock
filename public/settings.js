@@ -21,6 +21,7 @@ const gotoItems = [
 
 const backofficeItems = [
   { href: "/settings.html", label: "Settings", fixed: true },
+  { href: "/management-report.html", label: "Management Report", permission: "canAddInventoryItems" },
   { href: "/standing-orders.html", label: "Standing Orders", permission: "canAddInventoryItems" },
   { href: "/inventory-settings.html", label: "Inventory Items", permission: "canAddInventoryItems" },
   { href: "/suppliers.html", label: "Suppliers", permission: "canAddInventoryItems" },

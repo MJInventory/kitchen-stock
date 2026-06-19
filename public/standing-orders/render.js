@@ -1,6 +1,7 @@
 import { esc, scheduleOptions, sortByLabel, todayLocal } from "./helpers.js";
 
 function standingStatusLabel(order) {
+  if (String(order?.statusLabel || "").trim()) return String(order.statusLabel).trim();
   const expected = String(order?.expectedDate || "").trim();
   const today = todayLocal();
   if (order?.active) {

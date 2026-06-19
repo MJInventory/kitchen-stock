@@ -26,7 +26,7 @@ export function requestLocation(request, items = []) {
 }
 
 export function requestDay(request) {
-  return localDateKey(request?.requestedAt || "");
+  return String(request?.requestDay || "").trim() || localDateKey(request?.requestedAt || "");
 }
 
 export function scheduledDeliveryDay(request) {
@@ -34,6 +34,9 @@ export function scheduledDeliveryDay(request) {
 }
 
 export function hasFutureScheduledDelivery(request, today = todayLocal()) {
+  if (typeof request?.scheduledDeliveryFuture === "boolean") {
+    return request.scheduledDeliveryFuture;
+  }
   const deliveryDay = scheduledDeliveryDay(request);
   return Boolean(deliveryDay) && deliveryDay > today;
 }
@@ -41,6 +44,9 @@ export function hasFutureScheduledDelivery(request, today = todayLocal()) {
 export function isOlderOpenRequest(request, today = todayLocal()) {
   const day = requestDay(request);
   if (!day || hasFutureScheduledDelivery(request, today)) return false;
+  if (Number.isFinite(Number(request?.requestAgeDays))) {
+    return Number(request.requestAgeDays) >= openOrderThresholdDays();
+  }
   const requestedDate = new Date(`${day}T00:00:00`);
   const todayDate = new Date(`${today}T00:00:00`);
   const diffDays = Math.floor((todayDate.getTime() - requestedDate.getTime()) / 86400000);
@@ -52,11 +58,15 @@ export function isOpenAttentionRequest(request, today = todayLocal()) {
 }
 
 export function isInternalShortageRequest(request) {
+  if (String(request?.originType || "").trim().toLowerCase() === "automatic") {
+    return String(request?.notes || "").toLowerCase().includes("internal order shortage");
+  }
   return String(request?.notes || "").toLowerCase().includes("internal order shortage");
 }
 
 export function isAutoMinimumRequest(request) {
-  return String(request?.requestedBy || "").trim().toLowerCase() === "auto minimum"
+  return String(request?.originType || "").trim().toLowerCase() === "automatic"
+    || String(request?.requestedBy || "").trim().toLowerCase() === "auto minimum"
     || String(request?.notes || "").toLowerCase().includes("automatic minimum restock");
 }
 

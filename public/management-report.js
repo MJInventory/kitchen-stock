@@ -9,6 +9,7 @@ const loadButton = document.querySelector("#loadManagementButton");
 const printButton = document.querySelector("#printManagementButton");
 const message = document.querySelector("#managementMessage");
 const printLabel = document.querySelector("#managementPrintLabel");
+const heading = document.querySelector("#managementHeading");
 const summaryHost = document.querySelector("#managementSummary");
 const listHost = document.querySelector("#managementList");
 
@@ -121,6 +122,13 @@ function renderGroups(groups = []) {
   `).join("");
 }
 
+function setHeading(periodLabel = "") {
+  if (!heading) return;
+  heading.textContent = periodLabel
+    ? `Ordered Items Period (${periodLabel})`
+    : "Ordered Items Period";
+}
+
 async function loadReport() {
   setMessage("Loading management totals...");
   try {
@@ -128,11 +136,13 @@ async function loadReport() {
     const periodLabel = formatPeriodLabel(data);
     renderSummary(data.summary || {});
     renderGroups(data.groups || []);
+    setHeading(periodLabel);
     printLabel.textContent = periodLabel;
     setMessage(`Showing ${periodLabel || data.label || "selected period"}.`);
   } catch (error) {
     renderSummary({});
     renderGroups([]);
+    setHeading("");
     printLabel.textContent = "";
     setMessage(error.message || "Could not load management report.", true);
   }

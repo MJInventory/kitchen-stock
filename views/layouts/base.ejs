@@ -23,7 +23,7 @@
       <%- typeof body !== "undefined" ? body : "" %>
     </main>
 
-    <footer class="app-version">MJ Stock Magic v<%= typeof appVersion !== "undefined" ? appVersion : "" %></footer>
+    <footer class="app-version">Release v<%= typeof appVersion !== "undefined" ? appVersion : "" %><% if (typeof appReleaseLabel !== "undefined" && appReleaseLabel) { %> fix <%= appReleaseLabel %><% } %></footer>
     <%- include("../partials/footer-scripts") %>
   </body>
 </html>

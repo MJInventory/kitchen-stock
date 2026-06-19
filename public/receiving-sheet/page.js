@@ -99,6 +99,8 @@ export function initReceivingSheetPage() {
       return;
     }
     button.disabled = true;
+    button.classList.add("checked");
+    button.innerHTML = "&#10003;";
     setMessage("Receiving item and updating stock...");
     try {
       const orderedRequests = [...requests].sort((left, right) => {
@@ -111,10 +113,9 @@ export function initReceivingSheetPage() {
         const requestQty = Number(request.quantity || 0);
         if (!Number.isFinite(requestQty) || requestQty <= 0) continue;
         const applyQty = Math.min(remainingQty, requestQty);
-        await api(`/api/driver-lines/${request.driverLineId}/deliver`, {
+        await api(`/api/requests/${request.id}/deliver`, {
           method: "POST",
           body: JSON.stringify({
-            requestId: request.id,
             quantityReceived: applyQty
           })
         });
@@ -123,6 +124,8 @@ export function initReceivingSheetPage() {
       await loadSheet();
       setMessage(`Delivery updated for ${formatUserDisplay(sessionUser)}. Stock updated.`);
     } catch (error) {
+      button.classList.remove("checked");
+      button.innerHTML = "&nbsp;";
       setMessage(error.message, true);
     } finally {
       button.disabled = false;

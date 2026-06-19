@@ -114,14 +114,14 @@ export function renderReceivingSheet({
               .map((row) => `
                 <tr class="${row.rowClass}" data-display-key="${escapeHtml(row.key)}" title="${escapeHtml(row.originTitle || "")}">
                   <td>
-                    <button class="driver-check-button" type="button" data-action="received" ${row.requests.every((request) => request.driverLineId) ? "" : "disabled"} aria-label="Mark ${escapeHtml(row.itemName)} received">
+                    <button class="driver-check-button" type="button" data-action="received" aria-label="Mark ${escapeHtml(row.itemName)} received">
                       &nbsp;
                     </button>
                   </td>
                   <td>${escapeHtml(row.itemName)}</td>
                   <td>${escapeHtml(row.orderedQuantity)}</td>
                   <td>
-                    <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" ${row.requests.every((request) => request.driverLineId) ? "" : "disabled"} aria-label="Received quantity for ${escapeHtml(row.itemName)}">
+                    <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" aria-label="Received quantity for ${escapeHtml(row.itemName)}">
                   </td>
                   <td>${escapeHtml(row.unit || "")}</td>
                   <td>${escapeHtml(row.shelfCode || "")}</td>

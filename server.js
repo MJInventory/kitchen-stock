@@ -10,6 +10,7 @@ import {
   allowedUnits,
   appTimeZone,
   appUsersTableIdFromEnv,
+  appReleaseLabel,
   appVersion,
   authSecret,
   backofficeMenuOptions,
@@ -689,6 +690,7 @@ const { renderView, serveStatic } = createRenderer({
   publicDir,
   viewsDir,
   appVersion,
+  appReleaseLabel,
   assetWithVersion: viewHelpers.assetWithVersion,
   mimeTypes,
   send

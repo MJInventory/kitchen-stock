@@ -101,10 +101,21 @@ export function logicalRequestCompare(a, b) {
 
 export function supplierOptions(selectedSupplier, knownSuppliers = []) {
   const selected = selectedSupplier || "";
-  const hasSelected = knownSuppliers.some((supplier) => supplier.name === selected);
+  const normalized = new Set();
+  const suppliers = knownSuppliers
+    .map((supplier) => typeof supplier === "string" ? { name: supplier } : supplier)
+    .filter((supplier) => {
+      const name = String(supplier?.name || "").trim();
+      if (!name) return false;
+      const key = name.toLowerCase();
+      if (normalized.has(key)) return false;
+      normalized.add(key);
+      return true;
+    });
+  const hasSelected = suppliers.some((supplier) => supplier.name === selected);
   const options = [
     ...(selected && !hasSelected ? [{ name: selected }] : []),
-    ...knownSuppliers
+    ...suppliers
   ];
 
   return options

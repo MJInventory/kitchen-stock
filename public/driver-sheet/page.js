@@ -108,6 +108,24 @@ export function initDriverSheetPage() {
 
   function chooseSupplierChangeMode(itemName, supplierName) {
     return new Promise((resolve) => {
+      if (typeof HTMLDialogElement === "undefined") {
+        const response = window.prompt(
+          `Change supplier for ${itemName || "this item"}.\nType P for Permanent, O for One-Time, or C to cancel.`,
+          "O"
+        );
+        const choice = String(response || "").trim().toLowerCase();
+        if (choice === "p" || choice === "permanent") {
+          resolve("permanent");
+          return;
+        }
+        if (choice === "o" || choice === "one-time" || choice === "onetime") {
+          resolve("one-time");
+          return;
+        }
+        resolve(null);
+        return;
+      }
+
       const dialog = document.createElement("dialog");
       dialog.className = "choice-dialog";
       dialog.innerHTML = `
@@ -143,7 +161,25 @@ export function initDriverSheetPage() {
         event.preventDefault();
         finish(null);
       });
-      dialog.showModal();
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        const response = window.prompt(
+          `Change supplier for ${itemName || "this item"}.\nType P for Permanent, O for One-Time, or C to cancel.`,
+          "O"
+        );
+        dialog.remove();
+        const choice = String(response || "").trim().toLowerCase();
+        if (choice === "p" || choice === "permanent") {
+          resolve("permanent");
+          return;
+        }
+        if (choice === "o" || choice === "one-time" || choice === "onetime") {
+          resolve("one-time");
+          return;
+        }
+        resolve(null);
+      }
     });
   }
 

@@ -2251,9 +2251,9 @@ body.order-app {
 .product-row.selected .product-controls {
   grid-area: controls;
   display: grid;
-  grid-template-columns: minmax(0, max-content) 28px 56px 28px 96px 110px auto minmax(140px, max-content);
-  align-items: center;
-  gap: 8px;
+  grid-template-columns: minmax(112px, 132px) minmax(168px, 212px) minmax(88px, 108px) minmax(112px, 132px) minmax(88px, max-content) minmax(140px, max-content);
+  align-items: end;
+  gap: 10px;
   width: 100%;
 }
 
@@ -2295,12 +2295,44 @@ body.order-app {
   font-size: 10px;
   text-transform: uppercase;
   align-items: center;
+  align-self: end;
+  min-width: 0;
+}
+
+.qty-adjust {
+  display: grid;
+  grid-template-areas:
+    "label"
+    "controls";
+  gap: 6px;
+  color: var(--order-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  align-items: center;
+  align-self: end;
+  min-width: 0;
+}
+
+.qty-adjust-label {
+  grid-area: label;
+  display: block;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.qty-adjust-controls {
+  grid-area: controls;
+  display: grid;
+  grid-template-columns: 28px 56px 28px;
+  gap: 8px;
+  align-items: center;
 }
 
 .stock-adjust-label {
   grid-area: label;
   display: block;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .stock-adjust input {
@@ -2316,7 +2348,8 @@ body.order-app {
 }
 
 .product-controls select {
-  width: 96px;
+  width: 100%;
+  min-width: 0;
   border-color: var(--order-line);
   background: #080808;
   color: var(--order-ink);
@@ -2350,6 +2383,7 @@ body.order-app {
   color: var(--order-ink);
   font-size: 11px;
   text-transform: uppercase;
+  justify-self: start;
 }
 
 .product-delete-toggle input {
@@ -2369,20 +2403,20 @@ body.order-app {
   }
 
   .order-app .product-row.selected .product-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding-left: 0;
   }
 
   .order-app .product-row.selected .stock-adjust {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: auto 72px auto;
-    grid-template-areas:
-      "label label label"
-      "input button .";
-    align-items: center;
-    justify-content: start;
-    gap: 8px;
+    grid-column: auto;
+  }
+
+  .order-app .product-row.selected .qty-adjust {
+    grid-column: auto;
+  }
+
+  .order-app .product-row.selected .product-delete-toggle {
+    grid-column: span 2;
   }
 
   .order-app .product-row.selected .qty-minus,
@@ -3621,15 +3655,22 @@ body.order-app {
       "button";
   }
 
+  .order-app .product-row.selected .qty-adjust-controls {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
   .order-app .product-row.selected .stock-adjust input,
   .order-app .product-row.selected .stock-adjust button,
-  .order-app .product-row.selected .qty-minus,
-  .order-app .product-row.selected .qty-plus,
-  .order-app .product-row.selected .qty-input,
   .order-app .product-row.selected .unit-input,
   .order-app .product-row.selected .urgency-input,
   .order-app .product-row.selected .row-save-button,
   .order-app .product-row.selected .product-delete-toggle {
+    width: 100%;
+  }
+
+  .order-app .product-row.selected .qty-minus,
+  .order-app .product-row.selected .qty-plus,
+  .order-app .product-row.selected .qty-input {
     width: 100%;
   }
 

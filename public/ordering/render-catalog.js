@@ -111,9 +111,14 @@ export function renderProductList({
               <input class="stock-input" type="number" min="0" step="0.01" value="${item.quantity ?? 0}">
               <button class="stock-save" type="button">Set</button>
             </label>
-            <button class="qty-minus" type="button" aria-label="Decrease">-</button>
-            <input class="qty-input" type="number" min="0" step="1" value="${quantity}">
-            <button class="qty-plus" type="button" aria-label="Increase">+</button>
+            <label class="qty-adjust">
+              <span class="qty-adjust-label">Order</span>
+              <div class="qty-adjust-controls">
+                <button class="qty-minus" type="button" aria-label="Decrease">-</button>
+                <input class="qty-input" type="number" min="0" step="1" value="${quantity}">
+                <button class="qty-plus" type="button" aria-label="Increase">+</button>
+              </div>
+            </label>
             <select class="unit-input" aria-label="Order unit">
               ${["box", "bag", "item", "bottle"].map((unit) => `<option value="${unit}"${unit === (entry?.unit || itemUnit(item)) ? " selected" : ""}>${unit}</option>`).join("")}
             </select>

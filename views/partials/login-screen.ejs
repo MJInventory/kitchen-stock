@@ -5,7 +5,7 @@
     <label>Username <input id="usernameInput" type="text" autocomplete="username" required></label>
     <label>Password <input id="passwordInput" type="password"<% if (typeof passwordInputMode !== "undefined" && passwordInputMode) { %> inputmode="<%= passwordInputMode %>"<% } %> autocomplete="current-password" required></label>
     <button type="submit">Log In</button>
-    <p class="login-release">v<%= appVersion %><% if (appReleaseLabel) { %> - <%= appReleaseLabel %><% } %></p>
+    <p class="login-release">Release v<%= appVersion %><% if (appReleaseLabel) { %> fix <%= appReleaseLabel %><% } %></p>
     <p id="loginMessage" role="status"></p>
   </form>
 </section>

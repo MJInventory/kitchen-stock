@@ -89,7 +89,7 @@ export function attachOrderingInteractions(params) {
     markNotificationsRead
   });
 
-  submitButton.addEventListener("click", () => submitSelected());
+  submitButton?.addEventListener("click", () => submitSelected());
 
   bindOrderingCategoryNavigation({
     categoryGrid,

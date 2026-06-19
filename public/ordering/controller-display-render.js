@@ -72,6 +72,7 @@ export function createOrderingDisplayRender(options) {
 
   function updateSaveButton() {
     const count = getSelected().size;
+    if (!submitButton) return;
     submitButton.textContent = `${count} Saved`;
     submitButton.disabled = count === 0;
   }

@@ -24,7 +24,7 @@ export async function submitOrderingSelection({
   const scopedEntries = collectSelectedEntriesFromMap(selected, itemIds);
   if (!scopedEntries.length) return { recentRequests, selected };
 
-  submitButton.disabled = true;
+  if (submitButton) submitButton.disabled = true;
   setMessage("Saving order...");
 
   try {

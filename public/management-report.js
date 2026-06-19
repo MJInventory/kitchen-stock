@@ -47,6 +47,16 @@ function formatPeriodLabel(data = {}) {
   return from || to || data.label || "";
 }
 
+function formatLeadTimeLabel(value) {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  const totalMinutes = Math.max(0, Math.round(Number(value) * 24 * 60));
+  const wholeDays = Math.floor(totalMinutes / (24 * 60));
+  const minutesRemainder = totalMinutes - wholeDays * 24 * 60;
+  const hours = String(Math.floor(minutesRemainder / 60)).padStart(2, "0");
+  const minutes = String(minutesRemainder % 60).padStart(2, "0");
+  return `${wholeDays} day${wholeDays === 1 ? "" : "s"}, ${hours}:${minutes}`;
+}
+
 function toggleCustomRange() {
   customRange.hidden = modeSelect.value !== "custom";
 }
@@ -102,7 +112,7 @@ function renderGroups(groups = []) {
               <td>${escapeHtml(row.supplierName)}</td>
               <td>${escapeHtml(row.totalQuantity)}</td>
               <td>${escapeHtml(row.unit)}</td>
-              <td>${row.avgLeadTimeDays == null ? "-" : `${escapeHtml(row.avgLeadTimeDays)} day(s)`}</td>
+              <td>${escapeHtml(formatLeadTimeLabel(row.avgLeadTimeDays))}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -115,10 +125,11 @@ async function loadReport() {
   setMessage("Loading management totals...");
   try {
     const data = await auth.api(`/api/management-report?${buildQuery().toString()}`);
+    const periodLabel = formatPeriodLabel(data);
     renderSummary(data.summary || {});
     renderGroups(data.groups || []);
-    printLabel.textContent = formatPeriodLabel(data);
-    setMessage(`Showing ${data.label || "selected period"}.`);
+    printLabel.textContent = periodLabel;
+    setMessage(`Showing ${periodLabel || data.label || "selected period"}.`);
   } catch (error) {
     renderSummary({});
     renderGroups([]);

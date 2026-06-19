@@ -69,7 +69,7 @@ export function initDashboardPage() {
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
   let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-  let dashboardFilter = "";
+  let dashboardFilter = "all";
 
   function requestArea(request) {
     return resolveRequestArea(request, allItems);
@@ -279,7 +279,7 @@ export function initDashboardPage() {
   dashboardCards?.addEventListener("click", (event) => {
     const card = event.target.closest("[data-dashboard-filter]");
     if (!card?.dataset.dashboardFilter) return;
-    dashboardFilter = dashboardFilter === card.dataset.dashboardFilter ? "" : card.dataset.dashboardFilter;
+    dashboardFilter = dashboardFilter === card.dataset.dashboardFilter ? "all" : card.dataset.dashboardFilter;
     renderAll();
     if (dashboardFilter === "unread" && notificationPanel) {
       notificationPanel.scrollIntoView({ behavior: "smooth", block: "start" });

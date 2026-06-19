@@ -40,6 +40,13 @@ function setMessage(text, isError = false) {
   message.classList.toggle("error", Boolean(isError));
 }
 
+function formatPeriodLabel(data = {}) {
+  const from = String(data.from || "").trim();
+  const to = String(data.to || "").trim();
+  if (from && to && from !== to) return `${from} to ${to}`;
+  return from || to || data.label || "";
+}
+
 function toggleCustomRange() {
   customRange.hidden = modeSelect.value !== "custom";
 }
@@ -85,8 +92,7 @@ function renderGroups(groups = []) {
             <th>Supplier</th>
             <th>Qty</th>
             <th>Unit</th>
-            <th>Lines</th>
-            <th>Requested by</th>
+            <th>Avg lead time</th>
           </tr>
         </thead>
         <tbody>
@@ -96,8 +102,7 @@ function renderGroups(groups = []) {
               <td>${escapeHtml(row.supplierName)}</td>
               <td>${escapeHtml(row.totalQuantity)}</td>
               <td>${escapeHtml(row.unit)}</td>
-              <td>${escapeHtml(row.lineCount)}</td>
-              <td>${escapeHtml(row.requestedBy || "-")}</td>
+              <td>${row.avgLeadTimeDays == null ? "-" : `${escapeHtml(row.avgLeadTimeDays)} day(s)`}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -112,7 +117,7 @@ async function loadReport() {
     const data = await auth.api(`/api/management-report?${buildQuery().toString()}`);
     renderSummary(data.summary || {});
     renderGroups(data.groups || []);
-    printLabel.textContent = data.label || "";
+    printLabel.textContent = formatPeriodLabel(data);
     setMessage(`Showing ${data.label || "selected period"}.`);
   } catch (error) {
     renderSummary({});

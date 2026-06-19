@@ -366,7 +366,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
       saveBootstrapCache(data);
     },
     renderNotifications,
-    confirmDuplicateSave: confirmDuplicateSelectionSave,
+    confirmDuplicateSave,
     updateSaveButton
   });
 

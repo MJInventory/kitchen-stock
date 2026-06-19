@@ -58,7 +58,8 @@ export function renderDailyOrderBlock({
   allItems,
   sameUser,
   sessionPermissions,
-  sessionUser
+  sessionUser,
+  isOlderOpenRequest
 }) {
   renderDailyOrderView({
     dailyOrderCount,
@@ -71,7 +72,8 @@ export function renderDailyOrderBlock({
     allItems,
     sameUser,
     sessionPermissions,
-    sessionUser
+    sessionUser,
+    isOlderOpenRequest
   });
 }
 

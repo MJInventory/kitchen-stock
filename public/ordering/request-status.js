@@ -7,6 +7,7 @@ import {
 } from "./shared.js";
 
 export function isStandingOrder(request) {
+  if (typeof request?.isStanding === "boolean") return request.isStanding;
   return Boolean(String(request?.standingRunId || "").trim())
     || Boolean(String(request?.standingRunLineId || "").trim())
     || /^standing run id:/im.test(String(request?.notes || ""))

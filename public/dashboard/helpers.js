@@ -93,7 +93,10 @@ export function requestMatchesDashboardFilter(request, {
   today = todayLocal()
 }) {
   if (!dashboardFilter || dashboardFilter === "all") return true;
-  if (dashboardFilter === "today") return requestDay(request) === today && !isStandingOrderRequest(request);
+  if (dashboardFilter === "today") {
+    const isToday = typeof request?.isTodayRequest === "boolean" ? request.isTodayRequest : requestDay(request) === today;
+    return isToday && !isStandingOrderRequest(request);
+  }
   if (dashboardFilter === "mine") return sameUser(requestUser(request), sessionUser);
   if (dashboardFilter === "older") return isOpenAttentionRequest(request, today);
   if (dashboardFilter === "below") {

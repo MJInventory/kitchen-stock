@@ -54,16 +54,13 @@ export function renderDashboardCards({
 }) {
   if (!dashboardCards || !dashboardMode) return;
   dashboardMode.textContent = displayRoleMode();
-  const unresolved = recentRequests.filter((request) => !request.received && request.status !== "Fulfilled");
-  const myOpen = dashboardSummary?.dashboard?.mine ?? unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length;
-  const teamToday = dashboardSummary?.dashboard?.today ?? unresolved.filter((request) => requestDay(request) === today && !isStandingOrderRequest(request)).length;
-  const olderOpen = dashboardSummary?.dashboard?.older ?? unresolved.filter((request) => isOpenAttentionRequest(request, today)).length;
-  const belowMin = dashboardSummary?.dashboard?.below ?? allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length;
-  const standingDue = dashboardSummary?.dashboard?.standing ?? standingOrders.filter((order) => {
-    const expected = String(order.expectedDate || "").trim();
-    return expected && expected <= today;
-  }).length;
-  const unread = dashboardSummary?.dashboard?.unread ?? notifications.filter((note) => !note.isRead).length;
+  const summary = dashboardSummary?.dashboard || {};
+  const myOpen = Number(summary.mine || 0);
+  const teamToday = Number(summary.today || 0);
+  const olderOpen = Number(summary.older || 0);
+  const belowMin = Number(summary.below || 0);
+  const standingDue = Number(summary.standing || 0);
+  const unread = Number(summary.unread || 0);
 
   const cards = isOperationalRole()
     ? [

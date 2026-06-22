@@ -1,7 +1,7 @@
 import { escapeHtml } from "./shared.js";
 import { renderStatusChips, formatNotificationDate } from "./render-shared.js";
 import { groupRequestsByCategory, itemNameFromRequest, logicalRequestCompare } from "./request-grouping.js";
-import { isOlderOpenRequest, isOpenAttentionRequest, requestStatusChips, requestUser, isStandingOrder } from "./request-status.js";
+import { isOlderOpenRequest, requestStatusChips, isStandingOrder } from "./request-status.js";
 
 export function renderOrderingSummary({
   orderingSummaryCards,
@@ -20,18 +20,15 @@ export function renderOrderingSummary({
 }) {
   if (!orderingSummaryCards || !orderingMode) return;
   orderingMode.textContent = displayRoleMode();
-  const unresolved = recentRequests
-    .filter((request) => !request.received && request.status !== "Fulfilled")
-    .filter((request) => !request.standingRunId)
-    .filter((request) => !isStandingOrder(request));
+  const summaryCounts = orderingSummary?.ordering || {};
 
   const summary = [
     ["Saved by me", selected.size, "Items you are actively editing right now", "saved"],
-    ["My open", orderingSummary?.ordering?.mine ?? unresolved.filter((request) => sameUser(requestUser(request), sessionUser)).length, "Still open with your name on them", "mine"],
-    ["Team open", orderingSummary?.ordering?.team ?? unresolved.filter((request) => !sameUser(requestUser(request), sessionUser)).length, "Open lines from everybody else", "team"],
-    ["Older open", orderingSummary?.ordering?.older ?? unresolved.filter((request) => isOpenAttentionRequest(request, today)).length, "Still waiting from previous days", "older"],
-    ["Below minimum", orderingSummary?.ordering?.below ?? allItems.filter((item) => Number(item.quantity || 0) < Number(item.minimum || 0)).length, "Items already below their minimum", "below"],
-    ["Standing due", orderingSummary?.ordering?.standing ?? standingOrders.filter((order) => isStandingDue(order, today)).length, "Standing orders due now or overdue", "standing"]
+    ["My open", Number(summaryCounts.mine || 0), "Still open with your name on them", "mine"],
+    ["Team open", Number(summaryCounts.team || 0), "Open lines from everybody else", "team"],
+    ["Older open", Number(summaryCounts.older || 0), "Still waiting from previous days", "older"],
+    ["Below minimum", Number(summaryCounts.below || 0), "Items already below their minimum", "below"],
+    ["Standing due", Number(summaryCounts.standing || 0), "Standing orders due now or overdue", "standing"]
   ];
 
   orderingSummaryCards.innerHTML = summary

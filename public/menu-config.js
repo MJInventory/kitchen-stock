@@ -5,6 +5,7 @@
       { label: "Ordering", href: "/ordering.html", permission: "canUseSupplierOrdering" },
       { label: "Internal Orders", href: "/internal-orders.html", permission: "canPlaceInternalOrders" },
       { label: "Picker Board", href: "/picker-sheet.html", permission: "canPickInternalOrders" },
+      { label: "Kitchen Roster", href: "/kitchen-roster.html", permission: "canManageKitchenRoster" },
       { label: "Receiving", href: "/receiving-sheet.html" },
       { label: "Driver Sheet", href: "/driver-sheet.html" },
       { label: "Stock Count", href: "/stock-count.html" },
@@ -12,7 +13,6 @@
     ],
     backofficeItems: [
       { label: "Settings", href: "/settings.html", fixed: true },
-      { label: "Kitchen Roster", href: "/kitchen-roster.html", permission: "canManageKitchenRoster" },
       { label: "Management Report", href: "/management-report.html", permission: "canAddInventoryItems" },
       { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
       { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },

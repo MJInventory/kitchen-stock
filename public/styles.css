@@ -4056,13 +4056,14 @@ body.order-app {
 }
 
 .roster-grid-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
   padding-bottom: 8px;
 }
 
 .kitchen-roster-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0 8px;
 }
@@ -4096,7 +4097,7 @@ body.order-app {
 }
 
 .kitchen-roster-table tbody th {
-  width: 220px;
+  width: 170px;
   border-radius: 8px 0 0 8px;
 }
 
@@ -4105,12 +4106,56 @@ body.order-app {
 }
 
 .roster-shift-select {
-  min-width: 150px;
+  min-width: 0;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 9px 8px;
   font-weight: 800;
+  font-size: 12px;
+}
+
+@media (min-width: 1024px) {
+  .kitchen-roster-table tbody th {
+    width: 190px;
+  }
+
+  .roster-shift-select {
+    font-size: 13px;
+    padding: 10px 10px;
+  }
+}
+
+@media (max-width: 920px) and (orientation: landscape) {
+  .kitchen-roster-panel {
+    padding: 14px;
+  }
+
+  .kitchen-roster-table th,
+  .kitchen-roster-table td {
+    padding: 5px;
+  }
+
+  .kitchen-roster-table tbody th {
+    width: 120px;
+  }
+
+  .kitchen-roster-table tbody th strong {
+    font-size: 12px;
+  }
+
+  .kitchen-roster-table thead th,
+  .kitchen-roster-table thead span,
+  .kitchen-roster-table tbody th span {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+
+  .roster-shift-select {
+    border-radius: 6px;
+    padding: 7px 4px;
+    font-size: 10px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -4124,6 +4169,7 @@ body.order-app {
 
   .kitchen-roster-table {
     min-width: 760px;
+    table-layout: auto;
     font-size: 13px;
   }
 
@@ -4139,6 +4185,7 @@ body.order-app {
 @media print {
   .no-print,
   .login-screen,
+  .menu-duo,
   .top-actions,
   .topbar,
   .app-version {

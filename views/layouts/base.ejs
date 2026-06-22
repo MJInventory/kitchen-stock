@@ -9,6 +9,7 @@
       <header class="order-topbar<% if (typeof topbarClass !== "undefined" && topbarClass) { %> <%= topbarClass %><% } %>">
         <%- include("../partials/brand") %>
         <div class="top-actions">
+          <a id="currentUser" class="user-chip" href="/settings.html"></a>
           <%- typeof topbarActions !== "undefined" ? topbarActions : "" %>
         </div>
       </header>

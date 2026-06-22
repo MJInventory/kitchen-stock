@@ -240,6 +240,10 @@ button:hover,
   text-decoration: none;
 }
 
+.user-chip:empty {
+  display: none;
+}
+
 .user-chip:hover,
 .user-chip:focus-visible {
   text-decoration: none;
@@ -1567,7 +1571,7 @@ body.order-app {
   min-height: 92px;
   border-bottom: 1px solid var(--order-line-soft);
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(190px, auto) minmax(260px, 1fr);
+  grid-template-columns: minmax(240px, 1fr) minmax(360px, auto) minmax(110px, 1fr);
   justify-content: space-between;
   align-items: center;
   gap: 18px;
@@ -1617,6 +1621,11 @@ body.order-app {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
+  justify-self: end;
+}
+
+.order-topbar > .menu-duo {
+  justify-self: center;
 }
 
 .dashboard-cards {

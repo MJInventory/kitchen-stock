@@ -4187,6 +4187,7 @@ body.order-app {
   .login-screen,
   .menu-duo,
   .order-topbar,
+  .page-intro,
   .top-actions,
   .topbar,
   .app-version {
@@ -4228,8 +4229,11 @@ body.order-app {
   .roster-shift-select {
     appearance: none;
     border: 0;
-    padding: 4px;
+    padding: 2px;
     min-width: 0;
+    font-size: 8px;
+    font-weight: 500;
+    white-space: nowrap;
     color: #111827 !important;
   }
 }

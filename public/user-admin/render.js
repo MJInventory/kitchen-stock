@@ -14,6 +14,7 @@ export function filterUsers(users, { term, wantedRole, wantedStatus }) {
     if (wantedStatus === "must-change" && !user.mustChangePassword) return false;
     if (wantedStatus === "drivers" && !user.isDriver) return false;
     if (wantedStatus === "pickers" && !user.isPicker) return false;
+    if (wantedStatus === "kitchen-staff" && !user.isKitchenStaff) return false;
     return matchesSearch(user, term);
   });
 }
@@ -89,6 +90,19 @@ export function renderUsers({
             <div class="user-admin-toggle-row">
               <label class="check-label"><input class="user-is-driver" type="checkbox" ${user.isDriver ? "checked" : ""} ${user.editable ? "" : "disabled"}> Dedicated driver</label>
               <label class="check-label"><input class="user-is-picker" type="checkbox" ${user.isPicker ? "checked" : ""} ${user.editable ? "" : "disabled"}> Picker</label>
+              <label class="check-label"><input class="user-is-kitchen-staff" type="checkbox" ${user.isKitchenStaff ? "checked" : ""} ${user.editable ? "" : "disabled"}> Kitchen Staff</label>
+              <label>Kitchen function
+                <select class="user-kitchen-function" ${user.editable ? "" : "disabled"}>
+                  <option value=""${!user.kitchenFunction ? " selected" : ""}>Choose function</option>
+                  <option value="Chef"${user.kitchenFunction === "Chef" ? " selected" : ""}>Chef</option>
+                  <option value="Sous-Chef"${user.kitchenFunction === "Sous-Chef" ? " selected" : ""}>Sous-Chef</option>
+                  <option value="Line Cook"${user.kitchenFunction === "Line Cook" ? " selected" : ""}>Line Cook</option>
+                  <option value="Kitchen Helper"${user.kitchenFunction === "Kitchen Helper" ? " selected" : ""}>Kitchen Helper</option>
+                  <option value="Dishwasher"${user.kitchenFunction === "Dishwasher" ? " selected" : ""}>Dishwasher</option>
+                  <option value="Pickup Waiter"${user.kitchenFunction === "Pickup Waiter" ? " selected" : ""}>Pickup Waiter</option>
+                  <option value="Other"${user.kitchenFunction === "Other" ? " selected" : ""}>Other</option>
+                </select>
+              </label>
               <label class="check-label"><input class="user-notify-orders" type="checkbox" ${user.notifyOnNewOrders ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on new orders</label>
               <label class="check-label"><input class="user-notify-delivery" type="checkbox" ${user.notifyOnDelivery ? "checked" : ""} ${user.editable ? "" : "disabled"}> Notify on delivered items</label>
             </div>

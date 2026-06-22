@@ -12,6 +12,7 @@
     ],
     backofficeItems: [
       { label: "Settings", href: "/settings.html", fixed: true },
+      { label: "Kitchen Roster", href: "/kitchen-roster.html", permission: "canManageKitchenRoster" },
       { label: "Management Report", href: "/management-report.html", permission: "canAddInventoryItems" },
       { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
       { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },

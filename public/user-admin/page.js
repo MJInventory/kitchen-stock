@@ -125,6 +125,8 @@ export function initUserAdminPage() {
         theme: row.querySelector(".user-theme").value,
         isDriver: row.querySelector(".user-is-driver").checked,
         isPicker: row.querySelector(".user-is-picker").checked,
+        isKitchenStaff: row.querySelector(".user-is-kitchen-staff").checked,
+        kitchenFunction: row.querySelector(".user-kitchen-function").value,
         notifyOnNewOrders: row.querySelector(".user-notify-orders").checked,
         notifyOnDelivery: row.querySelector(".user-notify-delivery").checked,
         notifyAreas: {
@@ -178,6 +180,8 @@ export function initUserAdminPage() {
           theme: document.querySelector("#newTheme").value,
           isDriver: document.querySelector("#newIsDriver").checked,
           isPicker: document.querySelector("#newIsPicker").checked,
+          isKitchenStaff: document.querySelector("#newIsKitchenStaff").checked,
+          kitchenFunction: document.querySelector("#newKitchenFunction").value,
           notifyOnNewOrders: document.querySelector("#newNotifyOrders").checked,
           notifyOnDelivery: document.querySelector("#newNotifyDelivery").checked,
           notifyAreas: {

@@ -31,6 +31,19 @@
     <label class="check-label"><input id="newNotifyDelivery" type="checkbox" checked> Notify on delivered items</label>
     <label class="check-label"><input id="newIsDriver" type="checkbox"> Dedicated driver</label>
     <label class="check-label"><input id="newIsPicker" type="checkbox"> Picker</label>
+    <label class="check-label"><input id="newIsKitchenStaff" type="checkbox"> Kitchen Staff</label>
+    <label>Kitchen function
+      <select id="newKitchenFunction">
+        <option value="">Choose function</option>
+        <option value="Chef">Chef</option>
+        <option value="Sous-Chef">Sous-Chef</option>
+        <option value="Line Cook">Line Cook</option>
+        <option value="Kitchen Helper">Kitchen Helper</option>
+        <option value="Dishwasher">Dishwasher</option>
+        <option value="Pickup Waiter">Pickup Waiter</option>
+        <option value="Other">Other</option>
+      </select>
+    </label>
     <label class="check-label"><input id="newMustChange" type="checkbox"> Force password change</label>
     <button type="submit">Add User</button>
   </form>
@@ -61,6 +74,7 @@
         <option value="must-change">Password change required</option>
         <option value="drivers">Dedicated drivers</option>
         <option value="pickers">Pickers</option>
+        <option value="kitchen-staff">Kitchen staff</option>
       </select>
     </label>
   </div>

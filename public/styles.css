@@ -4019,3 +4019,169 @@ body.order-app {
     justify-self: start;
   }
 }
+
+.kitchen-roster-panel {
+  overflow: hidden;
+}
+
+.roster-shift-types {
+  margin: 18px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.shift-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.shift-type-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.shift-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  flex: 0 0 auto;
+}
+
+.roster-grid-wrap {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.kitchen-roster-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.kitchen-roster-table th,
+.kitchen-roster-table td {
+  padding: 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.kitchen-roster-table thead th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kitchen-roster-table thead span,
+.kitchen-roster-table tbody th span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kitchen-roster-table tbody tr {
+  background: var(--wash);
+}
+
+.kitchen-roster-table tbody th {
+  width: 220px;
+  border-radius: 8px 0 0 8px;
+}
+
+.kitchen-roster-table tbody td:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.roster-shift-select {
+  min-width: 150px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .kitchen-roster-panel {
+    margin-inline: -6px;
+  }
+
+  .shift-type-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kitchen-roster-table {
+    min-width: 760px;
+    font-size: 13px;
+  }
+
+  .kitchen-roster-table tbody th {
+    width: 160px;
+  }
+
+  .roster-shift-select {
+    min-width: 120px;
+  }
+}
+
+@media print {
+  .no-print,
+  .login-screen,
+  .top-actions,
+  .topbar,
+  .app-version {
+    display: none !important;
+  }
+
+  .shell,
+  .setup-shell,
+  .sheet-shell {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .panel,
+  .kitchen-roster-panel {
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .roster-grid-wrap {
+    overflow: visible;
+  }
+
+  .kitchen-roster-table {
+    min-width: 0;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font-size: 9px;
+  }
+
+  .kitchen-roster-table th,
+  .kitchen-roster-table td {
+    border: 1px solid #8da0b8;
+    padding: 4px;
+  }
+
+  .roster-shift-select {
+    appearance: none;
+    border: 0;
+    padding: 4px;
+    min-width: 0;
+    color: #111827 !important;
+  }
+}

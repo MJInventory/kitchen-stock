@@ -1,0 +1,32 @@
+<section class="panel no-print">
+  <div class="form-grid two">
+    <label>Week of
+      <input id="weekDate" type="date">
+    </label>
+    <div class="button-row compact-actions">
+      <button id="loadRosterButton" type="button">Load Week</button>
+      <button id="saveRosterButton" type="button">Save Week</button>
+      <button id="printRosterButton" type="button">Print / Save PDF</button>
+    </div>
+  </div>
+  <p id="rosterMessage" role="status"></p>
+</section>
+
+<section class="panel kitchen-roster-panel">
+  <div class="sheet-title-row">
+    <div>
+      <p class="eyebrow">Kitchen Schedule</p>
+      <h2>Kitchen Roster</h2>
+    </div>
+    <strong id="weekRange"></strong>
+  </div>
+
+  <section class="roster-shift-types no-print">
+    <h2>Shift Types</h2>
+    <div id="shiftLegend" class="shift-type-grid"></div>
+  </section>
+
+  <div id="rosterGrid" class="roster-grid-wrap">
+    <p>Load a week to start scheduling.</p>
+  </div>
+</section>

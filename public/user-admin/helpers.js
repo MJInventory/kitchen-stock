@@ -43,6 +43,8 @@ export function matchesSearch(user, term) {
     roleLabel(user.role),
     user.isDriver ? "driver" : "",
     user.isPicker ? "picker" : "",
+    user.isKitchenStaff ? "kitchen staff" : "",
+    user.kitchenFunction || "",
     user.active ? "active" : "inactive",
     user.mustChangePassword ? "password change" : "",
     user.notifyOnNewOrders ? "new orders" : "",
@@ -58,6 +60,8 @@ export function userMetaBadges(user) {
     user.mustChangePassword ? `<span class="user-meta-pill warn">Change password</span>` : "",
     user.isDriver ? `<span class="user-meta-pill accent">Driver</span>` : "",
     user.isPicker ? `<span class="user-meta-pill accent">Picker</span>` : "",
+    user.isKitchenStaff ? `<span class="user-meta-pill accent">Kitchen Staff</span>` : "",
+    user.kitchenFunction ? `<span class="user-meta-pill info">${escapeHtml(user.kitchenFunction)}</span>` : "",
     user.notifyOnNewOrders ? `<span class="user-meta-pill info">Order alerts</span>` : "",
     user.notifyOnDelivery ? `<span class="user-meta-pill info">Delivery alerts</span>` : ""
   ].filter(Boolean).join("");

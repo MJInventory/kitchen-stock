@@ -190,6 +190,24 @@ export function initOrderReportPage() {
     const nextFilter = card.dataset.activityFilter || "all";
     updateActivityFilter(activeActivityFilter === nextFilter ? "all" : nextFilter);
   });
+  activityReportList?.addEventListener("click", async (event) => {
+    const button = event.target.closest(".undo-delivery-button");
+    if (!button) return;
+    const requestId = button.dataset.requestId || "";
+    if (!requestId) return;
+    if (!window.confirm("Undo this received item? This will subtract the received quantity from stock and reopen the order.")) return;
+    button.disabled = true;
+    try {
+      setMessage("Undoing received item...");
+      await api(`/api/requests/${encodeURIComponent(requestId)}/undo-delivery`, { method: "POST" });
+      await loadReport();
+      setMessage("Received item was undone and the order was reopened.");
+    } catch (error) {
+      setMessage(error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
   logoutButton.addEventListener("click", showLogin);
 
   loginForm.addEventListener("submit", async (event) => {

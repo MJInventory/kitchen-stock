@@ -47,6 +47,17 @@ function activityActorLabel(entry) {
   return "By System";
 }
 
+function activityEntityId(entry) {
+  return String(entry?.entityId || entry?.entity_id || "").trim();
+}
+
+function canUndoDeliveryEntry(entry) {
+  const reason = String(entry?.reasonCode || "").trim();
+  return entry?.entityType === "order-request"
+    && Boolean(activityEntityId(entry))
+    && (reason === "delivery-complete" || reason === "delivery-partial");
+}
+
 export function renderSummary({ reportSummary, summary, activeReportFilter }) {
   const cards = [
     ["Guests", summary.guests ?? "-", ""],
@@ -185,6 +196,11 @@ export function renderActivity({ entries, summary, activitySummary, activityRepo
           ${entry.reasonCode ? `<span>${escapeHtml(labelForReasonCode(entry.reasonCode))}</span>` : ""}
         </div>
         ${entry.note ? `<p class="activity-note">${escapeHtml(entry.note)}</p>` : ""}
+        ${canUndoDeliveryEntry(entry) ? `
+          <button class="small-button danger-soft undo-delivery-button no-print" type="button" data-request-id="${escapeHtml(activityEntityId(entry))}">
+            Undo received
+          </button>
+        ` : ""}
       </article>
     `)
     .join("");

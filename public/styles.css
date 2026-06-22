@@ -191,6 +191,30 @@ button:hover,
   background: #8f1f17;
 }
 
+.small-button {
+  width: auto;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 7px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.small-button.danger-soft {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--line));
+  background: color-mix(in srgb, var(--surface) 88%, var(--danger) 12%);
+  color: var(--danger);
+}
+
+.small-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 .top-actions,
 .sheet-actions {
   display: flex;
@@ -3508,7 +3532,7 @@ body.order-app {
 
   .menu-duo {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     width: 100%;
     gap: 8px;
   }

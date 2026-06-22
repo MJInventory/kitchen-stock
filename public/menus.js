@@ -91,6 +91,10 @@
     menus.querySelectorAll("select").forEach((select) => {
       select.addEventListener("change", (event) => {
         if (!event.target.value) return;
+        if (typeof window.confirmNavigationAllowed === "function" && !window.confirmNavigationAllowed()) {
+          event.target.value = "";
+          return;
+        }
         window.location.href = event.target.value;
       });
     });

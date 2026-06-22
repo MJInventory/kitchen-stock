@@ -18,6 +18,7 @@
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
   let rosterData = null;
+  let rosterDirty = false;
 
   function setMessage(text, isError = false) {
     message.textContent = text || "";
@@ -102,6 +103,20 @@
     select.style.color = String(shift?.code || "").toUpperCase() === "OFF" ? "#f8fafc" : "#111827";
   }
 
+  function setRosterDirty(isDirty) {
+    rosterDirty = Boolean(isDirty);
+    saveButton.classList.toggle("attention", rosterDirty);
+    if (rosterDirty) {
+      setMessage("Unsaved changes. Save the week before leaving.");
+    }
+  }
+
+  function confirmLeaveIfDirty() {
+    if (!rosterDirty) return true;
+    return window.confirm("You have unsaved roster changes. Leave without saving?");
+  }
+  window.confirmNavigationAllowed = confirmLeaveIfDirty;
+
   function renderLegend() {
     shiftLegend.innerHTML = (rosterData.shiftTypes || []).map((shift) => `
       <article class="shift-type-card">
@@ -162,14 +177,19 @@
     `;
     rosterGrid.querySelectorAll(".roster-shift-select").forEach((select) => {
       updateSelectColor(select);
-      select.addEventListener("change", () => updateSelectColor(select));
+      select.addEventListener("change", () => {
+        updateSelectColor(select);
+        setRosterDirty(true);
+      });
     });
   }
 
   async function loadRoster() {
+    if (!confirmLeaveIfDirty()) return;
     setMessage("Loading roster...");
     rosterData = await api(`/api/kitchen-roster?date=${encodeURIComponent(weekDate.value || todayIso())}`);
     renderRoster();
+    setRosterDirty(false);
     setMessage("Roster loaded.");
   }
 
@@ -187,6 +207,7 @@
       body: JSON.stringify({ weekStart: rosterData.weekStart, shifts })
     });
     renderRoster();
+    setRosterDirty(false);
     setMessage("Roster saved.");
     saveButton.disabled = false;
   }
@@ -235,6 +256,11 @@
     setMessage(error.message, true);
   }));
   printButton.addEventListener("click", () => window.print());
+  window.addEventListener("beforeunload", (event) => {
+    if (!rosterDirty) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
 
   weekDate.value = todayIso();
   if (sessionToken && sessionUser) {

@@ -4152,6 +4152,17 @@ body.order-app {
   display: inline-block;
 }
 
+.print-only {
+  display: none;
+}
+
+.roster-print-footer {
+  margin-top: 12px;
+  font-size: 10px;
+  color: #111827;
+  text-align: right;
+}
+
 .kitchen-roster-table tbody td:last-child {
   border-radius: 0 8px 8px 0;
 }
@@ -4319,5 +4330,9 @@ body.order-app {
     break-inside: avoid;
     margin-top: 8px;
     color: #111827 !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 }

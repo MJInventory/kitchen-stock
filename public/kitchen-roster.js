@@ -185,7 +185,6 @@
             <tr>
               <th class="roster-function-cell" style="--function-bg:${escapeHtml(functionColor(staff.kitchen_function))}">
                 <strong>${escapeHtml(staff.display_name || staff.username)}</strong>
-                <span>${escapeHtml(staff.kitchen_function || "Other")}</span>
               </th>
               ${rosterData.days.map((day) => {
                 const shift = shiftMap.get(`${staff.id}:${day.date}`);
@@ -290,7 +289,13 @@
     saveButton.disabled = false;
     setMessage(error.message, true);
   }));
-  printButton.addEventListener("click", () => window.print());
+  printButton.addEventListener("click", () => {
+    const footer = document.querySelector("#rosterPrintFooter");
+    if (footer) {
+      footer.textContent = `Printed ${new Date().toLocaleString()} by ${formatDisplayName(sessionUser) || "Unknown"}`;
+    }
+    window.print();
+  });
   window.addEventListener("beforeunload", (event) => {
     if (!rosterDirty) return;
     event.preventDefault();

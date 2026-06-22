@@ -46,13 +46,18 @@ export function createDriverSheetActions({
   async function markDelivered(row, button) {
     const lineId = row.dataset.lineId;
     const requestId = row.dataset.requestId;
+    const quantityInput = row.querySelector(".driver-qty-input");
+    const quantityReceived = Number(quantityInput?.value || 0);
     if (button.classList.contains("checked")) return;
     button.disabled = true;
     setMessage("Marking delivered and updating stock...");
     try {
       await api(`/api/driver-lines/${lineId}/deliver`, {
         method: "POST",
-        body: JSON.stringify({ requestId })
+        body: JSON.stringify({
+          requestId,
+          ...(Number.isFinite(quantityReceived) && quantityReceived > 0 ? { quantityReceived } : {})
+        })
       });
       await loadSheet();
       setMessage("Delivered. Stock updated.");

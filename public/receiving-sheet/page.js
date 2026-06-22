@@ -86,8 +86,10 @@ export function initReceivingSheetPage() {
   async function markReceived(row, button) {
     const displayKey = row.dataset.displayKey || "";
     const displayRow = currentSheet.displayRows?.get(displayKey);
-    const requests = Array.isArray(displayRow?.requests) ? displayRow.requests : [];
-    if (button.classList.contains("checked")) return;
+    const requests = Array.isArray(displayRow?.requests)
+      ? displayRow.requests.filter((request) => request?.id)
+      : [];
+    if (button.disabled) return;
     if (!requests.length) {
       setMessage("Could not find the receiving line to update.", true);
       return;
@@ -123,6 +125,9 @@ export function initReceivingSheetPage() {
         });
         remainingQty -= applyQty;
       }
+      if (remainingQty > 0 && orderedRequests.length) {
+        setMessage("Received quantity was higher than the open quantity. Open lines were closed and stock was updated.");
+      }
       await loadSheet();
       setMessage(`Delivery updated for ${formatUserDisplay(sessionUser)}. Stock updated.`);
     } catch (error) {
@@ -137,7 +142,9 @@ export function initReceivingSheetPage() {
   async function deleteReceivingRow(row, button) {
     const displayKey = row.dataset.displayKey || "";
     const displayRow = currentSheet.displayRows?.get(displayKey);
-    const requests = Array.isArray(displayRow?.requests) ? displayRow.requests : [];
+    const requests = Array.isArray(displayRow?.requests)
+      ? displayRow.requests.filter((request) => request?.id)
+      : [];
     if (!requests.length) {
       setMessage("Could not find the receiving line to remove.", true);
       return;

@@ -30,7 +30,7 @@ function buildReceivingDisplayRows(requests = []) {
     const existing = grouped.get(key);
     if (!existing) {
       const row = {
-        key: `group-${rows.length + 1}`,
+        key: "",
         rowClass: receivingOriginClass(request),
         supplierName: request.supplierName || "",
         itemName: request.itemName || "",
@@ -51,6 +51,14 @@ function buildReceivingDisplayRows(requests = []) {
     existing.orderedQuantity += Number(request.quantity || 0);
     existing.receiveQuantity += Number(request.quantity || 0);
     existing.requests.push(request);
+  });
+
+  rows.forEach((row, index) => {
+    const requestKey = row.requests
+      .map((request) => String(request.id || "").trim())
+      .filter(Boolean)
+      .join("-");
+    row.key = `receiving-${requestKey || `${groupedReceivingKey(row)}-${index + 1}`}`;
   });
 
   return rows;
@@ -102,7 +110,7 @@ export function renderReceivingSheet({
             <tr>
               <th>Received</th>
               <th>Item</th>
-              <th>Ordered</th>
+              <th>Open</th>
               <th>Receive qty</th>
               <th>Unit</th>
               <th>Shelf</th>

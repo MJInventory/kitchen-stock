@@ -3,15 +3,15 @@ export function itemCategory(item) {
 }
 
 export function itemNameFromRequest(request, items = []) {
-  return items.find((item) => item.id === request?.itemId)?.name || "Requested item";
+  return request?.itemName || items.find((item) => item.id === request?.itemId)?.name || "Requested item";
 }
 
 export function requestSortValue(request, items = []) {
   const item = items.find((candidate) => candidate.id === request?.itemId);
   return {
-    supplier: item?.supplierName || request?.supplierName || "",
-    category: item?.category || request?.category || "",
-    name: item?.name || "Requested item"
+    supplier: request?.supplierName || item?.supplierName || "",
+    category: request?.category || item?.category || "",
+    name: request?.itemName || item?.name || "Requested item"
   };
 }
 
@@ -28,7 +28,7 @@ export function logicalRequestCompare(leftRequest, rightRequest, items = []) {
 export function groupRequestsByCategory(requests, items = []) {
   const groups = new Map();
   for (const request of requests) {
-    const category = items.find((candidate) => candidate.id === request?.itemId)?.category || request?.category || "Uncategorized";
+    const category = request?.category || items.find((candidate) => candidate.id === request?.itemId)?.category || "Uncategorized";
     if (!groups.has(category)) groups.set(category, []);
     groups.get(category).push(request);
   }

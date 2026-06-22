@@ -37,6 +37,7 @@ export function initOrderReportPage() {
   let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
   let currentReportRows = [];
   let currentActivityEntries = [];
+  let currentActivitySummary = {};
   let currentStandingOrders = [];
   let currentGuestCount = { guests: "", notes: "" };
   let activeReportFilter = "all";
@@ -97,6 +98,7 @@ export function initOrderReportPage() {
     currentStandingOrders = Array.isArray(data.standingOrders) ? data.standingOrders : [];
     currentGuestCount = data.guestCount || { guests: "", notes: "" };
     currentActivityEntries = Array.isArray(data.activity) ? data.activity : [];
+    currentActivitySummary = data.activitySummary || {};
     renderReport({
       data,
       reportList,
@@ -130,6 +132,7 @@ export function initOrderReportPage() {
         rows: currentReportRows,
         standingOrders: currentStandingOrders,
         activity: currentActivityEntries,
+        activitySummary: currentActivitySummary,
         guestCount: currentGuestCount
       },
       reportList,
@@ -150,6 +153,7 @@ export function initOrderReportPage() {
     activeActivityFilter = filter || "all";
     renderActivity({
       entries: currentActivityEntries,
+      summary: currentActivitySummary,
       activitySummary,
       activityReportList,
       activeActivityFilter

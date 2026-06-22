@@ -146,18 +146,15 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
     .join("");
 }
 
-export function renderActivity({ entries, activitySummary, activityReportList, activeActivityFilter }) {
+export function renderActivity({ entries, summary, activitySummary, activityReportList, activeActivityFilter }) {
   const list = Array.isArray(entries) ? entries : [];
-  const adds = list.filter((entry) => entry.actionType === "add").length;
-  const changes = list.filter((entry) => entry.actionType === "change").length;
-  const deletes = list.filter((entry) => entry.actionType === "delete").length;
-  const actors = new Set(list.map((entry) => String(entry.actorUsername || "").trim()).filter(Boolean)).size;
+  const counts = summary || {};
 
   activitySummary.innerHTML = [
-    ["Adds", adds, "add"],
-    ["Changes", changes, "change"],
-    ["Deletes", deletes, "delete"],
-    ["Users", actors, ""]
+    ["Adds", Number(counts.adds || 0), "add"],
+    ["Changes", Number(counts.changes || 0), "change"],
+    ["Deletes", Number(counts.deletes || 0), "delete"],
+    ["Users", Number(counts.users || 0), ""]
   ].map(([label, value, filter]) => `
     <article class="${filter ? "report-filter-card" : "report-info-card"}${filter && activeActivityFilter === filter ? " active" : ""}"${filter ? ` data-activity-filter="${escapeHtml(filter)}" role="button" tabindex="0"` : ""}>
       <strong>${escapeHtml(value)}</strong>
@@ -215,7 +212,7 @@ export function renderReport({
 
   renderSummary({ reportSummary, summary: data.summary || {}, activeReportFilter });
   renderStandingOrders({ orders: standingOrders, standingReportSummaryList, standingReportList });
-  renderActivity({ entries: data.activity || [], activitySummary, activityReportList, activeActivityFilter });
+  renderActivity({ entries: data.activity || [], summary: data.activitySummary || {}, activitySummary, activityReportList, activeActivityFilter });
 
   const today = String(data.date || "").trim();
   const visibleRows = reportRowsForFilter(rows, activeReportFilter);

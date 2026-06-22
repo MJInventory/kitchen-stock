@@ -4125,6 +4125,33 @@ body.order-app {
   border-radius: 8px 0 0 8px;
 }
 
+.roster-function-cell {
+  border-left: 8px solid var(--function-bg, transparent);
+}
+
+.roster-function-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.roster-function-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.roster-function-legend i {
+  width: 14px;
+  height: 10px;
+  border: 1px solid #8da0b8;
+  border-radius: 3px;
+  display: inline-block;
+}
+
 .kitchen-roster-table tbody td:last-child {
   border-radius: 0 8px 8px 0;
 }
@@ -4263,6 +4290,15 @@ body.order-app {
     background: var(--shift-bg, #ffffff) !important;
   }
 
+  .kitchen-roster-table .roster-function-cell {
+    background: var(--function-bg, #ffffff) !important;
+    border-left: 0;
+  }
+
+  .kitchen-roster-table .roster-function-cell span {
+    display: none !important;
+  }
+
   .roster-shift-select {
     appearance: none;
     background: transparent !important;
@@ -4277,5 +4313,11 @@ body.order-app {
 
   .roster-shift-cell[data-shift-code="OFF"] .roster-shift-select {
     color: #f8fafc !important;
+  }
+
+  .roster-function-legend {
+    break-inside: avoid;
+    margin-top: 8px;
+    color: #111827 !important;
   }
 }

@@ -39,6 +39,24 @@
     return /^#[0-9a-f]{3,8}$/i.test(color) ? color : "";
   }
 
+  function normalizeFunction(value) {
+    return String(value || "Other").trim() || "Other";
+  }
+
+  function functionColor(value) {
+    const key = normalizeFunction(value).toLowerCase();
+    const colors = {
+      chef: "#f8d7da",
+      "sous-chef": "#fff1b8",
+      "line cook": "#d8f3dc",
+      "kitchen helper": "#d9ecff",
+      dishwasher: "#eadcff",
+      "pickup waiter": "#ffe8c7",
+      other: "#e5e7eb"
+    };
+    return colors[key] || colors.other;
+  }
+
   function formatDisplayName(value) {
     return String(value || "").trim().replace(/\b\w/g, (char) => char.toUpperCase());
   }
@@ -149,6 +167,10 @@
     const options = (selectedId) => (rosterData.shiftTypes || []).map((shift) =>
       `<option value="${escapeHtml(shift.id)}"${shift.id === selectedId ? " selected" : ""}>${escapeHtml(shift.label)}</option>`
     ).join("");
+    const functionLegend = [...new Map((rosterData.staff || []).map((staff) => {
+      const label = normalizeFunction(staff.kitchen_function);
+      return [label.toLowerCase(), { label, color: functionColor(label) }];
+    })).values()];
 
     rosterGrid.innerHTML = `
       <table class="kitchen-roster-table">
@@ -161,7 +183,7 @@
         <tbody>
           ${rosterData.staff.map((staff) => `
             <tr>
-              <th>
+              <th class="roster-function-cell" style="--function-bg:${escapeHtml(functionColor(staff.kitchen_function))}">
                 <strong>${escapeHtml(staff.display_name || staff.username)}</strong>
                 <span>${escapeHtml(staff.kitchen_function || "Other")}</span>
               </th>
@@ -182,6 +204,11 @@
           `).join("")}
         </tbody>
       </table>
+      <div class="roster-function-legend">
+        ${functionLegend.map((item) => `
+          <span><i style="background:${escapeHtml(item.color)}"></i>${escapeHtml(item.label)}</span>
+        `).join("")}
+      </div>
     `;
     rosterGrid.querySelectorAll(".roster-shift-select").forEach((select) => {
       updateSelectColor(select);

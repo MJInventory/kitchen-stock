@@ -8,27 +8,9 @@ const settingsForm = document.querySelector("#settingsForm");
 const settingsMessage = document.querySelector("#settingsMessage");
 const settingsLogoutButton = document.querySelector("#settingsLogoutButton");
 
-const gotoItems = [
-  { href: "/", label: "Front Page" },
-  { href: "/ordering.html", label: "Ordering", permission: "canUseSupplierOrdering" },
-  { href: "/internal-orders.html", label: "Internal Orders", permission: "canPlaceInternalOrders" },
-  { href: "/picker-sheet.html", label: "Picker Board", permission: "canPickInternalOrders" },
-  { href: "/receiving-sheet.html", label: "Receiving" },
-  { href: "/driver-sheet.html", label: "Driver Sheet" },
-  { href: "/stock-count.html", label: "Stock Count" },
-  { href: "/order-report.html", label: "Reports" }
-];
-
-const backofficeItems = [
-  { href: "/settings.html", label: "Settings", fixed: true },
-  { href: "/management-report.html", label: "Management Report", permission: "canAddInventoryItems" },
-  { href: "/standing-orders.html", label: "Standing Orders", permission: "canAddInventoryItems" },
-  { href: "/inventory-settings.html", label: "Inventory Items", permission: "canAddInventoryItems" },
-  { href: "/suppliers.html", label: "Suppliers", permission: "canAddInventoryItems" },
-  { href: "/categories.html", label: "Categories", permission: "canAddInventoryItems" },
-  { href: "/shelf-codes.html", label: "Storage & Shelves", permission: "canAddInventoryItems" },
-  { href: "/user-admin.html", label: "User Admin", permission: "canAdminUsers" }
-];
+const menuConfig = window.MJ_STOCK_MENU_ITEMS || {};
+const gotoItems = menuConfig.gotoItems || [];
+const backofficeItems = menuConfig.backofficeItems || [];
 
 let auth = null;
 let currentPermissions = {};

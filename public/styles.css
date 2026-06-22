@@ -4139,6 +4139,10 @@ body.order-app {
   font-size: 12px;
 }
 
+.roster-shift-cell {
+  background: var(--shift-bg, transparent);
+}
+
 @media (min-width: 1024px) {
   .kitchen-roster-table tbody th {
     width: 190px;
@@ -4207,6 +4211,11 @@ body.order-app {
 }
 
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   .no-print,
   .login-screen,
   .menu-duo,
@@ -4250,8 +4259,13 @@ body.order-app {
     padding: 4px;
   }
 
+  .kitchen-roster-table .roster-shift-cell {
+    background: var(--shift-bg, #ffffff) !important;
+  }
+
   .roster-shift-select {
     appearance: none;
+    background: transparent !important;
     border: 0;
     padding: 2px;
     min-width: 0;
@@ -4259,5 +4273,9 @@ body.order-app {
     font-weight: 500;
     white-space: nowrap;
     color: #111827 !important;
+  }
+
+  .roster-shift-cell[data-shift-code="OFF"] .roster-shift-select {
+    color: #f8fafc !important;
   }
 }

@@ -34,6 +34,11 @@
     return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
   }
 
+  function safeCssColor(value) {
+    const color = String(value || "").trim();
+    return /^#[0-9a-f]{3,8}$/i.test(color) ? color : "";
+  }
+
   function formatDisplayName(value) {
     return String(value || "").trim().replace(/\b\w/g, (char) => char.toUpperCase());
   }
@@ -120,7 +125,7 @@
   function renderLegend() {
     shiftLegend.innerHTML = (rosterData.shiftTypes || []).map((shift) => `
       <article class="shift-type-card">
-        <span class="shift-dot" style="background:${escapeHtml(shift.color)}"></span>
+        <span class="shift-dot" style="background:${escapeHtml(safeCssColor(shift.color))}"></span>
         <strong>${escapeHtml(shift.label)}</strong>
       </article>
     `).join("");
@@ -162,8 +167,11 @@
               </th>
               ${rosterData.days.map((day) => {
                 const shift = shiftMap.get(`${staff.id}:${day.date}`);
+                const selectedShift = shiftById(shift?.shift_type_id) || shift;
+                const shiftColor = safeCssColor(selectedShift?.color || selectedShift?.shift_color);
+                const shiftCode = selectedShift?.code || selectedShift?.shift_code || "";
                 return `
-                  <td>
+                  <td class="roster-shift-cell" data-shift-code="${escapeHtml(shiftCode)}" style="${shiftColor ? `--shift-bg:${escapeHtml(shiftColor)}; background:${escapeHtml(shiftColor)};` : ""}">
                     <select class="roster-shift-select" data-user-id="${escapeHtml(staff.id)}" data-shift-date="${escapeHtml(day.date)}">
                       ${options(shift?.shift_type_id)}
                     </select>

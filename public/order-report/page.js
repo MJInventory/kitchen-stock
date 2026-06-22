@@ -160,6 +160,24 @@ export function initOrderReportPage() {
     });
   }
 
+  function hideUndoDeliveryEntries(requestId) {
+    const targetId = String(requestId || "").trim();
+    if (!targetId) return;
+    currentActivityEntries = currentActivityEntries.filter((entry) => {
+      const entityId = String(entry?.entityId || entry?.entity_id || "").trim();
+      const reason = String(entry?.reasonCode || "").trim();
+      return entityId !== targetId || (reason !== "delivery-complete" && reason !== "delivery-partial");
+    });
+    renderActivity({
+      entries: currentActivityEntries,
+      summary: currentActivitySummary,
+      activitySummary,
+      activityReportList,
+      activeActivityFilter
+    });
+  }
+
+
   async function saveGuests() {
     setMessage("Saving guests...");
     await api("/api/daily-guests", {
@@ -201,6 +219,7 @@ export function initOrderReportPage() {
       setMessage("Undoing received item...");
       await api(`/api/requests/${encodeURIComponent(requestId)}/undo-delivery`, { method: "POST" });
       await loadReport();
+      hideUndoDeliveryEntries(requestId);
       setMessage("Received item was undone and the order was reopened.");
     } catch (error) {
       setMessage(error.message, true);

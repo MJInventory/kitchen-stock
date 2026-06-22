@@ -56,7 +56,9 @@ export function createDriverSheetActions({
         method: "POST",
         body: JSON.stringify({
           requestId,
-          ...(Number.isFinite(quantityReceived) && quantityReceived > 0 ? { quantityReceived } : {})
+          ...(Number.isFinite(quantityReceived) && quantityReceived > 0
+            ? { quantityReceived, receivedQuantity: quantityReceived, receiveQuantity: quantityReceived }
+            : {})
         })
       });
       await loadSheet();

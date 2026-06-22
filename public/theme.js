@@ -1,13 +1,13 @@
 (function () {
   const APP_VERSION = document.querySelector('meta[name="app-version"]')?.getAttribute("content") || "dev";
 
-  function applyTheme(theme) {
-    const normalized = theme === "light" ? "light" : "dark";
+  function applyTheme() {
+    const normalized = "light";
     document.documentElement.dataset.theme = normalized;
     localStorage.setItem("kitchenStockTheme", normalized);
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) {
-      themeMeta.setAttribute("content", normalized === "light" ? "#f6f3ea" : "#050505");
+      themeMeta.setAttribute("content", "#f6f3ea");
     }
   }
 
@@ -31,7 +31,7 @@
   }
 
   window.applyKitchenTheme = applyTheme;
-  applyTheme(localStorage.getItem("kitchenStockTheme") || "dark");
+  applyTheme();
   registerUpdater();
 }());
 

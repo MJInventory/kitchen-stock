@@ -40,8 +40,8 @@ export function initUserAdminPage() {
     localStorage.setItem("kitchenStockUser", sessionUser);
     localStorage.setItem("kitchenStockRole", data.user.role || "user");
     localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
-    localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-    window.applyKitchenTheme?.(data.user.theme || "dark");
+    localStorage.setItem("kitchenStockTheme", "light");
+    window.applyKitchenTheme?.("light");
     window.setupKitchenPush?.();
   }
 
@@ -122,7 +122,7 @@ export function initUserAdminPage() {
         name,
         password: row.querySelector(".user-password").value,
         role: row.querySelector(".user-role").value,
-        theme: row.querySelector(".user-theme").value,
+        theme: "light",
         isDriver: row.querySelector(".user-is-driver").checked,
         isPicker: row.querySelector(".user-is-picker").checked,
         isKitchenStaff: row.querySelector(".user-is-kitchen-staff").checked,
@@ -177,7 +177,7 @@ export function initUserAdminPage() {
           name: document.querySelector("#newName").value,
           password: document.querySelector("#newPassword").value,
           role: document.querySelector("#newRole").value,
-          theme: document.querySelector("#newTheme").value,
+          theme: "light",
           isDriver: document.querySelector("#newIsDriver").checked,
           isPicker: document.querySelector("#newIsPicker").checked,
           isKitchenStaff: document.querySelector("#newIsKitchenStaff").checked,

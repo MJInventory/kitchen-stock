@@ -1,7 +1,6 @@
 import { authPage } from "/page-auth.js";
 
 const openOrderDaysInput = document.querySelector("#openOrderDays");
-const themeSelect = document.querySelector("#themeSelect");
 const gotoMenuOptions = document.querySelector("#gotoMenuOptions");
 const backofficeMenuOptions = document.querySelector("#backofficeMenuOptions");
 const settingsForm = document.querySelector("#settingsForm");
@@ -60,7 +59,6 @@ async function loadSettings() {
   currentPermissions = me.user.permissions || {};
   const data = await auth.api("/api/user-settings");
   const settings = data.settings || {};
-  themeSelect.value = String(me.user.theme || localStorage.getItem("kitchenStockTheme") || "dark").toLowerCase() === "light" ? "light" : "dark";
   openOrderDaysInput.value = Number(settings.openOrderDays || 7);
   renderMenuToggles(gotoMenuOptions, gotoItems, gotoItems.filter((item) => !((settings.hiddenGotoMenu || []).includes(item.href))).map((item) => item.href));
   renderMenuToggles(backofficeMenuOptions, backofficeItems, backofficeItems.filter((item) => !((settings.hiddenBackofficeMenu || []).includes(item.href))).map((item) => item.href));
@@ -72,7 +70,7 @@ settingsForm.addEventListener("submit", async (event) => {
   setMessage("Saving settings...");
   try {
     const payload = {
-      theme: themeSelect.value,
+      theme: "light",
       openOrderDays: Number(openOrderDaysInput.value || 7),
       hiddenGotoMenu: hiddenValues(gotoItems, checkedValues(gotoMenuOptions)),
       hiddenBackofficeMenu: hiddenValues(backofficeItems, checkedValues(backofficeMenuOptions))
@@ -82,8 +80,8 @@ settingsForm.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload)
     });
     localStorage.setItem("kitchenStockSettings", JSON.stringify(data.settings || {}));
-    localStorage.setItem("kitchenStockTheme", themeSelect.value);
-    window.applyKitchenTheme?.(themeSelect.value);
+    localStorage.setItem("kitchenStockTheme", "light");
+    window.applyKitchenTheme?.("light");
     window.refreshKitchenMenus?.();
     setMessage("Settings saved.");
     await loadSettings();

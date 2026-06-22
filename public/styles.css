@@ -4058,31 +4058,41 @@ body.order-app {
 }
 
 .roster-shift-types {
-  margin: 18px 0;
-  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
 }
 
+.roster-shift-types h2 {
+  margin: 0;
+  min-width: max-content;
+  font-size: 0.95rem;
+}
+
 .shift-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .shift-type-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 54px;
-  padding: 12px 14px;
+  gap: 6px;
+  min-height: 0;
+  padding: 5px 9px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--surface);
+  font-size: 0.88rem;
 }
 
 .shift-dot {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border-radius: 4px;
   border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
   flex: 0 0 auto;
@@ -4135,7 +4145,17 @@ body.order-app {
 }
 
 .roster-function-cell {
-  border-left: 8px solid var(--function-bg, transparent);
+  background: var(--function-bg, var(--wash)) !important;
+  border-left: 0;
+}
+
+.roster-lock-message {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--order-gold);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--order-gold) 12%, var(--surface));
+  color: var(--ink);
 }
 
 .roster-function-legend {
@@ -4239,7 +4259,13 @@ body.order-app {
   }
 
   .shift-type-grid {
-    grid-template-columns: 1fr;
+    display: flex;
+  }
+
+  .roster-shift-types {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .kitchen-roster-table {
@@ -4287,6 +4313,18 @@ body.order-app {
     border: 0;
     box-shadow: none;
     padding: 0;
+  }
+
+  html,
+  body,
+  body.order-app,
+  .shell,
+  .setup-shell,
+  .sheet-shell,
+  .panel,
+  .kitchen-roster-panel {
+    background: #ffffff !important;
+    color: #111827 !important;
   }
 
   .roster-grid-wrap {

@@ -8,8 +8,10 @@
   const weekDate = document.querySelector("#weekDate");
   const loadButton = document.querySelector("#loadRosterButton");
   const saveButton = document.querySelector("#saveRosterButton");
+  const lockButton = document.querySelector("#lockRosterButton");
   const printButton = document.querySelector("#printRosterButton");
   const message = document.querySelector("#rosterMessage");
+  const lockMessage = document.querySelector("#rosterLockMessage");
   const weekRange = document.querySelector("#weekRange");
   const shiftLegend = document.querySelector("#shiftLegend");
   const rosterGrid = document.querySelector("#rosterGrid");
@@ -80,8 +82,8 @@
     localStorage.setItem("kitchenStockUser", sessionUser);
     localStorage.setItem("kitchenStockRole", data.user.role || "user");
     localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
-    localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-    window.applyKitchenTheme?.(data.user.theme || "dark");
+    localStorage.setItem("kitchenStockTheme", "light");
+    window.applyKitchenTheme?.("light");
     window.refreshKitchenMenus?.();
   }
 
@@ -139,6 +141,25 @@
     return window.confirm("You have unsaved roster changes. Leave without saving?");
   }
   window.confirmNavigationAllowed = confirmLeaveIfDirty;
+
+  function applyRosterLockState() {
+    const locked = Boolean(rosterData?.locked);
+    if (lockButton) {
+      lockButton.hidden = !rosterData;
+      lockButton.textContent = locked ? "Unlock Week" : "Lock Week";
+      lockButton.classList.toggle("danger-soft", locked);
+    }
+    if (lockMessage) {
+      lockMessage.hidden = !locked;
+      lockMessage.textContent = locked
+        ? `Roster is locked${rosterData?.lockedBy ? ` by ${formatDisplayName(rosterData.lockedBy)}` : ""}. Unlock this week before changing shifts.`
+        : "";
+    }
+    if (saveButton) saveButton.disabled = locked || !rosterData;
+    rosterGrid.querySelectorAll(".roster-shift-select").forEach((select) => {
+      select.disabled = locked;
+    });
+  }
 
   function renderLegend() {
     shiftLegend.innerHTML = (rosterData.shiftTypes || []).map((shift) => `
@@ -216,6 +237,7 @@
         setRosterDirty(true);
       });
     });
+    applyRosterLockState();
   }
 
   async function loadRoster() {
@@ -229,6 +251,10 @@
 
   async function saveRoster() {
     if (!rosterData) return;
+    if (rosterData.locked) {
+      setMessage("Roster week is locked. Unlock it before saving changes.", true);
+      return;
+    }
     saveButton.disabled = true;
     setMessage("Saving roster...");
     const shifts = Array.from(rosterGrid.querySelectorAll(".roster-shift-select")).map((select) => ({
@@ -244,6 +270,24 @@
     setRosterDirty(false);
     setMessage("Roster saved.");
     saveButton.disabled = false;
+    applyRosterLockState();
+  }
+
+  async function toggleRosterLock() {
+    if (!rosterData) return;
+    if (!confirmLeaveIfDirty()) return;
+    const nextLocked = !rosterData.locked;
+    const prompt = nextLocked
+      ? "Lock this roster week? Nobody can change shifts until it is unlocked."
+      : "Unlock this roster week so shifts can be changed?";
+    if (!window.confirm(prompt)) return;
+    rosterData = await api("/api/kitchen-roster/lock", {
+      method: "POST",
+      body: JSON.stringify({ weekStart: rosterData.weekStart, locked: nextLocked })
+    });
+    renderRoster();
+    setRosterDirty(false);
+    setMessage(nextLocked ? "Roster locked." : "Roster unlocked.");
   }
 
   async function bootstrap() {
@@ -287,8 +331,10 @@
   loadButton.addEventListener("click", () => loadRoster().catch((error) => setMessage(error.message, true)));
   saveButton.addEventListener("click", () => saveRoster().catch((error) => {
     saveButton.disabled = false;
+    applyRosterLockState();
     setMessage(error.message, true);
   }));
+  lockButton?.addEventListener("click", () => toggleRosterLock().catch((error) => setMessage(error.message, true)));
   printButton.addEventListener("click", () => {
     const footer = document.querySelector("#rosterPrintFooter");
     if (footer) {

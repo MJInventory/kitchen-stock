@@ -107,6 +107,7 @@ export function renderReceivingSheet({
               <th>Unit</th>
               <th>Shelf</th>
               <th>Area / Location</th>
+              <th>Remove</th>
             </tr>
           </thead>
             <tbody>
@@ -126,6 +127,11 @@ export function renderReceivingSheet({
                   <td>${escapeHtml(row.unit || "")}</td>
                   <td>${escapeHtml(row.shelfCode || "")}</td>
                   <td>${escapeHtml([row.inventoryArea, row.storageLocation].filter(Boolean).join(" / "))}</td>
+                  <td>
+                    <button class="small-button receiving-delete-button" type="button" aria-label="Remove ${escapeHtml(row.itemName)} from receiving">
+                      Remove
+                    </button>
+                  </td>
                 </tr>
               `)
               .join("")}

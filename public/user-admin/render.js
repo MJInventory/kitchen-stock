@@ -69,12 +69,7 @@ export function renderUsers({
                   <option value="god"${user.role === "god" ? " selected" : ""}>God</option>
                 </select>
               </label>
-              <label>Theme
-                <select class="user-theme" ${user.editable ? "" : "disabled"}>
-                  <option value="dark"${user.theme !== "light" ? " selected" : ""}>Dark</option>
-                  <option value="light"${user.theme === "light" ? " selected" : ""}>Light</option>
-                </select>
-              </label>
+              <input class="user-theme" type="hidden" value="light">
               <label>New password
                 <input class="user-password" type="text" placeholder="Leave blank to keep current" ${user.editable && user.canSave ? "" : "disabled"}>
               </label>

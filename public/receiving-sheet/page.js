@@ -116,7 +116,9 @@ export function initReceivingSheetPage() {
         await api(`/api/requests/${request.id}/deliver`, {
           method: "POST",
           body: JSON.stringify({
-            quantityReceived: applyQty
+            quantityReceived: applyQty,
+            receivedQuantity: applyQty,
+            receiveQuantity: applyQty
           })
         });
         remainingQty -= applyQty;
@@ -126,6 +128,34 @@ export function initReceivingSheetPage() {
     } catch (error) {
       button.classList.remove("checked");
       button.innerHTML = "&nbsp;";
+      setMessage(error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function deleteReceivingRow(row, button) {
+    const displayKey = row.dataset.displayKey || "";
+    const displayRow = currentSheet.displayRows?.get(displayKey);
+    const requests = Array.isArray(displayRow?.requests) ? displayRow.requests : [];
+    if (!requests.length) {
+      setMessage("Could not find the receiving line to remove.", true);
+      return;
+    }
+    const itemName = displayRow?.itemName || "this item";
+    const suffix = requests.length > 1 ? ` (${requests.length} open lines)` : "";
+    if (!confirm(`Remove ${itemName}${suffix} from the receiving list?`)) return;
+    if (!confirm(`Really remove ${itemName}? This cannot be undone.`)) return;
+
+    button.disabled = true;
+    setMessage(`Removing ${itemName}...`);
+    try {
+      for (const request of requests) {
+        await api(`/api/requests/${request.id}`, { method: "DELETE" });
+      }
+      await loadSheet();
+      setMessage(`${itemName} removed from receiving.`);
+    } catch (error) {
       setMessage(error.message, true);
     } finally {
       button.disabled = false;
@@ -173,6 +203,14 @@ export function initReceivingSheetPage() {
       const textarea = card?.querySelector(".supplier-note-input");
       if (!supplierName || !textarea) return;
       saveSupplierMemo(supplierName, textarea, memoButton);
+      return;
+    }
+
+    const deleteButton = event.target.closest(".receiving-delete-button");
+    if (deleteButton) {
+      const row = deleteButton.closest("tr");
+      if (!row?.dataset.displayKey) return;
+      deleteReceivingRow(row, deleteButton);
     }
   });
 
@@ -198,8 +236,8 @@ export function initReceivingSheetPage() {
       localStorage.setItem("kitchenStockUser", sessionUser);
       localStorage.setItem("kitchenStockRole", data.user.role || "user");
       localStorage.setItem("kitchenStockPermissions", JSON.stringify(data.user.permissions || {}));
-      localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-      window.applyKitchenTheme?.(data.user.theme || "dark");
+      localStorage.setItem("kitchenStockTheme", "light");
+      window.applyKitchenTheme?.("light");
       if (data.user.mustChangePassword) {
         window.location.href = "/change-password.html";
         return;

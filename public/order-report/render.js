@@ -81,13 +81,18 @@ export function renderSummary({ reportSummary, summary, activeReportFilter }) {
 }
 
 export function renderStandingOrders({ orders, standingReportSummaryList, standingReportList }) {
-  if (!orders.length) {
+  const visibleOrders = (Array.isArray(orders) ? orders : []).filter((order) => {
+    const status = String(standingStatusLabel(order) || "").trim().toLowerCase();
+    return status !== "completed" && status !== "inactive";
+  });
+
+  if (!visibleOrders.length) {
     standingReportSummaryList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     standingReportList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     return;
   }
 
-  standingReportSummaryList.innerHTML = orders
+  standingReportSummaryList.innerHTML = visibleOrders
     .map((order) => {
       const items = Array.isArray(order.items) && order.items.length
         ? order.items
@@ -109,7 +114,7 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
     })
     .join("");
 
-  standingReportList.innerHTML = orders
+  standingReportList.innerHTML = visibleOrders
     .map((order) => {
       const items = Array.isArray(order.items) && order.items.length
         ? order.items

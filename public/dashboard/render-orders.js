@@ -131,15 +131,18 @@ export function renderStandingOrders({
   dashboardFilter,
   today
 }) {
+  const availableOrders = standingOrders.filter(
+    (order) => String(order.statusLabel || "").trim().toLowerCase() !== "completed"
+  );
   const onlyDue = dashboardFilter === "standing";
   const baseOrders = onlyDue
-    ? standingOrders.filter((order) => {
+    ? availableOrders.filter((order) => {
       const expected = String(order.expectedDate || "").trim();
       return expected && expected <= today;
     })
-    : standingOrders;
+    : availableOrders;
   const visibleOrders = isOperationalRole ? baseOrders : baseOrders.slice(0, 6);
-  standingOrderCount.textContent = `${standingOrders.length} scheduled`;
+  standingOrderCount.textContent = `${availableOrders.length} scheduled`;
   if (!visibleOrders.length) {
     standingOrderList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     return;

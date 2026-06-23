@@ -68,17 +68,38 @@ export function renderOrderItems({ order, itemById }) {
   const lines = Array.isArray(order.items) && order.items.length
     ? order.items
     : [{ itemId: order.itemId, itemName: order.itemName, quantity: order.quantity || 1 }];
-  return lines.map((line) => {
+  const rows = lines.map((line) => {
     const item = itemById(line.itemId);
+    const itemName = line.itemName || item?.name || "Inventory item";
+    const unit = item?.unit || "item";
     return `
-      <div class="standing-item-line existing-line" data-item-id="${esc(line.itemId)}" data-item-name="${esc(line.itemName || item?.name || "")}">
-        <strong>${esc(line.itemName || item?.name || "Inventory item")}</strong>
-        <span>${esc(item?.unit || "item")}</span>
-        <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(line.quantity || 1)}" aria-label="Quantity">
-        <button class="remove-existing-standing-item secondary" type="button">Remove</button>
+      <div class="standing-sheet-row standing-item-line existing-line" data-item-id="${esc(line.itemId)}" data-item-name="${esc(itemName)}">
+        <div class="standing-sheet-item">
+          <strong>${esc(itemName)}</strong>
+        </div>
+        <div class="standing-sheet-open">
+          <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(line.quantity || 1)}" aria-label="Open quantity">
+        </div>
+        <div class="standing-sheet-unit">
+          <span>${esc(unit)}</span>
+        </div>
+        <div class="standing-sheet-remove">
+          <button class="remove-existing-standing-item secondary" type="button">Remove</button>
+        </div>
       </div>
     `;
   }).join("");
+  return `
+    <div class="standing-sheet">
+      <div class="standing-sheet-header">
+        <span>Item</span>
+        <span>Open qty</span>
+        <span>Unit</span>
+        <span>Remove</span>
+      </div>
+      ${rows}
+    </div>
+  `;
 }
 
 export function renderStandingOrders({
@@ -93,10 +114,18 @@ export function renderStandingOrders({
   const showDelete = canAdminStandingOrders;
   standingList.innerHTML = orders.map((order) => `
     <article class="setting-row standing-order-row${expandedOrderId === order.id ? " expanded" : ""}" data-order-id="${esc(order.id)}">
-      <button class="standing-order-summary" type="button" aria-expanded="${expandedOrderId === order.id ? "true" : "false"}">
+      <button
+        class="standing-order-summary"
+        type="button"
+        aria-expanded="${expandedOrderId === order.id ? "true" : "false"}"
+        data-status="${esc(String(standingStatusLabel(order) || "").toLowerCase())}"
+      >
         <span class="standing-summary-main">
           <strong>${esc(order.name || order.supplierName || "Standing order")}</strong>
           <span>${esc(order.supplierName || "No supplier")}</span>
+          <span class="standing-summary-subline">
+            ${esc(`${order.openLines ?? 0} open of ${order.totalLines ?? (Array.isArray(order.items) ? order.items.length : 0)} item(s)`)}
+          </span>
         </span>
         <span class="standing-summary-meta">
           <span><b>Frequency</b> ${esc(order.schedule || "Other")}</span>
@@ -106,22 +135,30 @@ export function renderStandingOrders({
       </button>
       <div class="standing-order-body">
         <div class="standing-order-grid">
-          <label>Name <input class="standing-name" type="text" value="${esc(order.name || "")}"></label>
-          <label>Supplier <select class="standing-supplier">${optionsForSuppliers(suppliers, order.supplierName)}</select></label>
-          <label>Delivery date <input class="standing-date" type="date" value="${esc(order.expectedDate || todayLocal())}"></label>
-          <label>Schedule <select class="standing-schedule">${scheduleOptions(order.schedule)}</select></label>
-          <label>Other <input class="standing-other" type="text" value="${esc(order.otherSchedule || "")}"></label>
-          <label class="check-label"><input class="standing-active" type="checkbox" ${order.active ? "checked" : ""}> Active</label>
-          <div class="wide-field standing-items">${renderOrderItems({ order, itemById })}</div>
-          <div class="wide-field standing-edit-adder">
-            <label class="wide-field">Add item search
-              <input class="standing-add-search" type="search" placeholder="Search inventory items to add">
-            </label>
-            <label>Qty <input class="standing-add-qty" type="number" min="1" step="1" value="1"></label>
+          <div class="wide-field standing-sheet-meta">
+            <label>Name <input class="standing-name" type="text" value="${esc(order.name || "")}"></label>
+            <label>Supplier <select class="standing-supplier">${optionsForSuppliers(suppliers, order.supplierName)}</select></label>
+            <label>Delivery date <input class="standing-date" type="date" value="${esc(order.expectedDate || todayLocal())}"></label>
+            <label>Schedule <select class="standing-schedule">${scheduleOptions(order.schedule)}</select></label>
+            <label>Other <input class="standing-other" type="text" value="${esc(order.otherSchedule || "")}"></label>
+            <label class="check-label standing-active-label"><input class="standing-active" type="checkbox" ${order.active ? "checked" : ""}> Active</label>
+          </div>
+          <div class="wide-field standing-items">
+            <div class="standing-sheet-shell">
+              ${renderOrderItems({ order, itemById })}
+            </div>
+          </div>
+          <div class="wide-field standing-edit-adder standing-sheet-add">
+            <div class="standing-sheet-add-top">
+              <label class="wide-field">Add item search
+                <input class="standing-add-search" type="search" placeholder="Search inventory items to add">
+              </label>
+              <label>Qty <input class="standing-add-qty" type="number" min="1" step="1" value="1"></label>
+            </div>
             <div class="standing-add-results search-pick-list"><p class="empty-sheet">Type to search inventory items.</p></div>
           </div>
-          <label class="wide-field">Notes <textarea class="standing-notes" rows="2">${esc(order.notes || "")}</textarea></label>
-          <div class="standing-row-actions wide-field">
+          <label class="wide-field">Supplier memo <textarea class="standing-notes" rows="2">${esc(order.notes || "")}</textarea></label>
+          <div class="standing-row-actions wide-field standing-sheet-actions">
             <button class="save-standing" type="button">Save</button>
             ${showDelete ? '<button class="delete-standing danger" type="button">Delete</button>' : ""}
           </div>

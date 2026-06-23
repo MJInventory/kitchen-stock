@@ -23,13 +23,17 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
+function sortMenuItems(items) {
+  return [...items].sort((left, right) => String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" }));
+}
+
 function isAllowed(item) {
   return !item.permission || Boolean(currentPermissions[item.permission]);
 }
 
 function renderMenuToggles(host, items, selectedValues = []) {
   const selected = new Set(selectedValues);
-  host.innerHTML = items
+  host.innerHTML = sortMenuItems(items)
     .filter(isAllowed)
     .map((item) => `
       <label class="check-label">

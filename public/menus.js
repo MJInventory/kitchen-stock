@@ -9,6 +9,10 @@
   const gotoItems = menuConfig.gotoItems || [];
   const backofficeItems = menuConfig.backofficeItems || [];
 
+  function sortMenuItems(items) {
+    return [...items].sort((left, right) => String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" }));
+  }
+
   function syncSessionState() {
     permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
     storedRole = String(localStorage.getItem("kitchenStockRole") || "").trim().toLowerCase();
@@ -43,7 +47,7 @@
   }
 
   function renderSelect(label, selectId, items) {
-    const visibleItems = items.filter(allowed);
+    const visibleItems = sortMenuItems(items.filter(allowed));
     if (!visibleItems.length) return "";
     const selectedHref = visibleItems.some((item) => item.href === currentPath) ? currentPath : "";
     const defaultLabel = label === "Go to" ? "Choose screen" : "Choose task";

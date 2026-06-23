@@ -158,12 +158,16 @@ export function renderDailyOrder({
 }
 
 export function renderStandingOrders({ standingOrderCount, standingOrderList, standingOrders }) {
-  standingOrderCount.textContent = `${standingOrders.length} scheduled`;
-  if (!standingOrders.length) {
+  const availableOrders = (Array.isArray(standingOrders) ? standingOrders : []).filter((order) => {
+    const status = String(order.statusLabel || "").trim().toLowerCase();
+    return order?.active !== false && status !== "completed" && status !== "inactive";
+  });
+  standingOrderCount.textContent = `${availableOrders.length} scheduled`;
+  if (!availableOrders.length) {
     standingOrderList.innerHTML = '<p class="empty-sheet">No standing orders scheduled.</p>';
     return;
   }
-  standingOrderList.innerHTML = standingOrders
+  standingOrderList.innerHTML = availableOrders
     .slice(0, 100)
     .map((order) => `
       <a class="daily-order-row daily-order-link" href="/standing-orders.html?orderId=${encodeURIComponent(order.id)}">

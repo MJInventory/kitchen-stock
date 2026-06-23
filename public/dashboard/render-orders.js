@@ -131,9 +131,10 @@ export function renderStandingOrders({
   dashboardFilter,
   today
 }) {
-  const availableOrders = standingOrders.filter(
-    (order) => String(order.statusLabel || "").trim().toLowerCase() !== "completed"
-  );
+  const availableOrders = standingOrders.filter((order) => {
+    const status = String(order.statusLabel || "").trim().toLowerCase();
+    return order?.active !== false && status !== "completed" && status !== "inactive";
+  });
   const onlyDue = dashboardFilter === "standing";
   const baseOrders = onlyDue
     ? availableOrders.filter((order) => {

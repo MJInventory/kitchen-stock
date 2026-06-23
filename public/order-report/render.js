@@ -12,6 +12,8 @@ import {
 } from "./helpers.js";
 
 function standingStatusLabel(order) {
+  const explicit = String(order?.statusLabel || "").trim();
+  if (explicit) return explicit;
   const expected = String(order?.expectedDate || "").trim();
   const today = new Date().toISOString().slice(0, 10);
   if (order?.active) {
@@ -83,7 +85,7 @@ export function renderSummary({ reportSummary, summary, activeReportFilter }) {
 export function renderStandingOrders({ orders, standingReportSummaryList, standingReportList }) {
   const visibleOrders = (Array.isArray(orders) ? orders : []).filter((order) => {
     const status = String(standingStatusLabel(order) || "").trim().toLowerCase();
-    return status !== "completed" && status !== "inactive";
+    return order?.active !== false && status !== "completed" && status !== "inactive";
   });
 
   if (!visibleOrders.length) {

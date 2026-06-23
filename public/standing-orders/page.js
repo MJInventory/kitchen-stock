@@ -235,20 +235,28 @@ export function initStandingOrdersPage() {
       const existing = itemsContainer.querySelector(`.existing-line[data-item-id="${CSS.escape(item.id)}"]`);
       if (existing) {
         const qtyInput = existing.querySelector(".standing-line-qty");
-        qtyInput.value = Number(qtyInput.value || 0) + quantity;
+        const nextQty = Number(qtyInput.value || 0) + quantity;
+        qtyInput.value = nextQty;
+        const openCell = existing.querySelector(".standing-sheet-open-display");
+        if (openCell) openCell.textContent = String(nextQty);
       } else {
         const tableBody = itemsContainer.querySelector(".standing-order-table tbody");
         if (!tableBody) {
           setMessage("Standing order item list is not ready. Reload the screen and try again.", true);
           return;
         }
+        const shelf = item.shelf || item.shelfCode || "TBD";
+        const areaLocation = [item.area || item.inventoryArea, item.location || item.storageLocation].filter(Boolean).join(" / ") || "Unassigned";
         tableBody.insertAdjacentHTML("beforeend", `
           <tr class="standing-sheet-row standing-item-line existing-line" data-item-id="${esc(item.id)}" data-item-name="${esc(item.name)}">
             <td class="standing-sheet-item"><strong>${esc(item.name)}</strong></td>
+            <td class="standing-sheet-open-display">${esc(quantity)}</td>
             <td class="standing-sheet-open">
-            <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(quantity)}" aria-label="Quantity">
+              <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(quantity)}" aria-label="Order quantity">
             </td>
             <td class="standing-sheet-unit"><span>${esc(item.unit || "item")}</span></td>
+            <td class="standing-sheet-shelf">${esc(shelf)}</td>
+            <td class="standing-sheet-location">${esc(areaLocation)}</td>
             <td class="standing-sheet-remove">
               <button class="remove-existing-standing-item secondary" type="button">Remove</button>
             </td>

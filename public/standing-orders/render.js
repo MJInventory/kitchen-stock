@@ -28,6 +28,16 @@ function standingOpenSummary(order) {
   return `${open} open of ${total} item(s)`;
 }
 
+function standingShelf(line, item) {
+  return line?.shelf || line?.shelfCode || item?.shelf || item?.shelfCode || "TBD";
+}
+
+function standingAreaLocation(line, item) {
+  const area = line?.area || line?.inventoryArea || item?.area || item?.inventoryArea || "";
+  const location = line?.location || line?.storageLocation || item?.location || item?.storageLocation || "";
+  return [area, location].filter(Boolean).join(" / ") || "Unassigned";
+}
+
 export function renderSelectedItems({ selectedItems, standingItems, itemById }) {
   if (!selectedItems.length) {
     standingItems.innerHTML = '<p class="empty-sheet">No items added yet.</p>';
@@ -88,13 +98,18 @@ export function renderOrderItems({ order, itemById }) {
     const itemName = line.itemName || item?.name || "Inventory item";
     const unit = line.unit || item?.unit || "item";
     const quantity = standingLineQuantity(line) || 1;
+    const shelf = standingShelf(line, item);
+    const areaLocation = standingAreaLocation(line, item);
     return `
       <tr class="standing-sheet-row standing-item-line existing-line" data-item-id="${esc(line.itemId)}" data-item-name="${esc(itemName)}">
         <td class="standing-sheet-item"><strong>${esc(itemName)}</strong></td>
+        <td class="standing-sheet-open-display">${esc(quantity)}</td>
         <td class="standing-sheet-open">
-          <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(quantity)}" aria-label="Open quantity">
+          <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(quantity)}" aria-label="Order quantity">
         </td>
         <td class="standing-sheet-unit"><span>${esc(unit)}</span></td>
+        <td class="standing-sheet-shelf">${esc(shelf)}</td>
+        <td class="standing-sheet-location">${esc(areaLocation)}</td>
         <td class="standing-sheet-remove">
           <button class="remove-existing-standing-item secondary" type="button">Remove</button>
         </td>
@@ -107,8 +122,11 @@ export function renderOrderItems({ order, itemById }) {
         <thead>
           <tr>
             <th>Item</th>
-            <th>Open qty</th>
+            <th>Open</th>
+            <th>Order qty</th>
             <th>Unit</th>
+            <th>Shelf</th>
+            <th>Area / Location</th>
             <th>Remove</th>
           </tr>
         </thead>

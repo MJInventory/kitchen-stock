@@ -861,9 +861,10 @@ button:hover,
 
 .standing-order-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 760px;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
+  font-size: 13px;
 }
 
 .standing-order-table .standing-item-line,
@@ -873,57 +874,81 @@ button:hover,
 
 .standing-order-table th,
 .standing-order-table td {
-  border-bottom: 1px solid var(--line);
-  padding: 10px 12px;
+  border: 1px solid var(--table-border, var(--line));
+  padding: 6px 8px;
   text-align: left;
   vertical-align: middle;
 }
 
 .standing-order-table th {
-  background: color-mix(in srgb, var(--surface) 94%, var(--ink) 6%);
+  background: color-mix(in srgb, var(--surface) 90%, var(--ink) 10%);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.standing-order-table tr:last-child td {
-  border-bottom: 0;
+.standing-order-table tbody tr:nth-child(odd) td {
+  background: #e9f7e6;
+}
+
+.standing-order-table tbody tr:nth-child(even) td {
+  background: #e3effa;
 }
 
 .standing-order-table .standing-sheet-item {
-  background: color-mix(in srgb, var(--surface) 96%, var(--success) 4%);
-}
-
-.standing-order-table .standing-sheet-open,
-.standing-order-table .standing-sheet-unit,
-.standing-order-table .standing-sheet-remove {
-  border-left: 1px solid var(--line);
+  min-width: 220px;
 }
 
 .standing-order-table .standing-sheet-item strong {
   white-space: normal;
 }
 
-.standing-order-table .standing-sheet-open input {
-  width: min(120px, 100%);
+.standing-order-table .standing-sheet-open-display {
   text-align: right;
+  width: 60px;
 }
 
+.standing-order-table .standing-sheet-open {
+  width: 110px;
+}
+
+.standing-order-table .standing-sheet-open input,
+.standing-order-table .standing-line-qty {
+  height: 34px;
+  max-width: 100%;
+  text-align: right;
+  width: 90px;
+}
+
+.standing-order-table .standing-sheet-unit,
 .standing-order-table .standing-sheet-unit span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  width: 70px;
+}
+
+.standing-order-table .standing-sheet-shelf {
+  width: 80px;
+}
+
+.standing-order-table .standing-sheet-location {
+  min-width: 170px;
 }
 
 .standing-order-table .standing-sheet-remove {
-  text-align: right;
+  text-align: center;
+  width: 110px;
 }
 
 .standing-order-table .standing-sheet-remove button {
-  min-width: 96px;
+  min-height: 34px;
+  min-width: 86px;
+  padding: 0 14px;
+  border-radius: 999px;
 }
 
 .search-pick-list {
@@ -4047,26 +4072,32 @@ body.order-app {
   }
 }
 
-.standing-order-table .standing-sheet-item::before,
-.standing-order-table .standing-sheet-open::before,
-.standing-order-table .standing-sheet-unit::before,
-.standing-order-table .standing-sheet-remove::before {
+.standing-order-table td::before {
   content: none;
   display: none;
 }
 
 @media (max-width: 720px) {
   .standing-order-table {
-    min-width: 520px;
+    min-width: 720px;
   }
 
   .standing-order-table th,
   .standing-order-table td {
-    padding: 8px;
+    padding: 6px;
+  }
+
+  .standing-order-table .standing-sheet-item {
+    min-width: 180px;
+  }
+
+  .standing-order-table .standing-sheet-open input,
+  .standing-order-table .standing-line-qty {
+    width: 80px;
   }
 
   .standing-order-table .standing-sheet-remove button {
-    min-width: 84px;
+    min-width: 76px;
   }
 }
 

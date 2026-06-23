@@ -774,7 +774,8 @@ button:hover,
 .standing-sheet-shell {
   border: 1px solid var(--line);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: var(--surface);
   box-shadow: var(--soft-shadow);
 }
@@ -855,6 +856,73 @@ button:hover,
 }
 
 .standing-sheet-remove button {
+  min-width: 96px;
+}
+
+.standing-order-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.standing-order-table .standing-item-line,
+.standing-order-table .standing-sheet-row {
+  display: table-row;
+}
+
+.standing-order-table th,
+.standing-order-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.standing-order-table th {
+  background: color-mix(in srgb, var(--surface) 94%, var(--ink) 6%);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.standing-order-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.standing-order-table .standing-sheet-item {
+  background: color-mix(in srgb, var(--surface) 96%, var(--success) 4%);
+}
+
+.standing-order-table .standing-sheet-open,
+.standing-order-table .standing-sheet-unit,
+.standing-order-table .standing-sheet-remove {
+  border-left: 1px solid var(--line);
+}
+
+.standing-order-table .standing-sheet-item strong {
+  white-space: normal;
+}
+
+.standing-order-table .standing-sheet-open input {
+  width: min(120px, 100%);
+  text-align: right;
+}
+
+.standing-order-table .standing-sheet-unit span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.standing-order-table .standing-sheet-remove {
+  text-align: right;
+}
+
+.standing-order-table .standing-sheet-remove button {
   min-width: 96px;
 }
 
@@ -3976,6 +4044,29 @@ body.order-app {
 
   .notify-area-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.standing-order-table .standing-sheet-item::before,
+.standing-order-table .standing-sheet-open::before,
+.standing-order-table .standing-sheet-unit::before,
+.standing-order-table .standing-sheet-remove::before {
+  content: none;
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .standing-order-table {
+    min-width: 520px;
+  }
+
+  .standing-order-table th,
+  .standing-order-table td {
+    padding: 8px;
+  }
+
+  .standing-order-table .standing-sheet-remove button {
+    min-width: 84px;
   }
 }
 

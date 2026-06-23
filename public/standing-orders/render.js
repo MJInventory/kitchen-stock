@@ -13,6 +13,21 @@ function standingStatusLabel(order) {
   return "Inactive";
 }
 
+function standingLineQuantity(line) {
+  const value = Number(line?.openQuantity ?? line?.remainingQuantity ?? line?.quantity ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function standingOpenSummary(order) {
+  const lines = Array.isArray(order?.items) ? order.items : [];
+  const totalValue = Number(order?.totalLines ?? lines.length);
+  const reportedOpen = Number(order?.openLines);
+  const computedOpen = lines.filter((line) => standingLineQuantity(line) > 0).length;
+  const total = Number.isFinite(totalValue) ? totalValue : lines.length;
+  const open = Number.isFinite(reportedOpen) && reportedOpen > 0 ? reportedOpen : computedOpen;
+  return `${open} open of ${total} item(s)`;
+}
+
 export function renderSelectedItems({ selectedItems, standingItems, itemById }) {
   if (!selectedItems.length) {
     standingItems.innerHTML = '<p class="empty-sheet">No items added yet.</p>';
@@ -71,33 +86,34 @@ export function renderOrderItems({ order, itemById }) {
   const rows = lines.map((line) => {
     const item = itemById(line.itemId);
     const itemName = line.itemName || item?.name || "Inventory item";
-    const unit = item?.unit || "item";
+    const unit = line.unit || item?.unit || "item";
+    const quantity = standingLineQuantity(line) || 1;
     return `
-      <div class="standing-sheet-row standing-item-line existing-line" data-item-id="${esc(line.itemId)}" data-item-name="${esc(itemName)}">
-        <div class="standing-sheet-item">
-          <strong>${esc(itemName)}</strong>
-        </div>
-        <div class="standing-sheet-open">
-          <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(line.quantity || 1)}" aria-label="Open quantity">
-        </div>
-        <div class="standing-sheet-unit">
-          <span>${esc(unit)}</span>
-        </div>
-        <div class="standing-sheet-remove">
+      <tr class="standing-sheet-row standing-item-line existing-line" data-item-id="${esc(line.itemId)}" data-item-name="${esc(itemName)}">
+        <td class="standing-sheet-item"><strong>${esc(itemName)}</strong></td>
+        <td class="standing-sheet-open">
+          <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(quantity)}" aria-label="Open quantity">
+        </td>
+        <td class="standing-sheet-unit"><span>${esc(unit)}</span></td>
+        <td class="standing-sheet-remove">
           <button class="remove-existing-standing-item secondary" type="button">Remove</button>
-        </div>
-      </div>
+        </td>
+      </tr>
     `;
   }).join("");
   return `
     <div class="standing-sheet">
-      <div class="standing-sheet-header">
-        <span>Item</span>
-        <span>Open qty</span>
-        <span>Unit</span>
-        <span>Remove</span>
-      </div>
-      ${rows}
+      <table class="standing-order-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Open qty</th>
+            <th>Unit</th>
+            <th>Remove</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
   `;
 }
@@ -124,7 +140,7 @@ export function renderStandingOrders({
           <strong>${esc(order.name || order.supplierName || "Standing order")}</strong>
           <span>${esc(order.supplierName || "No supplier")}</span>
           <span class="standing-summary-subline">
-            ${esc(`${order.openLines ?? 0} open of ${order.totalLines ?? (Array.isArray(order.items) ? order.items.length : 0)} item(s)`)}
+            ${esc(standingOpenSummary(order))}
           </span>
         </span>
         <span class="standing-summary-meta">

@@ -237,13 +237,22 @@ export function initStandingOrdersPage() {
         const qtyInput = existing.querySelector(".standing-line-qty");
         qtyInput.value = Number(qtyInput.value || 0) + quantity;
       } else {
-        itemsContainer.insertAdjacentHTML("beforeend", `
-          <div class="standing-item-line existing-line" data-item-id="${esc(item.id)}" data-item-name="${esc(item.name)}">
-            <strong>${esc(item.name)}</strong>
-            <span>${esc(item.unit || "item")}</span>
+        const tableBody = itemsContainer.querySelector(".standing-order-table tbody");
+        if (!tableBody) {
+          setMessage("Standing order item list is not ready. Reload the screen and try again.", true);
+          return;
+        }
+        tableBody.insertAdjacentHTML("beforeend", `
+          <tr class="standing-sheet-row standing-item-line existing-line" data-item-id="${esc(item.id)}" data-item-name="${esc(item.name)}">
+            <td class="standing-sheet-item"><strong>${esc(item.name)}</strong></td>
+            <td class="standing-sheet-open">
             <input class="standing-line-qty" type="number" min="1" step="1" value="${esc(quantity)}" aria-label="Quantity">
-            <button class="remove-existing-standing-item secondary" type="button">Remove</button>
-          </div>
+            </td>
+            <td class="standing-sheet-unit"><span>${esc(item.unit || "item")}</span></td>
+            <td class="standing-sheet-remove">
+              <button class="remove-existing-standing-item secondary" type="button">Remove</button>
+            </td>
+          </tr>
         `);
       }
       row.querySelector(".standing-add-search").value = "";

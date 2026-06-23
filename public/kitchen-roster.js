@@ -21,6 +21,7 @@
   let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
   let rosterData = null;
   let rosterDirty = false;
+  let canManageRoster = false;
 
   function setMessage(text, isError = false) {
     message.textContent = text || "";
@@ -144,20 +145,25 @@
 
   function applyRosterLockState() {
     const locked = Boolean(rosterData?.locked);
+    const readOnly = !canManageRoster;
     if (lockButton) {
-      lockButton.hidden = !rosterData;
+      lockButton.hidden = !rosterData || readOnly;
       lockButton.textContent = locked ? "Unlock Week" : "Lock Week";
       lockButton.classList.toggle("danger-soft", locked);
     }
     if (lockMessage) {
-      lockMessage.hidden = !locked;
-      lockMessage.textContent = locked
+      const lockText = locked
         ? `Roster is locked${rosterData?.lockedBy ? ` by ${formatDisplayName(rosterData.lockedBy)}` : ""}. Unlock this week before changing shifts.`
-        : "";
+        : "Read-only access. Only Admin and God users can change this roster.";
+      lockMessage.hidden = !locked && !readOnly;
+      lockMessage.textContent = readOnly ? lockText : (locked ? lockText : "");
     }
-    if (saveButton) saveButton.disabled = locked || !rosterData;
+    if (saveButton) {
+      saveButton.disabled = locked || !rosterData || readOnly;
+      saveButton.hidden = readOnly;
+    }
     rosterGrid.querySelectorAll(".roster-shift-select").forEach((select) => {
-      select.disabled = locked;
+      select.disabled = locked || readOnly;
     });
   }
 
@@ -251,6 +257,10 @@
 
   async function saveRoster() {
     if (!rosterData) return;
+    if (!canManageRoster) {
+      setMessage("You can view the roster, but only Admin and God users can change it.", true);
+      return;
+    }
     if (rosterData.locked) {
       setMessage("Roster week is locked. Unlock it before saving changes.", true);
       return;
@@ -275,6 +285,10 @@
 
   async function toggleRosterLock() {
     if (!rosterData) return;
+    if (!canManageRoster) {
+      setMessage("Only Admin and God users can lock or unlock the roster.", true);
+      return;
+    }
     if (!confirmLeaveIfDirty()) return;
     const nextLocked = !rosterData.locked;
     const prompt = nextLocked
@@ -294,9 +308,10 @@
     try {
       const me = await api("/api/me");
       if (me.token) saveSession(me);
-      if (!me.user?.permissions?.canManageKitchenRoster) {
-        throw new Error("Only admins marked as Kitchen Staff can manage the kitchen roster.");
+      if (!me.user?.permissions?.canViewKitchenRoster) {
+        throw new Error("You do not have access to the kitchen roster.");
       }
+      canManageRoster = Boolean(me.user?.permissions?.canManageKitchenRoster);
       showApp();
       await loadRoster();
     } catch (error) {

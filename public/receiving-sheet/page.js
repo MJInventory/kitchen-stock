@@ -86,17 +86,15 @@ export function initReceivingSheetPage() {
   async function markReceived(row, button) {
     const displayKey = row.dataset.displayKey || "";
     const displayRow = currentSheet.displayRows?.get(displayKey);
-    const requests = Array.isArray(displayRow?.requests)
-      ? displayRow.requests.filter((request) => request?.id)
-      : [];
+    const request = displayRow?.request?.id ? displayRow.request : null;
     if (button.disabled) return;
-    if (!requests.length) {
+    if (!request?.id) {
       setMessage("Could not find the receiving line to update.", true);
       return;
     }
     const quantityInput = row.querySelector(".receive-qty-input");
-    let remainingQty = Number(quantityInput?.value || 0);
-    if (!Number.isFinite(remainingQty) || remainingQty <= 0) {
+    const receiveQty = Number(quantityInput?.value || 0);
+    if (!Number.isFinite(receiveQty) || receiveQty <= 0) {
       setMessage("Receive quantity must be greater than zero.", true);
       return;
     }
@@ -105,29 +103,14 @@ export function initReceivingSheetPage() {
     button.innerHTML = "&#10003;";
     setMessage("Receiving item and updating stock...");
     try {
-      const orderedRequests = [...requests].sort((left, right) => {
-        const leftTime = new Date(left.requestedAt || 0).getTime();
-        const rightTime = new Date(right.requestedAt || 0).getTime();
-        return leftTime - rightTime;
+      await api(`/api/requests/${request.id}/deliver`, {
+        method: "POST",
+        body: JSON.stringify({
+          quantityReceived: receiveQty,
+          receivedQuantity: receiveQty,
+          receiveQuantity: receiveQty
+        })
       });
-      for (const request of orderedRequests) {
-        if (remainingQty <= 0) break;
-        const requestQty = Number(request.quantity || 0);
-        if (!Number.isFinite(requestQty) || requestQty <= 0) continue;
-        const applyQty = Math.min(remainingQty, requestQty);
-        await api(`/api/requests/${request.id}/deliver`, {
-          method: "POST",
-          body: JSON.stringify({
-            quantityReceived: applyQty,
-            receivedQuantity: applyQty,
-            receiveQuantity: applyQty
-          })
-        });
-        remainingQty -= applyQty;
-      }
-      if (remainingQty > 0 && orderedRequests.length) {
-        setMessage("Received quantity was higher than the open quantity. Open lines were closed and stock was updated.");
-      }
       await loadSheet();
       setMessage(`Delivery updated for ${formatUserDisplay(sessionUser)}. Stock updated.`);
     } catch (error) {
@@ -142,24 +125,19 @@ export function initReceivingSheetPage() {
   async function deleteReceivingRow(row, button) {
     const displayKey = row.dataset.displayKey || "";
     const displayRow = currentSheet.displayRows?.get(displayKey);
-    const requests = Array.isArray(displayRow?.requests)
-      ? displayRow.requests.filter((request) => request?.id)
-      : [];
-    if (!requests.length) {
+    const request = displayRow?.request?.id ? displayRow.request : null;
+    if (!request?.id) {
       setMessage("Could not find the receiving line to remove.", true);
       return;
     }
     const itemName = displayRow?.itemName || "this item";
-    const suffix = requests.length > 1 ? ` (${requests.length} open lines)` : "";
-    if (!confirm(`Remove ${itemName}${suffix} from the receiving list?`)) return;
+    if (!confirm(`Remove ${itemName} from the receiving list?`)) return;
     if (!confirm(`Really remove ${itemName}? This cannot be undone.`)) return;
 
     button.disabled = true;
     setMessage(`Removing ${itemName}...`);
     try {
-      for (const request of requests) {
-        await api(`/api/requests/${request.id}`, { method: "DELETE" });
-      }
+      await api(`/api/requests/${request.id}`, { method: "DELETE" });
       await loadSheet();
       setMessage(`${itemName} removed from receiving.`);
     } catch (error) {

@@ -8,60 +8,24 @@ import {
   supplierNoteMap
 } from "./helpers.js";
 
-function groupedReceivingKey(request) {
-  return [
-    String(request.supplierName || "").trim().toLowerCase(),
-    String(request.itemId || request.itemName || "").trim().toLowerCase(),
-    String(request.unit || "").trim().toLowerCase(),
-    String(request.shelfCode || "").trim().toLowerCase(),
-    String(request.inventoryArea || "").trim().toLowerCase(),
-    String(request.storageLocation || "").trim().toLowerCase(),
-    receivingOriginClass(request)
-  ].join("|");
-}
-
 function buildReceivingDisplayRows(requests = []) {
-  const rows = [];
-  const grouped = new Map();
-  const sorted = [...requests].sort(logicalRequestCompare);
-
-  sorted.forEach((request) => {
-    const key = groupedReceivingKey(request);
-    const existing = grouped.get(key);
-    if (!existing) {
-      const row = {
-        key: "",
-        rowClass: receivingOriginClass(request),
-        supplierName: request.supplierName || "",
-        itemName: request.itemName || "",
-        orderedQuantity: Number(request.quantity || 0),
-        receiveQuantity: Number(request.quantity || 0),
-        unit: request.unit || "",
-        shelfCode: request.shelfCode || "",
-        inventoryArea: request.inventoryArea || "",
-        storageLocation: request.storageLocation || "",
-        originTitle: receivingOriginTitle(request),
-        requests: [request]
-      };
-      grouped.set(key, row);
-      rows.push(row);
-      return;
-    }
-
-    existing.orderedQuantity += Number(request.quantity || 0);
-    existing.receiveQuantity += Number(request.quantity || 0);
-    existing.requests.push(request);
-  });
-
-  rows.forEach((row, index) => {
-    const requestKey = row.requests
-      .map((request) => String(request.id || "").trim())
-      .filter(Boolean)
-      .join("-");
-    row.key = `receiving-${requestKey || `${groupedReceivingKey(row)}-${index + 1}`}`;
-  });
-
-  return rows;
+  return [...requests]
+    .sort(logicalRequestCompare)
+    .map((request) => ({
+      key: `receiving-${String(request.id || "").trim()}`,
+      requestId: request.id,
+      rowClass: receivingOriginClass(request),
+      supplierName: request.supplierName || "",
+      itemName: request.itemName || "",
+      openQuantity: Number(request.quantity || 0),
+      receiveQuantity: Number(request.quantity || 0),
+      unit: request.unit || "",
+      shelfCode: request.shelfCode || "",
+      inventoryArea: request.inventoryArea || "",
+      storageLocation: request.storageLocation || "",
+      originTitle: receivingOriginTitle(request),
+      request
+    }));
 }
 
 export function renderReceivingSheet({
@@ -128,7 +92,7 @@ export function renderReceivingSheet({
                     </button>
                   </td>
                   <td>${escapeHtml(row.itemName)}</td>
-                  <td>${escapeHtml(row.orderedQuantity)}</td>
+                  <td>${escapeHtml(row.openQuantity)}</td>
                   <td>
                     <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" aria-label="Received quantity for ${escapeHtml(row.itemName)}">
                   </td>

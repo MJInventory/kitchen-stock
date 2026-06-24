@@ -168,8 +168,8 @@ export function renderStandingOrders({
         </span>
       </button>
       <div class="standing-order-body">
-        <div class="standing-order-grid">
-          <div class="wide-field standing-sheet-meta">
+        <section class="sheet-group standing-sheet-group">
+          <div class="standing-order-grid standing-order-grid--top">
             <label>Name <input class="standing-name" type="text" value="${esc(order.name || "")}"></label>
             <label>Supplier <select class="standing-supplier">${optionsForSuppliers(suppliers, order.supplierName)}</select></label>
             <label>Delivery date <input class="standing-date" type="date" value="${esc(order.expectedDate || todayLocal())}"></label>
@@ -177,26 +177,26 @@ export function renderStandingOrders({
             <label>Other <input class="standing-other" type="text" value="${esc(order.otherSchedule || "")}"></label>
             <label class="check-label standing-active-label"><input class="standing-active" type="checkbox" ${order.active ? "checked" : ""}> Active</label>
           </div>
-          <div class="wide-field standing-items">
-            <div class="standing-sheet-shell">
-              ${renderOrderItems({ order, itemById })}
-            </div>
+          <div class="supplier-note-card standing-note-card">
+            <label>Supplier memo
+              <textarea class="standing-notes supplier-note-input" rows="2">${esc(order.notes || "")}</textarea>
+            </label>
+            <button class="save-standing icon-button" type="button">Save standing order</button>
           </div>
-          <div class="wide-field standing-edit-adder standing-sheet-add">
-            <div class="standing-sheet-add-top">
-              <label class="wide-field">Add item search
-                <input class="standing-add-search" type="search" placeholder="Search inventory items to add">
-              </label>
-              <label>Qty <input class="standing-add-qty" type="number" min="1" step="1" value="1"></label>
-            </div>
-            <div class="standing-add-results search-pick-list"><p class="empty-sheet">Type to search inventory items.</p></div>
+          <div class="standing-sheet-shell">
+            ${renderOrderItems({ order, itemById })}
           </div>
-          <label class="wide-field">Supplier memo <textarea class="standing-notes" rows="2">${esc(order.notes || "")}</textarea></label>
-          <div class="standing-row-actions wide-field standing-sheet-actions">
-            <button class="save-standing" type="button">Save</button>
+          <div class="standing-order-grid standing-order-grid--bottom standing-sheet-add">
+            <label class="wide-field">Add item search
+              <input class="standing-add-search" type="search" placeholder="Search inventory items to add">
+            </label>
+            <label>Qty <input class="standing-add-qty" type="number" min="1" step="1" value="1"></label>
+          </div>
+          <div class="standing-add-results search-pick-list"><p class="empty-sheet">Type to search inventory items.</p></div>
+          <div class="standing-row-actions standing-sheet-actions">
             ${showDelete ? '<button class="delete-standing danger" type="button">Delete</button>' : ""}
           </div>
-        </div>
+        </section>
       </div>
     </article>
   `).join("");

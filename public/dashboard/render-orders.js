@@ -131,9 +131,19 @@ export function renderStandingOrders({
   dashboardFilter,
   today
 }) {
+  const deriveStandingStatus = (order) => {
+    const rawStatus = String(order?.statusLabel || "").trim().toLowerCase();
+    if (rawStatus) return rawStatus;
+    const expected = String(order?.expectedDate || "").trim();
+    if (order?.active === false || order?.active === 0 || order?.active === "false") {
+      return expected && expected >= today ? "scheduled" : "inactive";
+    }
+    return expected && expected <= today ? "due" : "scheduled";
+  };
+
   const availableOrders = standingOrders.filter((order) => {
-    const status = String(order.statusLabel || "").trim().toLowerCase();
-    return order?.active !== false && status !== "completed" && status !== "inactive";
+    const status = deriveStandingStatus(order);
+    return status !== "completed" && status !== "inactive";
   });
   const onlyDue = dashboardFilter === "standing";
   const baseOrders = onlyDue

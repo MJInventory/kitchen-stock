@@ -985,11 +985,56 @@ button:hover,
   grid-template-columns: minmax(0, 1fr) 120px;
 }
 
-.standing-sheet-add {
+.standing-sheet-group {
+  display: grid;
+  gap: 0;
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: var(--soft-shadow);
+  overflow: hidden;
+}
+
+.standing-order-grid--top,
+.standing-order-grid--bottom {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.standing-order-grid--top {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+}
+
+.standing-order-grid--top label,
+.standing-order-grid--bottom label {
+  display: grid;
+  gap: 6px;
+}
+
+.standing-order-grid--bottom {
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: end;
+  border-top: 1px solid var(--line);
+}
+
+.standing-note-card {
+  margin: 0;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+}
+
+.standing-sheet-shell {
+  border-top: 1px solid var(--line);
+}
+
+.standing-sheet-add {
+  border: 0;
+  border-radius: 0;
   background: color-mix(in srgb, var(--surface) 97%, var(--ink) 3%);
-  padding: 12px;
+  padding: 14px 16px 0;
 }
 
 .standing-sheet-add-top {
@@ -1011,11 +1056,16 @@ button:hover,
 
 .standing-sheet-actions {
   justify-content: flex-end;
+  padding: 0 16px 16px;
 }
 
 .standing-order-body .standing-notes {
   min-height: 84px;
   resize: vertical;
+}
+
+.standing-add-results {
+  padding: 0 16px 16px;
 }
 
 .standing-report-summary-row {

@@ -243,20 +243,20 @@ export function renderStandingOrderRuns({ runs, standingRunList, expandedRunId }
             return `
               <tr class="standing-sheet-row standing-run-line${isReceived ? " standing-run-line--received" : ""}" data-request-id="${esc(line.orderRequestId || "")}" data-run-line-id="${esc(line.id || "")}">
                 <td class="standing-run-line-received">
-                  <button class="driver-check-button standing-run-received-button${isReceived ? " checked" : ""}" type="button" ${isReceived || (!line.orderRequestId && !line.id) ? "disabled" : ""} aria-label="Mark ${esc(line.itemName || "item")} received">
+                  <button class="driver-check-button standing-run-received-button${isReceived ? " checked" : ""}" type="button" ${isReceived ? "disabled" : ""} aria-label="Mark ${esc(line.itemName || "item")} received">
                     ${isReceived ? "&#10003;" : "&nbsp;"}
                   </button>
                 </td>
                 <td class="standing-sheet-item"><strong>${esc(line.itemName || "Inventory item")}</strong></td>
                 <td class="standing-sheet-open-display">${esc(line.quantity ?? "")}</td>
                 <td class="standing-sheet-open">
-                  <input class="standing-line-qty standing-run-receive-qty" type="number" min="0.01" step="0.01" value="${esc(line.quantity ?? "")}" aria-label="Received quantity for ${esc(line.itemName || "item")}" ${isReceived || (!line.orderRequestId && !line.id) ? "disabled" : ""}>
+                  <input class="standing-line-qty standing-run-receive-qty" type="number" min="0.01" step="0.01" value="${esc(line.quantity ?? "")}" aria-label="Received quantity for ${esc(line.itemName || "item")}" ${isReceived ? "disabled" : ""}>
                 </td>
                 <td class="standing-sheet-unit"><span>${esc(line.unit || "")}</span></td>
                 <td class="standing-sheet-shelf">${esc(line.shelfCode || "TBD")}</td>
                 <td class="standing-sheet-location">${esc(areaLocation || "Unassigned")}</td>
                 <td class="standing-sheet-remove">
-                  ${isReceived ? "" : `<button class="small-button receiving-delete-button standing-run-delete-button" type="button" ${!line.orderRequestId && !line.id ? "disabled" : ""}>Remove</button>`}
+                  ${isReceived ? "" : `<button class="small-button receiving-delete-button standing-run-delete-button" type="button">Remove</button>`}
                 </td>
               </tr>
             `;

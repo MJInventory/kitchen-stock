@@ -350,7 +350,7 @@ export function initStandingOrdersPage() {
       }
       receiveButton.disabled = true;
       setMessage("Receiving item...");
-      page.api(requestId ? `/api/requests/${requestId}/deliver` : `/api/standing-order-run-lines/${runLineId}/deliver`, {
+      page.api(runLineId ? `/api/standing-order-run-lines/${runLineId}/deliver` : `/api/requests/${requestId}/deliver`, {
         method: "POST",
         body: JSON.stringify({
           quantityReceived: receiveQty,
@@ -378,7 +378,7 @@ export function initStandingOrdersPage() {
       if (!window.confirm(`Remove ${itemName} from this standing order run?`)) return;
       deleteButton.disabled = true;
       setMessage(`Removing ${itemName}...`);
-      page.api(requestId ? `/api/requests/${requestId}` : `/api/standing-order-run-lines/${runLineId}`, { method: "DELETE" })
+      page.api(runLineId ? `/api/standing-order-run-lines/${runLineId}` : `/api/requests/${requestId}`, { method: "DELETE" })
         .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
         .then(() => setMessage(`${itemName} removed.`))
         .catch((error) => setMessage(error.message, true))

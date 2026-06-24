@@ -27,8 +27,10 @@ export function initStandingOrdersPage() {
   let items = [];
   let suppliers = [];
   let selectedItems = [];
+  let standingRuns = [];
   const requestedOrderId = new URLSearchParams(window.location.search).get("orderId") || "";
   let expandedOrderId = requestedOrderId || "";
+  let expandedRunId = "";
 
   function setMessage(text, isError = false) {
     message.textContent = text;
@@ -127,7 +129,8 @@ export function initStandingOrdersPage() {
 
   async function loadStandingOrderRuns() {
     const data = await page.api("/api/standing-order-runs");
-    renderStandingOrderRuns({ runs: data.runs || [], standingRunList });
+    standingRuns = data.runs || [];
+    renderStandingOrderRuns({ runs: standingRuns, standingRunList, expandedRunId });
   }
 
   itemSearchInput.addEventListener("input", () => {
@@ -315,6 +318,67 @@ export function initStandingOrdersPage() {
         .then(loadStandingOrders)
         .then(loadStandingOrderRuns)
         .then(() => setMessage("Standing order deleted."))
+        .catch((error) => setMessage(error.message, true))
+        .finally(() => { deleteButton.disabled = false; });
+    }
+  });
+
+  standingRunList.addEventListener("click", (event) => {
+    const summaryButton = event.target.closest(".standing-run-summary");
+    if (summaryButton) {
+      const row = summaryButton.closest(".standing-run-card");
+      const runId = row?.dataset.runId || "";
+      expandedRunId = expandedRunId === runId ? "" : runId;
+      renderStandingOrderRuns({ runs: standingRuns, standingRunList, expandedRunId });
+      return;
+    }
+
+    const receiveButton = event.target.closest(".standing-run-received-button");
+    if (receiveButton) {
+      const row = receiveButton.closest(".standing-run-line");
+      const requestId = row?.dataset.requestId || "";
+      const qtyInput = row?.querySelector(".standing-run-receive-qty");
+      const receiveQty = Number(qtyInput?.value || 0);
+      if (!requestId) {
+        setMessage("Could not find the standing-order line to update.", true);
+        return;
+      }
+      if (!Number.isFinite(receiveQty) || receiveQty <= 0) {
+        setMessage("Receive quantity must be greater than zero.", true);
+        return;
+      }
+      receiveButton.disabled = true;
+      setMessage("Receiving item...");
+      page.api(`/api/requests/${requestId}/deliver`, {
+        method: "POST",
+        body: JSON.stringify({
+          quantityReceived: receiveQty,
+          receivedQuantity: receiveQty,
+          receiveQuantity: receiveQty
+        })
+      })
+        .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
+        .then(() => setMessage("Standing-order delivery updated."))
+        .catch((error) => setMessage(error.message, true))
+        .finally(() => { receiveButton.disabled = false; });
+      return;
+    }
+
+    const deleteButton = event.target.closest(".standing-run-delete-button");
+    if (deleteButton) {
+      const row = deleteButton.closest(".standing-run-line");
+      const requestId = row?.dataset.requestId || "";
+      const itemName = row?.querySelector(".standing-sheet-item strong")?.textContent || "this item";
+      if (!requestId) {
+        setMessage("Could not find the standing-order line to remove.", true);
+        return;
+      }
+      if (!window.confirm(`Remove ${itemName} from this standing order run?`)) return;
+      deleteButton.disabled = true;
+      setMessage(`Removing ${itemName}...`);
+      page.api(`/api/requests/${requestId}`, { method: "DELETE" })
+        .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
+        .then(() => setMessage(`${itemName} removed.`))
         .catch((error) => setMessage(error.message, true))
         .finally(() => { deleteButton.disabled = false; });
     }

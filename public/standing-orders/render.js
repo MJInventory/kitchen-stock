@@ -215,33 +215,88 @@ export function renderStandingOrders({
   }
 }
 
-export function renderStandingOrderRuns({ runs, standingRunList }) {
+export function renderStandingOrderRuns({ runs, standingRunList, expandedRunId }) {
   if (!runs.length) {
     standingRunList.innerHTML = '<p class="empty-sheet">No standing order runs generated yet.</p>';
     return;
   }
 
-  standingRunList.innerHTML = runs.map((run) => `
-    <article class="setting-row standing-run-row">
-      <div>
-        <strong>${esc(run.name || run.standingOrderName || "Standing order run")}</strong>
-        <span>${esc(run.supplierName || "No supplier")} / ${esc(run.expectedDate || "No date")} / ${esc(run.status || "Open")}</span>
-      </div>
-      <div>
-        <strong>${esc(run.receivedLines ?? 0)} / ${esc(run.totalLines ?? 0)}</strong>
-        <span>Received lines</span>
-      </div>
-      <div>
-        <strong>${esc(run.closedBy || "")}</strong>
-        <span>${run.closedAt ? `Closed ${esc(run.closedAt.slice(0, 10))}` : "Not closed yet"}</span>
-      </div>
-      <div class="wide-field standing-run-lines">
-        ${(run.lines || []).map((line) => `
-          <span class="${line.received ? "received-text" : ""}">
-            ${line.received ? "Received" : "Open"} - ${esc(line.itemName)} - ${esc(line.quantity ?? "")} ${esc(line.unit || "")}${line.receivedBy ? ` by ${esc(line.receivedBy)}` : ""}
+  const renderRunItems = (run) => `
+    <div class="standing-sheet">
+      <table class="standing-order-table standing-run-table">
+        <thead>
+          <tr>
+            <th>Received</th>
+            <th>Item</th>
+            <th>Open</th>
+            <th>Receive qty</th>
+            <th>Unit</th>
+            <th>Shelf</th>
+            <th>Area / Location</th>
+            <th>Remove</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${(run.lines || []).map((line) => {
+            const areaLocation = [line.inventoryArea, line.storageLocation].filter(Boolean).join(" / ");
+            const isReceived = Boolean(line.received);
+            return `
+              <tr class="standing-sheet-row standing-run-line${isReceived ? " standing-run-line--received" : ""}" data-request-id="${esc(line.orderRequestId || "")}">
+                <td class="standing-run-line-received">
+                  <button class="driver-check-button standing-run-received-button${isReceived ? " checked" : ""}" type="button" ${isReceived || !line.orderRequestId ? "disabled" : ""} aria-label="Mark ${esc(line.itemName || "item")} received">
+                    ${isReceived ? "&#10003;" : "&nbsp;"}
+                  </button>
+                </td>
+                <td class="standing-sheet-item"><strong>${esc(line.itemName || "Inventory item")}</strong></td>
+                <td class="standing-sheet-open-display">${esc(line.quantity ?? "")}</td>
+                <td class="standing-sheet-open">
+                  <input class="standing-line-qty standing-run-receive-qty" type="number" min="0.01" step="0.01" value="${esc(line.quantity ?? "")}" aria-label="Received quantity for ${esc(line.itemName || "item")}" ${isReceived || !line.orderRequestId ? "disabled" : ""}>
+                </td>
+                <td class="standing-sheet-unit"><span>${esc(line.unit || "")}</span></td>
+                <td class="standing-sheet-shelf">${esc(line.shelfCode || "TBD")}</td>
+                <td class="standing-sheet-location">${esc(areaLocation || "Unassigned")}</td>
+                <td class="standing-sheet-remove">
+                  <button class="small-button receiving-delete-button standing-run-delete-button" type="button" ${isReceived || !line.orderRequestId ? "disabled" : ""}>Remove</button>
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  standingRunList.innerHTML = runs.map((run) => {
+    const statusLabel = String(run.status || (run.openLines > 0 ? "Open" : "Closed")).trim();
+    const statusKey = statusLabel.toLowerCase() === "closed" ? "completed" : "due";
+    const isExpanded = expandedRunId === run.id;
+    return `
+      <article class="setting-row standing-order-row standing-run-card${isExpanded ? " expanded" : ""}" data-run-id="${esc(run.id)}">
+        <button
+          class="standing-order-summary standing-run-summary"
+          type="button"
+          aria-expanded="${isExpanded ? "true" : "false"}"
+          data-status="${esc(statusKey)}"
+        >
+          <span class="standing-summary-main">
+            <strong>${esc(run.name || run.standingOrderName || "Standing order run")}</strong>
+            <span>${esc(run.supplierName || "No supplier")} / ${esc(run.expectedDate || "No date")} / ${esc(statusLabel)}</span>
+            <span class="standing-summary-subline">${esc(`${run.openLines ?? 0} open of ${run.totalLines ?? 0} line(s)`)}</span>
           </span>
-        `).join("")}
-      </div>
-    </article>
-  `).join("");
+          <span class="standing-summary-meta">
+            <span><b>Received</b> ${esc(run.receivedLines ?? 0)} / ${esc(run.totalLines ?? 0)}</span>
+            <span><b>Generated</b> ${esc((run.generatedAt || "").slice(0, 10) || "unknown")}</span>
+            <span>${run.closedAt ? `Closed ${esc(run.closedAt.slice(0, 10))}` : "Not closed yet"}</span>
+          </span>
+        </button>
+        <div class="standing-order-body standing-run-body">
+          <section class="sheet-group standing-sheet-group">
+            <div class="standing-sheet-shell">
+              ${renderRunItems(run)}
+            </div>
+          </section>
+        </div>
+      </article>
+    `;
+  }).join("");
 }

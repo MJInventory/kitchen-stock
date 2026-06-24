@@ -704,6 +704,29 @@ button:hover,
   margin-top: 4px;
 }
 
+.standing-run-card .standing-run-body {
+  padding: 0;
+}
+
+.standing-run-card .standing-sheet-group {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.standing-run-table .standing-run-line td {
+  background: #e9f7e6;
+}
+
+.standing-run-table .standing-run-line--received td {
+  background: color-mix(in srgb, var(--surface) 92%, var(--success) 8%);
+}
+
+.standing-run-line-received {
+  text-align: center;
+  width: 72px;
+}
+
 .setup-menu-panel {
   margin-bottom: 14px;
 }

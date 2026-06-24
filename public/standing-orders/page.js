@@ -337,9 +337,10 @@ export function initStandingOrdersPage() {
     if (receiveButton) {
       const row = receiveButton.closest(".standing-run-line");
       const requestId = row?.dataset.requestId || "";
+      const runLineId = row?.dataset.runLineId || "";
       const qtyInput = row?.querySelector(".standing-run-receive-qty");
       const receiveQty = Number(qtyInput?.value || 0);
-      if (!requestId) {
+      if (!requestId && !runLineId) {
         setMessage("Could not find the standing-order line to update.", true);
         return;
       }
@@ -349,7 +350,7 @@ export function initStandingOrdersPage() {
       }
       receiveButton.disabled = true;
       setMessage("Receiving item...");
-      page.api(`/api/requests/${requestId}/deliver`, {
+      page.api(requestId ? `/api/requests/${requestId}/deliver` : `/api/standing-order-run-lines/${runLineId}/deliver`, {
         method: "POST",
         body: JSON.stringify({
           quantityReceived: receiveQty,
@@ -368,15 +369,16 @@ export function initStandingOrdersPage() {
     if (deleteButton) {
       const row = deleteButton.closest(".standing-run-line");
       const requestId = row?.dataset.requestId || "";
+      const runLineId = row?.dataset.runLineId || "";
       const itemName = row?.querySelector(".standing-sheet-item strong")?.textContent || "this item";
-      if (!requestId) {
+      if (!requestId && !runLineId) {
         setMessage("Could not find the standing-order line to remove.", true);
         return;
       }
       if (!window.confirm(`Remove ${itemName} from this standing order run?`)) return;
       deleteButton.disabled = true;
       setMessage(`Removing ${itemName}...`);
-      page.api(`/api/requests/${requestId}`, { method: "DELETE" })
+      page.api(requestId ? `/api/requests/${requestId}` : `/api/standing-order-run-lines/${runLineId}`, { method: "DELETE" })
         .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
         .then(() => setMessage(`${itemName} removed.`))
         .catch((error) => setMessage(error.message, true))

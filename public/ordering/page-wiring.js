@@ -145,6 +145,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     pendingJumpItemId,
     pendingJumpCategory
   } = state;
+  let unitRecords = [];
 
   const {
     setMessage,
@@ -181,6 +182,21 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
       sessionPermissions = nextSession.permissions || {};
     }
   });
+
+  function renderUnitOptions(selectedUnit = "") {
+    const current = String(selectedUnit || "item").trim().toLowerCase() || "item";
+    const options = unitRecords.length
+      ? unitRecords
+      : ["box", "bag", "item", "bottle"].map((name) => ({ name }));
+    const names = options.map((unit) => String(unit?.name || "").trim().toLowerCase()).filter(Boolean);
+    const merged = names.includes(current) ? options : [{ name: current }, ...options];
+    return merged
+      .map((unit) => {
+        const name = String(unit?.name || "").trim().toLowerCase();
+        return `<option value="${name}"${name === current ? " selected" : ""}>${name}</option>`;
+      })
+      .join("");
+  }
 
   const {
     hasSearchTerm,
@@ -266,6 +282,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     scoreOrderingItemSearch,
     computeCategoryStats,
     itemUnit,
+    getUnitOptions: renderUnitOptions,
     renderOrderingSummaryBlock,
     renderOrderingSummaryView,
     renderSelectedChipsView,
@@ -361,10 +378,12 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     updateCurrentStockAction,
     markNotificationsReadAction,
     api,
+    loadItemFormOptions: () => api("/api/item-form-options"),
     queueApi,
     setMessage,
     render,
-    refreshOrderingDisplay: (data) => {
+    refreshOrderingDisplay: (data, formOptions = null) => {
+      if (formOptions?.units) unitRecords = formOptions.units;
       applyBootstrapData(data);
       applyPendingJump();
       saveBootstrapCache(data);

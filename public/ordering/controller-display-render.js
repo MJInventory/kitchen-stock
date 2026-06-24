@@ -63,6 +63,7 @@ export function createOrderingDisplayRender(options) {
     addItemHrefFromSearch,
     defaultQuantity,
     itemUnit,
+    getUnitOptions,
     entryUnit,
     itemCategory,
     orderingSummaryCards,
@@ -195,6 +196,7 @@ export function createOrderingDisplayRender(options) {
       selected: getSelected(),
       defaultQuantity,
       itemUnit,
+      unitOptions: getUnitOptions(),
       requestOpenStatsForItem,
       addItemHrefFromSearch,
       sessionPermissions: getSessionPermissions()

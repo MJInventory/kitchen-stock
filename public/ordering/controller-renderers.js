@@ -116,6 +116,7 @@ export function renderProductListBlock({
   selected,
   defaultQuantity,
   itemUnit,
+  unitOptions,
   requestOpenStatsForItem,
   addItemHrefFromSearch,
   sessionPermissions
@@ -132,6 +133,7 @@ export function renderProductListBlock({
     selected,
     defaultQuantity,
     itemUnit,
+    unitOptions,
     requestOpenStatsForItem,
     addItemHrefFromSearch,
     sessionPermissions

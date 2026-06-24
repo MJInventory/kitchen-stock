@@ -28,7 +28,7 @@ export function initDriverSheetPage() {
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-  let currentSheet = { date: "", requests: [], suppliers: [] };
+  let currentSheet = { date: "", requests: [], suppliers: [], units: [] };
 
   function setMessage(text, isError = false) {
     sheetMessage.textContent = text;
@@ -194,8 +194,11 @@ export function initDriverSheetPage() {
 
   async function loadSheet() {
     setMessage("Loading...");
-    const data = await api(`/api/driver-sheet?date=${encodeURIComponent(sheetDate.value)}`);
-    renderCurrentSheet(data);
+    const [data, formOptions] = await Promise.all([
+      api(`/api/driver-sheet?date=${encodeURIComponent(sheetDate.value)}`),
+      api("/api/item-form-options")
+    ]);
+    renderCurrentSheet({ ...data, units: formOptions.units || [] });
     setMessage("");
   }
 

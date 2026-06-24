@@ -58,6 +58,7 @@ export function renderProductList({
   selected,
   defaultQuantity,
   itemUnit,
+  unitOptions,
   requestOpenStatsForItem,
   addItemHrefFromSearch,
   sessionPermissions
@@ -120,7 +121,7 @@ export function renderProductList({
               </div>
             </label>
             <select class="unit-input" aria-label="Order unit">
-              ${["box", "bag", "item", "bottle"].map((unit) => `<option value="${unit}"${unit === (entry?.unit || itemUnit(item)) ? " selected" : ""}>${unit}</option>`).join("")}
+              ${unitOptions(entry?.unit || itemUnit(item))}
             </select>
             <select class="urgency-input" aria-label="Urgency">
               ${["Low", "Medium", "High", "Critical"].map((level) => `<option${level === urgency ? " selected" : ""}>${level}</option>`).join("")}

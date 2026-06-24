@@ -28,6 +28,7 @@ export function createOrderingFlowController({
   updateCurrentStockAction,
   markNotificationsReadAction,
   api,
+  loadItemFormOptions,
   queueApi,
   setMessage,
   render,
@@ -86,8 +87,11 @@ export function createOrderingFlowController({
 
   async function refresh(silent = false) {
     if (!silent) setMessage("Loading products...");
-    const data = await api("/api/bootstrap");
-    refreshOrderingDisplay(data);
+    const [data, formOptions] = await Promise.all([
+      api("/api/bootstrap"),
+      loadItemFormOptions()
+    ]);
+    refreshOrderingDisplay(data, formOptions);
     setMessage("");
   }
 

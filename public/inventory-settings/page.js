@@ -30,7 +30,8 @@ export function initInventorySettingsPage() {
     inventoryAreas: [],
     storageLocations: [],
     shelfCodes: [],
-    suppliers: []
+    suppliers: [],
+    units: []
   };
 
   function setLoginMessage(text, isError = false) {

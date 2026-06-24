@@ -103,7 +103,7 @@ export function renderItems({
         <label>
           Unit
           <select class="unit-select">
-            ${["box", "bag", "item", "bottle"].map((unit) => `<option${item.unit === unit ? " selected" : ""}>${unit}</option>`).join("")}
+            ${optionList(optionsData.units || [], item.unit, "Choose unit")}
           </select>
         </label>
         <label class="check-label delete-item-label">

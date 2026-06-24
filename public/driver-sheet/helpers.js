@@ -126,10 +126,18 @@ export function supplierOptions(selectedSupplier, knownSuppliers = []) {
     .join("");
 }
 
-export function unitOptions(selectedUnit) {
+export function unitOptions(selectedUnit, units = []) {
   const current = String(selectedUnit || "item").trim().toLowerCase() || "item";
-  return ["box", "bag", "item", "bottle"]
-    .map((unit) => `<option value="${escapeHtml(unit)}"${unit === current ? " selected" : ""}>${escapeHtml(unit)}</option>`)
+  const options = (units || []).length
+    ? units.map((unit) => typeof unit === "string" ? { name: unit } : unit)
+    : ["box", "bag", "item", "bottle"].map((unit) => ({ name: unit }));
+  const names = options.map((unit) => String(unit?.name || "").trim().toLowerCase()).filter(Boolean);
+  const merged = names.includes(current) ? options : [{ name: current }, ...options];
+  return merged
+    .map((unit) => {
+      const name = String(unit?.name || "").trim().toLowerCase();
+      return `<option value="${escapeHtml(name)}"${name === current ? " selected" : ""}>${escapeHtml(name)}</option>`;
+    })
     .join("");
 }
 

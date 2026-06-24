@@ -12,7 +12,8 @@ import {
 export function renderSheet(data, elements) {
   const currentSheet = {
     ...data,
-    requests: (data.requests || []).filter((request) => !isStandingOrderRequest(request))
+    requests: (data.requests || []).filter((request) => !isStandingOrderRequest(request)),
+    units: data.units || []
   };
 
   elements.driverName.value = formatUserDisplay(data.driverName || elements.driverName.value || "");
@@ -82,7 +83,7 @@ export function renderSheet(data, elements) {
                         </td>
                         <td>
                           <select class="driver-unit-select" ${request.driverLineId ? "" : "disabled"} aria-label="Unit for ${escapeHtml(request.itemName)}">
-                            ${unitOptions(request.unit)}
+                            ${unitOptions(request.unit, currentSheet.units)}
                           </select>
                           <span class="print-value">${escapeHtml(request.unit || "item")}</span>
                         </td>

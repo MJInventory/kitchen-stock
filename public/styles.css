@@ -739,6 +739,37 @@ button:hover,
   opacity: 0.88;
 }
 
+.standing-status-cards .standing-status-toggle,
+.standing-status-cards .standing-status-toggle.active,
+.standing-status-cards .standing-status-toggle:hover,
+.standing-status-cards .standing-status-toggle:focus-visible {
+  color: #1f2937 !important;
+  background: linear-gradient(135deg, #f6edc8 0%, #f4e3a1 100%) !important;
+  border-color: #d4a514 !important;
+  box-shadow: 0 0 0 1px rgba(212, 165, 20, 0.18), 0 16px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+.standing-status-cards .standing-status-toggle strong,
+.standing-status-cards .standing-status-toggle span,
+.standing-status-cards .standing-status-toggle small {
+  color: #1f2937 !important;
+  text-shadow: none !important;
+}
+
+.standing-status-cards .standing-status-toggle span {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.standing-status-cards .standing-status-toggle small {
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  opacity: 0.95 !important;
+  max-width: 100% !important;
+}
+
 .standing-run-table .standing-run-line td {
   background: #e9f7e6;
 }

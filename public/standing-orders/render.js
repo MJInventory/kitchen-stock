@@ -15,7 +15,8 @@ function standingStatusLabel(order) {
 
 export function standingOrderMatchesStatusFilter(order, filter = "open") {
   const status = String(order?.statusLabel || "").trim().toLowerCase();
-  const isOpen = order?.active !== false && status !== "completed" && status !== "inactive";
+  const isCompletedLike = status === "completed" || status === "closed" || status === "inactive";
+  const isOpen = order?.active !== false && !isCompletedLike;
   return filter === "all" ? true : isOpen;
 }
 

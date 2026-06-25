@@ -3,7 +3,7 @@ const CACHE_NAME = `kitchen-stock-v${APP_VERSION}`;
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/offline-queue.js",
-  "/mjstock-logo.png",
+  "/madame-janette-logo.png",
   "/mjstock-icon-192.png",
   "/mjstock-icon-512.png",
   "/mjstock-apple-touch.png"

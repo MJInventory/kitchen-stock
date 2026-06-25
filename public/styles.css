@@ -1292,6 +1292,13 @@ button:hover,
   min-width: 210px;
 }
 
+.inventory-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  gap: 10px;
+  align-items: center;
+}
+
 .home-order-panel {
   max-width: 960px;
   width: 100%;

@@ -34,10 +34,14 @@
   <div class="row">
     <label>
       Search
-      <input id="searchFilter" type="search" placeholder="Search item, supplier, category...">
+      <div class="inventory-search-row">
+        <input id="searchFilter" type="search" placeholder="Search item, supplier, category...">
+        <button id="searchItemsButton" class="icon-button" type="button" aria-label="Search items">&#128269;</button>
+      </div>
     </label>
   </div>
   <div class="setup-save-bar">
+    <button id="loadItemsButton" class="secondary" type="button">Load Items</button>
     <p id="setupMessage" role="status"></p>
     <button id="saveAllButton" type="button" disabled>Save All Changes</button>
   </div>

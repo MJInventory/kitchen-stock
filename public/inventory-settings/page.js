@@ -16,13 +16,21 @@ export function initInventorySettingsPage() {
   const areaFilter = document.querySelector("#areaFilter");
   const locationFilter = document.querySelector("#locationFilter");
   const searchFilter = document.querySelector("#searchFilter");
+  const searchItemsButton = document.querySelector("#searchItemsButton");
   const setupMessage = document.querySelector("#setupMessage");
   const itemSettingsList = document.querySelector("#itemSettingsList");
   const saveAllButton = document.querySelector("#saveAllButton");
+  const loadItemsButton = document.querySelector("#loadItemsButton");
 
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let items = [];
+  let hasLoadedItems = false;
+  let appliedFilters = {
+    areaValue: "",
+    locationValue: "",
+    searchValue: ""
+  };
   let dirtyIds = new Set();
   let draftValues = new Map();
   let optionsData = {
@@ -131,27 +139,41 @@ export function initInventorySettingsPage() {
   }
 
   function renderItemList() {
+    if (!hasLoadedItems) {
+      itemSettingsList.innerHTML = '<p class="empty-sheet">Click Load Items to view inventory items.</p>';
+      return;
+    }
     renderItems({
       items,
       dirtyIds,
       draftValues,
       optionsData,
-      areaValue: areaFilter.value,
-      locationValue: locationFilter.value,
-      searchValue: normalize(searchFilter?.value),
+      areaValue: appliedFilters.areaValue,
+      locationValue: appliedFilters.locationValue,
+      searchValue: appliedFilters.searchValue,
       itemSettingsList
     });
   }
 
-  async function loadItems() {
-    setSetupMessage("Loading...");
-    const [data, formOptions] = await Promise.all([api("/api/items"), api("/api/item-form-options")]);
-    items = data.items;
+  async function loadOptions() {
+    const formOptions = await api("/api/item-form-options");
     optionsData = formOptions;
-    dirtyIds.clear();
-    draftValues.clear();
     fillFilter(areaFilter, optionsData.inventoryAreas || [], areaFilter.value, "All");
     fillFilter(locationFilter, optionsData.storageLocations || [], locationFilter.value, "All");
+  }
+
+  async function loadItems() {
+    setSetupMessage("Loading...");
+    const data = await api("/api/items");
+    items = data.items;
+    hasLoadedItems = true;
+    dirtyIds.clear();
+    draftValues.clear();
+    appliedFilters = {
+      areaValue: areaFilter.value,
+      locationValue: locationFilter.value,
+      searchValue: normalize(searchFilter?.value)
+    };
     renderItemList();
     saveAllButton.disabled = true;
     setSetupMessage("");
@@ -255,7 +277,8 @@ export function initInventorySettingsPage() {
       passwordInput.value = "";
       setLoginMessage("");
       showApp();
-      await loadItems();
+      await loadOptions();
+      renderItemList();
     } catch (error) {
       setLoginMessage(error.message, true);
     }
@@ -265,9 +288,27 @@ export function initInventorySettingsPage() {
     if (dirtyIds.size && !window.confirm("You have unsaved inventory changes. Leave this screen anyway?")) return;
     showLogin();
   });
-  areaFilter.addEventListener("change", renderItemList);
-  locationFilter.addEventListener("change", renderItemList);
-  searchFilter?.addEventListener("input", renderItemList);
+  loadItemsButton?.addEventListener("click", () => {
+    loadItems().catch((error) => setSetupMessage(error.message, true));
+  });
+  searchItemsButton?.addEventListener("click", () => {
+    if (!hasLoadedItems) {
+      loadItems().catch((error) => setSetupMessage(error.message, true));
+      return;
+    }
+    appliedFilters = {
+      areaValue: areaFilter.value,
+      locationValue: locationFilter.value,
+      searchValue: normalize(searchFilter?.value)
+    };
+    renderItemList();
+    setSetupMessage("");
+  });
+  searchFilter?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    searchItemsButton?.click();
+  });
   saveAllButton.addEventListener("click", () => {
     saveAllChanges().catch((error) => {
       saveAllButton.disabled = false;
@@ -298,7 +339,9 @@ export function initInventorySettingsPage() {
 
   if (sessionToken && sessionUser) {
     showApp();
-    loadItems().catch((error) => setSetupMessage(error.message, true));
+    loadOptions()
+      .then(renderItemList)
+      .catch((error) => setSetupMessage(error.message, true));
   } else {
     showLogin();
   }

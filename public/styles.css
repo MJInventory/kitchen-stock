@@ -722,6 +722,23 @@ button:hover,
   min-height: 120px;
 }
 
+.standing-status-toggle {
+  color: #1f2937;
+  background: linear-gradient(135deg, #f6edc8 0%, #f4e3a1 100%);
+  border-color: #d4a514;
+  box-shadow: 0 0 0 1px rgba(212, 165, 20, 0.18), 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+.standing-status-toggle strong,
+.standing-status-toggle span,
+.standing-status-toggle small {
+  color: #1f2937;
+}
+
+.standing-status-toggle small {
+  opacity: 0.88;
+}
+
 .standing-run-table .standing-run-line td {
   background: #e9f7e6;
 }

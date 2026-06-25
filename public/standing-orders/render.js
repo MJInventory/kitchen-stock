@@ -146,17 +146,14 @@ export function renderStandingStatusCards({ orders, activeFilter, standingStatus
   if (!standingStatusCards) return;
   const allOrders = Array.isArray(orders) ? orders : [];
   const openCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "open")).length;
-  const cards = [
-    ["Open", openCount, "Hide completed standing orders", "open"],
-    ["All", allOrders.length, "Show every standing order", "all"]
-  ];
-  standingStatusCards.innerHTML = cards.map(([label, value, hint, filter]) => `
-    <button class="dashboard-card dashboard-filter-card${activeFilter === filter ? " active" : ""}" type="button" data-standing-status-filter="${esc(filter)}" aria-pressed="${activeFilter === filter ? "true" : "false"}">
-      <strong>${esc(value)}</strong>
-      <span>${esc(label)}</span>
-      <small>${esc(hint)}</small>
+  const showingAll = activeFilter === "all";
+  standingStatusCards.innerHTML = `
+    <button class="dashboard-card dashboard-filter-card active standing-status-toggle" type="button" data-standing-status-filter="${showingAll ? "open" : "all"}" aria-pressed="${showingAll ? "true" : "false"}">
+      <strong>${esc(showingAll ? allOrders.length : openCount)}</strong>
+      <span>${esc(showingAll ? "All Standing Orders" : "Open Standing Orders")}</span>
+      <small>${esc(showingAll ? "Click to hide completed standing orders" : "Click to show completed standing orders too")}</small>
     </button>
-  `).join("");
+  `;
 }
 
 export function renderStandingOrders({

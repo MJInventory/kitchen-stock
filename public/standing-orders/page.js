@@ -5,7 +5,9 @@ import {
   renderSearchResults,
   renderSelectedItems,
   renderStandingOrderRuns,
-  renderStandingOrders
+  renderStandingOrders,
+  renderStandingStatusCards,
+  standingOrderMatchesStatusFilter
 } from "./render.js";
 
 export function initStandingOrdersPage() {
@@ -23,14 +25,17 @@ export function initStandingOrdersPage() {
   const standingItems = document.querySelector("#standingItems");
   const standingList = document.querySelector("#standingList");
   const standingRunList = document.querySelector("#standingRunList");
+  const standingStatusCards = document.querySelector("#standingStatusCards");
 
   let items = [];
   let suppliers = [];
   let selectedItems = [];
+  let standingOrders = [];
   let standingRuns = [];
   const requestedOrderId = new URLSearchParams(window.location.search).get("orderId") || "";
   let expandedOrderId = requestedOrderId || "";
   let expandedRunId = "";
+  let standingStatusFilter = "open";
 
   function setMessage(text, isError = false) {
     message.textContent = text;
@@ -116,14 +121,23 @@ export function initStandingOrdersPage() {
 
   async function loadStandingOrders() {
     const data = await page.api("/api/standing-orders");
+    standingOrders = data.standingOrders || [];
+    if (requestedOrderId && standingStatusFilter === "open") {
+      const requestedOrder = standingOrders.find((order) => order.id === requestedOrderId);
+      if (requestedOrder && !standingOrderMatchesStatusFilter(requestedOrder, "open")) {
+        standingStatusFilter = "all";
+      }
+    }
+    renderStandingStatusCards({ orders: standingOrders, activeFilter: standingStatusFilter, standingStatusCards });
     renderStandingOrders({
-      orders: data.standingOrders || [],
+      orders: standingOrders,
       standingList,
       suppliers,
       requestedOrderId,
       expandedOrderId,
       canAdminStandingOrders: canAdminStandingOrders(),
-      itemById
+      itemById,
+      statusFilter: standingStatusFilter
     });
   }
 
@@ -213,6 +227,25 @@ export function initStandingOrdersPage() {
     if (search) {
       renderStandingAddResults(search.closest(".standing-order-row"));
     }
+  });
+
+  standingStatusCards?.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-standing-status-filter]");
+    if (!card) return;
+    const nextFilter = card.dataset.standingStatusFilter === "all" ? "all" : "open";
+    if (standingStatusFilter === nextFilter) return;
+    standingStatusFilter = nextFilter;
+    renderStandingStatusCards({ orders: standingOrders, activeFilter: standingStatusFilter, standingStatusCards });
+    renderStandingOrders({
+      orders: standingOrders,
+      standingList,
+      suppliers,
+      requestedOrderId,
+      expandedOrderId,
+      canAdminStandingOrders: canAdminStandingOrders(),
+      itemById,
+      statusFilter: standingStatusFilter
+    });
   });
 
   standingList.addEventListener("click", (event) => {

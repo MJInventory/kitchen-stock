@@ -13,6 +13,12 @@ function standingStatusLabel(order) {
   return "Inactive";
 }
 
+export function standingOrderMatchesStatusFilter(order, filter = "open") {
+  const status = String(order?.statusLabel || "").trim().toLowerCase();
+  const isOpen = order?.active !== false && status !== "completed" && status !== "inactive";
+  return filter === "all" ? true : isOpen;
+}
+
 function standingLineQuantity(line) {
   const value = Number(line?.openQuantity ?? line?.remainingQuantity ?? line?.quantity ?? 0);
   return Number.isFinite(value) ? value : 0;
@@ -136,6 +142,23 @@ export function renderOrderItems({ order, itemById }) {
   `;
 }
 
+export function renderStandingStatusCards({ orders, activeFilter, standingStatusCards }) {
+  if (!standingStatusCards) return;
+  const allOrders = Array.isArray(orders) ? orders : [];
+  const openCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "open")).length;
+  const cards = [
+    ["Open", openCount, "Hide completed standing orders", "open"],
+    ["All", allOrders.length, "Show every standing order", "all"]
+  ];
+  standingStatusCards.innerHTML = cards.map(([label, value, hint, filter]) => `
+    <button class="dashboard-card dashboard-filter-card${activeFilter === filter ? " active" : ""}" type="button" data-standing-status-filter="${esc(filter)}" aria-pressed="${activeFilter === filter ? "true" : "false"}">
+      <strong>${esc(value)}</strong>
+      <span>${esc(label)}</span>
+      <small>${esc(hint)}</small>
+    </button>
+  `).join("");
+}
+
 export function renderStandingOrders({
   orders,
   standingList,
@@ -143,10 +166,12 @@ export function renderStandingOrders({
   requestedOrderId,
   expandedOrderId,
   canAdminStandingOrders,
-  itemById
+  itemById,
+  statusFilter = "open"
 }) {
   const showDelete = canAdminStandingOrders;
-  standingList.innerHTML = orders.map((order) => `
+  const filteredOrders = (Array.isArray(orders) ? orders : []).filter((order) => standingOrderMatchesStatusFilter(order, statusFilter));
+  standingList.innerHTML = filteredOrders.map((order) => `
     <article class="setting-row standing-order-row${expandedOrderId === order.id ? " expanded" : ""}" data-order-id="${esc(order.id)}">
       <button
         class="standing-order-summary"
@@ -202,7 +227,7 @@ export function renderStandingOrders({
   `).join("");
 
   if (!standingList.innerHTML) {
-    standingList.innerHTML = '<p class="empty-sheet">No standing orders yet.</p>';
+    standingList.innerHTML = `<p class="empty-sheet">No ${statusFilter === "open" ? "open " : ""}standing orders yet.</p>`;
   }
 
   if (requestedOrderId) {

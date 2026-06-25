@@ -714,6 +714,14 @@ button:hover,
   box-shadow: none;
 }
 
+.standing-status-filter-panel {
+  margin: 0 0 16px;
+}
+
+.standing-status-cards .dashboard-card {
+  min-height: 120px;
+}
+
 .standing-run-table .standing-run-line td {
   background: #e9f7e6;
 }

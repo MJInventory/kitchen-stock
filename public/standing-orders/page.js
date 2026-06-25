@@ -37,7 +37,6 @@ export function initStandingOrdersPage() {
   const requestedOrderId = new URLSearchParams(window.location.search).get("orderId") || "";
   let expandedOrderId = requestedOrderId || "";
   let expandedRunId = "";
-  let standingScheduleFilter = "all";
   let standingStatusFilter = "open";
 
   function setMessage(text, isError = false) {
@@ -52,7 +51,6 @@ export function initStandingOrdersPage() {
   function renderStandingStatusControls() {
     renderStandingStatusCards({
       orders: standingOrders,
-      scheduleFilter: standingScheduleFilter,
       statusFilter: standingStatusFilter,
       standingStatusCards,
       standingRuns
@@ -156,7 +154,6 @@ export function initStandingOrdersPage() {
       expandedOrderId,
       canAdminStandingOrders: canAdminStandingOrders(),
       itemById,
-      scheduleFilter: standingScheduleFilter,
       statusFilter: standingStatusFilter,
       standingRuns
     });
@@ -252,28 +249,11 @@ export function initStandingOrdersPage() {
   });
 
   standingStatusCards?.addEventListener("click", (event) => {
-    const scheduleCard = event.target.closest("[data-standing-schedule-filter]");
-    if (scheduleCard) {
-      standingScheduleFilter = scheduleCard.dataset.standingScheduleFilter === "scheduled" ? "scheduled" : "all";
-      renderStandingStatusControls();
-      renderStandingOrders({
-        orders: standingOrders,
-        standingList,
-        suppliers,
-        requestedOrderId,
-        expandedOrderId,
-        canAdminStandingOrders: canAdminStandingOrders(),
-        itemById,
-        scheduleFilter: standingScheduleFilter,
-        statusFilter: standingStatusFilter,
-        standingRuns
-      });
-      return;
-    }
-
     const statusCard = event.target.closest("[data-standing-status-filter]");
     if (statusCard) {
-      const nextFilter = statusCard.dataset.standingStatusFilter === "closed" ? "closed" : "open";
+      const nextFilter = ["open", "closed", "all"].includes(statusCard.dataset.standingStatusFilter)
+        ? statusCard.dataset.standingStatusFilter
+        : "open";
       if (standingStatusFilter === nextFilter) return;
       standingStatusFilter = nextFilter;
       renderStandingStatusControls();
@@ -285,7 +265,6 @@ export function initStandingOrdersPage() {
         expandedOrderId,
         canAdminStandingOrders: canAdminStandingOrders(),
         itemById,
-        scheduleFilter: standingScheduleFilter,
         statusFilter: standingStatusFilter,
         standingRuns
       });

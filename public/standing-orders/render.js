@@ -29,33 +29,19 @@ function standingRunIsOpen(run) {
   return status === "scheduled" || status === "open" || status.includes("not closed") || !standingRunIsClosed(run);
 }
 
-function standingScheduleIsRecurring(order) {
-  const schedule = String(order?.schedule || "").trim().toLowerCase();
-  return schedule && schedule !== "one time";
-}
-
-function standingOrderIsFutureOneTime(order) {
-  const schedule = String(order?.schedule || "").trim().toLowerCase();
-  const expected = String(order?.expectedDate || "").trim();
-  return schedule === "one time" && Boolean(expected) && expected > todayLocal();
-}
-
-export function standingOrderMatchesScheduleFilter(order, filter = "all") {
-  if (filter === "all") return true;
-  return standingScheduleIsRecurring(order) || standingOrderIsFutureOneTime(order);
-}
-
 export function standingOrderMatchesStatusFilter(order, filter = "open", openRunOrderIds = new Set()) {
   const status = String(order?.statusLabel || "").trim().toLowerCase();
   const isCompletedLike = status === "completed" || status === "closed" || status === "inactive";
   const isExplicitlyOpen = status === "open" || status === "scheduled" || status.includes("not closed");
   const isOpenFromRuns = standingOrderHasOpenRun(order, openRunOrderIds);
   const isOpen = isExplicitlyOpen || isOpenFromRuns || (order?.active !== false && !isCompletedLike);
+  if (filter === "all") return true;
   return filter === "closed" ? !isOpen : isOpen;
 }
 
 export function standingRunMatchesStatusFilter(run, filter = "open") {
   const isOpen = standingRunIsOpen(run);
+  if (filter === "all") return true;
   return filter === "closed" ? !isOpen : isOpen;
 }
 
@@ -184,7 +170,6 @@ export function renderOrderItems({ order, itemById }) {
 
 export function renderStandingStatusCards({
   orders,
-  scheduleFilter,
   statusFilter,
   standingStatusCards,
   standingRuns = []
@@ -198,29 +183,24 @@ export function renderStandingStatusCards({
       .map((run) => String(run?.standingOrderId || "").trim())
       .filter(Boolean)
   );
-  const scheduledCount = allOrders.filter((order) => standingOrderMatchesScheduleFilter(order, "scheduled")).length;
-  const openCount =
-    allOrders
-      .filter((order) => standingOrderMatchesScheduleFilter(order, scheduleFilter))
-      .filter((order) => standingOrderMatchesStatusFilter(order, "open", openRunOrderIds)).length
+  const openCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "open", openRunOrderIds)).length
     + allRuns.filter((run) => standingRunMatchesStatusFilter(run, "open")).length;
-  const closedCount =
-    allOrders
-      .filter((order) => standingOrderMatchesScheduleFilter(order, scheduleFilter))
-      .filter((order) => standingOrderMatchesStatusFilter(order, "closed", openRunOrderIds)).length
+  const closedCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "closed", openRunOrderIds)).length
     + allRuns.filter((run) => standingRunMatchesStatusFilter(run, "closed")).length;
-  const showingAllSchedules = scheduleFilter === "all";
-  const showingOpen = statusFilter === "open";
+  const allCount = allOrders.length + allRuns.length;
+  const nextFilter = statusFilter === "open" ? "closed" : statusFilter === "closed" ? "all" : "open";
+  const currentCount = statusFilter === "open" ? openCount : statusFilter === "closed" ? closedCount : allCount;
+  const currentLabel = statusFilter === "open" ? "Open Standing Orders" : statusFilter === "closed" ? "Closed Standing Orders" : "All Standing Orders";
+  const helperText = statusFilter === "open"
+    ? "Click to show completed and closed standing orders"
+    : statusFilter === "closed"
+      ? "Click to show everything"
+      : "Click to show open and scheduled standing orders";
   standingStatusCards.innerHTML = `
-    <button class="dashboard-card dashboard-filter-card active standing-status-toggle" type="button" data-standing-schedule-filter="${showingAllSchedules ? "scheduled" : "all"}" aria-pressed="${showingAllSchedules ? "true" : "false"}">
-      <strong>${esc(showingAllSchedules ? allOrders.length : scheduledCount)}</strong>
-      <span>${esc(showingAllSchedules ? "All Standing Orders" : "Scheduled / Future Only")}</span>
-      <small>${esc(showingAllSchedules ? "Click to show only scheduled periodical and future one-time standing orders" : "Click to show all standing orders")}</small>
-    </button>
-    <button class="dashboard-card dashboard-filter-card standing-status-toggle standing-status-toggle--secondary active" type="button" data-standing-status-filter="${showingOpen ? "closed" : "open"}" aria-pressed="${showingOpen ? "true" : "false"}">
-      <strong>${esc(showingOpen ? openCount : closedCount)}</strong>
-      <span>${esc(showingOpen ? "Open Standing Orders" : "Closed Standing Orders")}</span>
-      <small>${esc(showingOpen ? "Click to show completed and closed standing orders" : "Click to show open and scheduled standing orders")}</small>
+    <button class="dashboard-card dashboard-filter-card standing-status-toggle standing-status-toggle--secondary active" type="button" data-standing-status-filter="${nextFilter}" aria-pressed="true">
+      <strong>${esc(currentCount)}</strong>
+      <span>${esc(currentLabel)}</span>
+      <small>${esc(helperText)}</small>
     </button>
   `;
 }
@@ -233,7 +213,6 @@ export function renderStandingOrders({
   expandedOrderId,
   canAdminStandingOrders,
   itemById,
-  scheduleFilter = "all",
   statusFilter = "open",
   standingRuns = []
 }) {
@@ -245,7 +224,6 @@ export function renderStandingOrders({
       .filter(Boolean)
   );
   const filteredOrders = (Array.isArray(orders) ? orders : [])
-    .filter((order) => standingOrderMatchesScheduleFilter(order, scheduleFilter))
     .filter((order) => standingOrderMatchesStatusFilter(order, statusFilter, openRunOrderIds));
   standingList.innerHTML = filteredOrders.map((order) => `
     <article class="setting-row standing-order-row${expandedOrderId === order.id ? " expanded" : ""}" data-order-id="${esc(order.id)}">

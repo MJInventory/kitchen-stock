@@ -170,13 +170,10 @@ export function initDashboardPage() {
       displayRoleMode: () => displayRoleMode(sessionRole),
       recentRequests,
       matchesDashboardOwnerFilter,
-      matchesDashboardStatusFilter,
-      isOpenAttentionRequest,
-      requestDay,
       sessionUser,
-      today,
-      dashboardStatusFilter,
-      dashboardOwnerFilter
+      dashboardOwnerFilter,
+      matchesDashboardStatusFilter,
+      today
     });
     renderDailyOrder({
       dailyOrderCount,
@@ -280,12 +277,6 @@ export function initDashboardPage() {
   });
 
   dashboardCards?.addEventListener("click", (event) => {
-    const statusCard = event.target.closest("[data-dashboard-status-filter]");
-    if (statusCard?.dataset.dashboardStatusFilter) {
-      dashboardStatusFilter = statusCard.dataset.dashboardStatusFilter === "closed" ? "closed" : "open";
-      renderAll();
-      return;
-    }
     const ownerCard = event.target.closest("[data-dashboard-owner-filter]");
     if (!ownerCard?.dataset.dashboardOwnerFilter) return;
     dashboardOwnerFilter = ownerCard.dataset.dashboardOwnerFilter === "mine" ? "mine" : "all";

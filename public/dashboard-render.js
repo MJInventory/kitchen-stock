@@ -38,35 +38,22 @@ export function renderDashboardCards({
   displayRoleMode,
   recentRequests,
   matchesDashboardOwnerFilter,
-  matchesDashboardStatusFilter,
-  isOpenAttentionRequest,
-  requestDay,
   sessionUser,
-  dashboardStatusFilter,
   dashboardOwnerFilter,
+  matchesDashboardStatusFilter,
   today
 }) {
   if (!dashboardCards || !dashboardMode) return;
   dashboardMode.textContent = displayRoleMode();
   const requests = (Array.isArray(recentRequests) ? recentRequests : [])
     .filter((request) => !request?.standingRunId);
-  const visibleForStatus = (request, filter) => {
-    if (!matchesDashboardStatusFilter(request, { dashboardStatusFilter: filter, today })) return false;
-    if (filter === "open") {
-      return requestDay(request) === today || isOpenAttentionRequest(request, today);
-    }
-    return true;
-  };
-  const openCount = requests.filter((request) => visibleForStatus(request, "open")).length;
-  const closedCount = requests.filter((request) => visibleForStatus(request, "closed")).length;
   const mineCount = requests
-    .filter((request) => visibleForStatus(request, dashboardStatusFilter))
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
     .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter: "mine", sessionUser }))
     .length;
   const allCount = requests
-    .filter((request) => visibleForStatus(request, dashboardStatusFilter))
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
     .length;
-  const nextStatus = dashboardStatusFilter === "open" ? "closed" : "open";
   const nextOwner = dashboardOwnerFilter === "mine" ? "all" : "mine";
 
   dashboardCards.innerHTML = `
@@ -74,11 +61,6 @@ export function renderDashboardCards({
       <strong>${escapeHtml(dashboardOwnerFilter === "mine" ? mineCount : allCount)}</strong>
       <span>${escapeHtml(dashboardOwnerFilter === "mine" ? "My Orders" : "All Users Orders")}</span>
       <small>${escapeHtml(dashboardOwnerFilter === "mine" ? "Click to show all users orders for the current status" : "Click to show only your orders for the current status")}</small>
-    </button>
-    <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-status-filter="${escapeHtml(nextStatus)}" aria-pressed="true">
-      <strong>${escapeHtml(dashboardStatusFilter === "open" ? openCount : closedCount)}</strong>
-      <span>${escapeHtml(dashboardStatusFilter === "open" ? "Open Items" : "Closed Items")}</span>
-      <small>${escapeHtml(dashboardStatusFilter === "open" ? "Click to show completed, closed, and delivered items" : "Click to show not closed, scheduled, and 2Deliver items")}</small>
     </button>
   `;
 }

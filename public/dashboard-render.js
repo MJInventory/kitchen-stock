@@ -32,35 +32,3 @@ export function renderNotifications({
     .join("");
 }
 
-export function renderDashboardCards({
-  dashboardCards,
-  dashboardMode,
-  displayRoleMode,
-  recentRequests,
-  matchesDashboardOwnerFilter,
-  sessionUser,
-  dashboardOwnerFilter,
-  matchesDashboardStatusFilter,
-  today
-}) {
-  if (!dashboardCards || !dashboardMode) return;
-  dashboardMode.textContent = displayRoleMode();
-  const requests = (Array.isArray(recentRequests) ? recentRequests : [])
-    .filter((request) => !request?.standingRunId);
-  const mineCount = requests
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
-    .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter: "mine", sessionUser }))
-    .length;
-  const allCount = requests
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
-    .length;
-  const nextOwner = dashboardOwnerFilter === "mine" ? "all" : "mine";
-
-  dashboardCards.innerHTML = `
-    <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-owner-filter="${escapeHtml(nextOwner)}" aria-pressed="true">
-      <strong>${escapeHtml(dashboardOwnerFilter === "mine" ? mineCount : allCount)}</strong>
-      <span>${escapeHtml(dashboardOwnerFilter === "mine" ? "My Orders" : "All Users Orders")}</span>
-      <small>${escapeHtml(dashboardOwnerFilter === "mine" ? "Click to show all users orders for the current status" : "Click to show only your orders for the current status")}</small>
-    </button>
-  `;
-}

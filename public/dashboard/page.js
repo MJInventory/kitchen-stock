@@ -28,7 +28,6 @@ import {
 } from "../ordering/request-status.js";
 import {
   renderDailyOrder,
-  renderDashboardCards,
   renderNotifications,
   renderOpenOrders,
   renderStandingOrders
@@ -59,8 +58,6 @@ export function initDashboardPage() {
   const notificationPanel = document.querySelector(".notification-panel");
   const readAllNotificationsButton = document.querySelector("#readAllNotificationsButton");
   const enablePushButton = document.querySelector("#enablePushButton");
-  const dashboardMode = document.querySelector("#dashboardMode");
-  const dashboardCards = document.querySelector("#dashboardCards");
   const message = document.querySelector("#message");
 
   let allItems = [];
@@ -72,9 +69,6 @@ export function initDashboardPage() {
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
   let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-  let dashboardStatusFilter = "open";
-  let dashboardOwnerFilter = "all";
-
   function requestArea(request) {
     return resolveRequestArea(request, allItems);
   }
@@ -164,17 +158,6 @@ export function initDashboardPage() {
       readAllNotificationsButton,
       notifications
     });
-    renderDashboardCards({
-      dashboardCards,
-      dashboardMode,
-      displayRoleMode: () => displayRoleMode(sessionRole),
-      recentRequests,
-      matchesDashboardOwnerFilter,
-      sessionUser,
-      dashboardOwnerFilter,
-      matchesDashboardStatusFilter,
-      today
-    });
     renderDailyOrder({
       dailyOrderCount,
       dailyOrderList,
@@ -182,7 +165,7 @@ export function initDashboardPage() {
       selectedArea: selectedFilterValue(dailyAreaFilter),
       requestArea,
       requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
-      dashboardStatusFilter,
+      dashboardStatusFilter: "open",
       matchesDashboardOwnerFilter: (request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }),
       matchesDashboardStatusFilter,
       requestDay,
@@ -201,7 +184,7 @@ export function initDashboardPage() {
       selectedArea: selectedFilterValue(dailyAreaFilter),
       requestArea,
       requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
-      dashboardStatusFilter,
+      dashboardStatusFilter: "open",
       matchesDashboardOwnerFilter: (request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }),
       matchesDashboardStatusFilter,
       isOpenAttentionRequest,
@@ -274,13 +257,6 @@ export function initDashboardPage() {
     } catch (error) {
       setLoginMessage(error.message, true);
     }
-  });
-
-  dashboardCards?.addEventListener("click", (event) => {
-    const ownerCard = event.target.closest("[data-dashboard-owner-filter]");
-    if (!ownerCard?.dataset.dashboardOwnerFilter) return;
-    dashboardOwnerFilter = ownerCard.dataset.dashboardOwnerFilter === "mine" ? "mine" : "all";
-    renderAll();
   });
 
   logoutButton?.addEventListener("click", showLogin);

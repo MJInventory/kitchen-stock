@@ -139,7 +139,13 @@ export function initStandingOrdersPage() {
     standingOrders = data.standingOrders || [];
     if (requestedOrderId && standingStatusFilter === "open") {
       const requestedOrder = standingOrders.find((order) => order.id === requestedOrderId);
-      if (requestedOrder && !standingOrderMatchesStatusFilter(requestedOrder, "open")) {
+      const openRunOrderIds = new Set(
+        standingRuns
+          .filter((run) => !run?.closedAt && Number(run?.openLines || 0) > 0)
+          .map((run) => String(run?.standingOrderId || "").trim())
+          .filter(Boolean)
+      );
+      if (requestedOrder && !standingOrderMatchesStatusFilter(requestedOrder, "open", openRunOrderIds)) {
         standingStatusFilter = "all";
       }
     }
@@ -152,7 +158,8 @@ export function initStandingOrdersPage() {
       expandedOrderId,
       canAdminStandingOrders: canAdminStandingOrders(),
       itemById,
-      statusFilter: standingStatusFilter
+      statusFilter: standingStatusFilter,
+      standingRuns
     });
   }
 
@@ -260,7 +267,8 @@ export function initStandingOrdersPage() {
         expandedOrderId,
         canAdminStandingOrders: canAdminStandingOrders(),
         itemById,
-        statusFilter: standingStatusFilter
+        statusFilter: standingStatusFilter,
+        standingRuns
       });
       return;
     }

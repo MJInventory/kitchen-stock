@@ -13,11 +13,18 @@ function standingStatusLabel(order) {
   return "Inactive";
 }
 
-export function standingOrderMatchesStatusFilter(order, filter = "open") {
+function standingOrderHasOpenRun(order, openRunOrderIds) {
+  if (!openRunOrderIds || !openRunOrderIds.size) return false;
+  const orderId = String(order?.id || "").trim();
+  return orderId ? openRunOrderIds.has(orderId) : false;
+}
+
+export function standingOrderMatchesStatusFilter(order, filter = "open", openRunOrderIds = new Set()) {
   const status = String(order?.statusLabel || "").trim().toLowerCase();
   const isCompletedLike = status === "completed" || status === "closed" || status === "inactive";
   const isExplicitlyOpen = status === "open" || status.includes("not closed");
-  const isOpen = isExplicitlyOpen || (order?.active !== false && !isCompletedLike);
+  const isOpenFromRuns = standingOrderHasOpenRun(order, openRunOrderIds);
+  const isOpen = isExplicitlyOpen || isOpenFromRuns || (order?.active !== false && !isCompletedLike);
   return filter === "all" ? true : isOpen;
 }
 
@@ -148,7 +155,13 @@ export function renderStandingStatusCards({ orders, activeFilter, standingStatus
   if (!standingStatusCards) return;
   const allOrders = Array.isArray(orders) ? orders : [];
   const allRuns = Array.isArray(standingRuns) ? standingRuns : [];
-  const openCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "open")).length;
+  const openRunOrderIds = new Set(
+    allRuns
+      .filter((run) => !run?.closedAt && Number(run?.openLines || 0) > 0)
+      .map((run) => String(run?.standingOrderId || "").trim())
+      .filter(Boolean)
+  );
+  const openCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "open", openRunOrderIds)).length;
   const showingAll = activeFilter === "all";
   standingStatusCards.innerHTML = `
     <button class="dashboard-card dashboard-filter-card active standing-status-toggle" type="button" data-standing-status-filter="${showingAll ? "open" : "all"}" aria-pressed="${showingAll ? "true" : "false"}">
@@ -172,10 +185,17 @@ export function renderStandingOrders({
   expandedOrderId,
   canAdminStandingOrders,
   itemById,
-  statusFilter = "open"
+  statusFilter = "open",
+  standingRuns = []
 }) {
   const showDelete = canAdminStandingOrders;
-  const filteredOrders = (Array.isArray(orders) ? orders : []).filter((order) => standingOrderMatchesStatusFilter(order, statusFilter));
+  const openRunOrderIds = new Set(
+    (Array.isArray(standingRuns) ? standingRuns : [])
+      .filter((run) => !run?.closedAt && Number(run?.openLines || 0) > 0)
+      .map((run) => String(run?.standingOrderId || "").trim())
+      .filter(Boolean)
+  );
+  const filteredOrders = (Array.isArray(orders) ? orders : []).filter((order) => standingOrderMatchesStatusFilter(order, statusFilter, openRunOrderIds));
   standingList.innerHTML = filteredOrders.map((order) => `
     <article class="setting-row standing-order-row${expandedOrderId === order.id ? " expanded" : ""}" data-order-id="${esc(order.id)}">
       <button

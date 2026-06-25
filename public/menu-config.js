@@ -15,11 +15,7 @@
       { label: "Settings", href: "/settings.html", fixed: true },
       { label: "Management Report", href: "/management-report.html", permission: "canAddInventoryItems" },
       { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
-      { label: "Inventory Items", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
-      { label: "Suppliers", href: "/suppliers.html", permission: "canAddInventoryItems" },
-      { label: "Categories", href: "/categories.html", permission: "canAddInventoryItems" },
-      { label: "Units of Measure", href: "/units-of-measure.html", permission: "canAdminUsers" },
-      { label: "Storage & Shelves", href: "/shelf-codes.html", permission: "canAddInventoryItems" },
+      { label: "Item Admin", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
       { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" }
     ]
   };

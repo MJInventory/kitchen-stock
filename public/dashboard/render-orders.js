@@ -8,6 +8,7 @@ export function renderDailyOrder({
   selectedArea,
   requestArea,
   requesterMatches,
+  dashboardStatusFilter,
   requestDay,
   today,
   matchesDashboardOwnerFilter,
@@ -20,14 +21,14 @@ export function renderDailyOrder({
   buildOrderJumpHref
 }) {
   const activeRequests = recentRequests
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter, today }))
     .filter((request) => !request.standingRunId)
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
     .filter((request) => matchesDashboardOwnerFilter(request))
     .filter((request) => requestDay(request) === today)
     .sort(logicalRequestCompare);
-  dailyOrderCount.textContent = `${activeRequests.length} active`;
+  dailyOrderCount.textContent = `${activeRequests.length} ${dashboardStatusFilter}`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100), allItems);
   dailyOrderList.innerHTML = grouped
     .map(([category, requests]) => `
@@ -57,7 +58,7 @@ export function renderDailyOrder({
     .join("");
 
   if (!dailyOrderList.innerHTML) {
-    dailyOrderList.innerHTML = '<p class="empty-sheet">No active orders yet.</p>';
+    dailyOrderList.innerHTML = `<p class="empty-sheet">No ${dashboardStatusFilter} orders for today.</p>`;
   }
 }
 
@@ -68,6 +69,7 @@ export function renderOpenOrders({
   selectedArea,
   requestArea,
   requesterMatches,
+  dashboardStatusFilter,
   isOpenAttentionRequest,
   isOlderOpenRequest,
   today,
@@ -83,14 +85,16 @@ export function renderOpenOrders({
   overdueRowClass = () => ""
 }) {
   const openRequests = recentRequests
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter, today }))
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
     .filter((request) => matchesDashboardOwnerFilter(request))
-    .filter((request) => isOpenAttentionRequest(request, today))
+    .filter((request) => dashboardStatusFilter === "open"
+      ? isOpenAttentionRequest(request, today)
+      : requestDay(request) !== today)
     .sort(logicalRequestCompare);
 
-  openOrderCount.textContent = `${openRequests.length} open`;
+  openOrderCount.textContent = `${openRequests.length} ${dashboardStatusFilter}`;
   const grouped = groupRequestsByCategory(openRequests.slice(0, 100), allItems);
   openOrderList.innerHTML = grouped
     .map(([category, requests]) => `
@@ -121,7 +125,7 @@ export function renderOpenOrders({
     .join("");
 
   if (!openOrderList.innerHTML) {
-    openOrderList.innerHTML = '<p class="empty-sheet">No older open orders.</p>';
+    openOrderList.innerHTML = `<p class="empty-sheet">No ${dashboardStatusFilter === "open" ? "older open" : "older closed"} orders.</p>`;
   }
 }
 

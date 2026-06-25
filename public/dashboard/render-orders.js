@@ -10,7 +10,8 @@ export function renderDailyOrder({
   requesterMatches,
   requestDay,
   today,
-  requestMatchesDashboardFilter,
+  matchesDashboardOwnerFilter,
+  matchesDashboardStatusFilter,
   logicalRequestCompare,
   allItems,
   requestCategory,
@@ -19,12 +20,12 @@ export function renderDailyOrder({
   buildOrderJumpHref
 }) {
   const activeRequests = recentRequests
-    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
     .filter((request) => !request.standingRunId)
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
+    .filter((request) => matchesDashboardOwnerFilter(request))
     .filter((request) => requestDay(request) === today)
-    .filter((request) => requestMatchesDashboardFilter(request, today))
     .sort(logicalRequestCompare);
   dailyOrderCount.textContent = `${activeRequests.length} active`;
   const grouped = groupRequestsByCategory(activeRequests.slice(0, 100), allItems);
@@ -70,7 +71,8 @@ export function renderOpenOrders({
   isOpenAttentionRequest,
   isOlderOpenRequest,
   today,
-  requestMatchesDashboardFilter,
+  matchesDashboardOwnerFilter,
+  matchesDashboardStatusFilter,
   logicalRequestCompare,
   allItems,
   requestDay,
@@ -81,11 +83,11 @@ export function renderOpenOrders({
   overdueRowClass = () => ""
 }) {
   const openRequests = recentRequests
-    .filter((request) => !request.received && request.status !== "Fulfilled")
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
     .filter((request) => !selectedArea || requestArea(request) === selectedArea)
     .filter(requesterMatches)
+    .filter((request) => matchesDashboardOwnerFilter(request))
     .filter((request) => isOpenAttentionRequest(request, today))
-    .filter((request) => requestMatchesDashboardFilter(request, today))
     .sort(logicalRequestCompare);
 
   openOrderCount.textContent = `${openRequests.length} open`;

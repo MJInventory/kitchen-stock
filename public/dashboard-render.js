@@ -36,59 +36,47 @@ export function renderDashboardCards({
   dashboardCards,
   dashboardMode,
   displayRoleMode,
-  isOperationalRole,
-  dashboardSummary,
   recentRequests,
   requestUser,
+  matchesDashboardOwnerFilter,
+  matchesDashboardStatusFilter,
   sameUser,
   sessionUser,
-  requestDay,
-  today,
-  isStandingOrderRequest,
-  isOpenAttentionRequest,
-  isOlderOpenRequest,
-  allItems,
-  standingOrders,
-  notifications,
-  dashboardFilter
+  dashboardStatusFilter,
+  dashboardOwnerFilter,
+  today
 }) {
   if (!dashboardCards || !dashboardMode) return;
   dashboardMode.textContent = displayRoleMode();
-  const summary = dashboardSummary?.dashboard || {};
-  const myOpen = Number(summary.mine || 0);
-  const teamToday = Number(summary.today || 0);
-  const olderOpen = Number(summary.older || 0);
-  const belowMin = Number(summary.below || 0);
-  const standingDue = Number(summary.standing || 0);
-  const unread = Number(summary.unread || 0);
+  const requests = Array.isArray(recentRequests) ? recentRequests : [];
+  const openCount = requests
+    .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }))
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
+    .length;
+  const closedCount = requests
+    .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }))
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "closed", today }))
+    .length;
+  const mineCount = requests
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter, today }))
+    .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter: "mine", sessionUser }))
+    .length;
+  const allCount = requests
+    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter, today }))
+    .length;
+  const nextStatus = dashboardStatusFilter === "open" ? "closed" : "open";
+  const nextOwner = dashboardOwnerFilter === "mine" ? "all" : "mine";
 
-  const cards = isOperationalRole()
-    ? [
-      ["Today active", teamToday, "Open order lines still waiting today", "today"],
-      ["My open", myOpen, "Items with your name still open", "mine"],
-      ["Older open", olderOpen, "Still waiting from previous days", "older"],
-      ["Below minimum", belowMin, "Inventory items currently under minimum", "below"],
-      ["Standing due", standingDue, "Standing orders due now or overdue", "standing"],
-      ["Unread", unread, "Notifications waiting for action", "unread"]
-    ]
-    : [
-      ["My open", myOpen, "Items you still have open", "mine"],
-      ["Today active", teamToday, "Open order lines still waiting today", "today"],
-      ["Older open", olderOpen, "Still waiting from previous days", "older"],
-      ["Unread", unread, "Notifications waiting for you", "unread"]
-    ];
-
-  dashboardCards.innerHTML = cards
-    .filter(([, value, , filterKey]) => Number(value || 0) > 0 || dashboardFilter === filterKey)
-    .map(([label, value, hint, filterKey]) => `
-    <button class="dashboard-card dashboard-filter-card${dashboardFilter === filterKey ? " active" : ""}" type="button" data-dashboard-filter="${escapeHtml(filterKey)}" aria-pressed="${dashboardFilter === filterKey ? "true" : "false"}">
-      <strong>${escapeHtml(value)}</strong>
-      <span>${escapeHtml(label)}</span>
-      <small>${escapeHtml(hint)}</small>
+  dashboardCards.innerHTML = `
+    <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-status-filter="${escapeHtml(nextStatus)}" aria-pressed="true">
+      <strong>${escapeHtml(dashboardStatusFilter === "open" ? openCount : closedCount)}</strong>
+      <span>${escapeHtml(dashboardStatusFilter === "open" ? "Open Items" : "Closed Items")}</span>
+      <small>${escapeHtml(dashboardStatusFilter === "open" ? "Click to show completed, closed, and delivered items" : "Click to show not closed, scheduled, and 2Deliver items")}</small>
     </button>
-  `).join("");
-
-  if (!dashboardCards.innerHTML) {
-    dashboardCards.innerHTML = '<p class="empty-sheet">Nothing needs attention right now.</p>';
-  }
+    <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-owner-filter="${escapeHtml(nextOwner)}" aria-pressed="true">
+      <strong>${escapeHtml(dashboardOwnerFilter === "mine" ? mineCount : allCount)}</strong>
+      <span>${escapeHtml(dashboardOwnerFilter === "mine" ? "My Orders" : "All Users Orders")}</span>
+      <small>${escapeHtml(dashboardOwnerFilter === "mine" ? "Click to show all users orders for the current status" : "Click to show only your orders for the current status")}</small>
+    </button>
+  `;
 }

@@ -1,14 +1,16 @@
 import {
   buildOrderJumpHref,
   displayRoleMode,
+  isDashboardOpenRequest,
   formatUserDisplay,
   isOperationalRole,
+  matchesDashboardOwnerFilter,
+  matchesDashboardStatusFilter,
   populateDailyAreaFilter,
   populateDailyUserFilter,
   renderPushStatus,
   requestCategory,
   requesterMatches,
-  requestMatchesDashboardFilter,
   sameUser,
   selectedFilterValue,
   todayLocal
@@ -70,7 +72,8 @@ export function initDashboardPage() {
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
   let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
   let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-  let dashboardFilter = "all";
+  let dashboardStatusFilter = "open";
+  let dashboardOwnerFilter = "all";
 
   function requestArea(request) {
     return resolveRequestArea(request, allItems);
@@ -165,21 +168,15 @@ export function initDashboardPage() {
       dashboardCards,
       dashboardMode,
       displayRoleMode: () => displayRoleMode(sessionRole),
-      isOperationalRole: () => isOperationalRole(sessionPermissions),
       recentRequests,
       requestUser,
+      matchesDashboardOwnerFilter,
+      matchesDashboardStatusFilter,
       sameUser,
       sessionUser,
-      requestDay,
       today,
-      isStandingOrderRequest,
-      isOpenAttentionRequest,
-      isOlderOpenRequest,
-      allItems,
-      standingOrders,
-      notifications,
-      dashboardSummary: summary,
-      dashboardFilter
+      dashboardStatusFilter,
+      dashboardOwnerFilter
     });
     renderDailyOrder({
       dailyOrderCount,
@@ -188,9 +185,10 @@ export function initDashboardPage() {
       selectedArea: selectedFilterValue(dailyAreaFilter),
       requestArea,
       requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
+      matchesDashboardOwnerFilter: (request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }),
+      matchesDashboardStatusFilter,
       requestDay,
       today,
-      requestMatchesDashboardFilter: (request, currentToday) => requestMatchesDashboardFilter(request, { dashboardFilter, allItems, sessionUser, today: currentToday }),
       logicalRequestCompare: (left, right) => logicalRequestCompare(left, right, allItems),
       allItems,
       requestCategory: (request) => requestCategory(request, allItems),
@@ -205,10 +203,11 @@ export function initDashboardPage() {
       selectedArea: selectedFilterValue(dailyAreaFilter),
       requestArea,
       requesterMatches: (request) => requesterMatches(request, { dailyScopeFilter, dailyUserFilter, sessionUser }),
+      matchesDashboardOwnerFilter: (request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }),
+      matchesDashboardStatusFilter,
       isOpenAttentionRequest,
       isOlderOpenRequest,
       today,
-      requestMatchesDashboardFilter: (request, currentToday) => requestMatchesDashboardFilter(request, { dashboardFilter, allItems, sessionUser, today: currentToday }),
       logicalRequestCompare: (left, right) => logicalRequestCompare(left, right, allItems),
       allItems,
       requestDay,
@@ -223,7 +222,6 @@ export function initDashboardPage() {
       standingOrderList,
       standingOrders,
       isOperationalRole: isOperationalRole(sessionPermissions),
-      dashboardFilter,
       today
     });
   }
@@ -280,13 +278,16 @@ export function initDashboardPage() {
   });
 
   dashboardCards?.addEventListener("click", (event) => {
-    const card = event.target.closest("[data-dashboard-filter]");
-    if (!card?.dataset.dashboardFilter) return;
-    dashboardFilter = dashboardFilter === card.dataset.dashboardFilter ? "all" : card.dataset.dashboardFilter;
-    renderAll();
-    if (dashboardFilter === "unread" && notificationPanel) {
-      notificationPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    const statusCard = event.target.closest("[data-dashboard-status-filter]");
+    if (statusCard?.dataset.dashboardStatusFilter) {
+      dashboardStatusFilter = statusCard.dataset.dashboardStatusFilter === "closed" ? "closed" : "open";
+      renderAll();
+      return;
     }
+    const ownerCard = event.target.closest("[data-dashboard-owner-filter]");
+    if (!ownerCard?.dataset.dashboardOwnerFilter) return;
+    dashboardOwnerFilter = ownerCard.dataset.dashboardOwnerFilter === "mine" ? "mine" : "all";
+    renderAll();
   });
 
   logoutButton?.addEventListener("click", showLogin);

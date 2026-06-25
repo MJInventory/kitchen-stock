@@ -86,25 +86,29 @@ export function requesterMatches(request, { dailyScopeFilter, dailyUserFilter, s
   return sameUser(requestUser(request), selectedUser);
 }
 
-export function requestMatchesDashboardFilter(request, {
-  dashboardFilter,
-  allItems,
-  sessionUser,
-  today = todayLocal()
-}) {
-  if (!dashboardFilter || dashboardFilter === "all") return true;
-  if (dashboardFilter === "today") {
-    const isToday = typeof request?.isTodayRequest === "boolean" ? request.isTodayRequest : requestDay(request) === today;
-    return isToday && !isStandingOrderRequest(request);
-  }
-  if (dashboardFilter === "mine") return sameUser(requestUser(request), sessionUser);
-  if (dashboardFilter === "older") return isOpenAttentionRequest(request, today);
-  if (dashboardFilter === "below") {
-    const item = itemForRequest(request, allItems);
-    return item ? Number(item.quantity || 0) < Number(item.minimum || 0) : false;
-  }
-  if (dashboardFilter === "standing" || dashboardFilter === "unread") return false;
+export function matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }) {
+  if (dashboardOwnerFilter === "mine") return sameUser(requestUser(request), sessionUser);
   return true;
+}
+
+export function isDashboardClosedRequest(request, today = todayLocal()) {
+  const status = String(request?.status || "").trim().toLowerCase();
+  if (Boolean(request?.delivered) || Boolean(request?.received)) return true;
+  return status === "completed" || status === "closed" || status === "fulfilled" || status === "delivered";
+}
+
+export function isDashboardOpenRequest(request, today = todayLocal()) {
+  if (isDashboardClosedRequest(request, today)) return false;
+  const status = String(request?.status || "").trim().toLowerCase();
+  if (status.includes("not closed")) return true;
+  if (status === "scheduled" || status === "open") return true;
+  if (Boolean(request?.toDeliver)) return true;
+  return true;
+}
+
+export function matchesDashboardStatusFilter(request, { dashboardStatusFilter, today = todayLocal() }) {
+  if (dashboardStatusFilter === "closed") return isDashboardClosedRequest(request, today);
+  return isDashboardOpenRequest(request, today);
 }
 
 export function renderPushStatus(enablePushButton, detail = {}) {

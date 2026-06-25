@@ -171,6 +171,8 @@ export function initDashboardPage() {
       recentRequests,
       matchesDashboardOwnerFilter,
       matchesDashboardStatusFilter,
+      isOpenAttentionRequest,
+      requestDay,
       sessionUser,
       today,
       dashboardStatusFilter,

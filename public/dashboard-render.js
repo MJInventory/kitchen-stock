@@ -39,6 +39,8 @@ export function renderDashboardCards({
   recentRequests,
   matchesDashboardOwnerFilter,
   matchesDashboardStatusFilter,
+  isOpenAttentionRequest,
+  requestDay,
   sessionUser,
   dashboardStatusFilter,
   dashboardOwnerFilter,
@@ -48,20 +50,21 @@ export function renderDashboardCards({
   dashboardMode.textContent = displayRoleMode();
   const requests = (Array.isArray(recentRequests) ? recentRequests : [])
     .filter((request) => !request?.standingRunId);
-  const openCount = requests
-    .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }))
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
-    .length;
-  const closedCount = requests
-    .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }))
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "closed", today }))
-    .length;
+  const visibleForStatus = (request, filter) => {
+    if (!matchesDashboardStatusFilter(request, { dashboardStatusFilter: filter, today })) return false;
+    if (filter === "open") {
+      return requestDay(request) === today || isOpenAttentionRequest(request, today);
+    }
+    return true;
+  };
+  const openCount = requests.filter((request) => visibleForStatus(request, "open")).length;
+  const closedCount = requests.filter((request) => visibleForStatus(request, "closed")).length;
   const mineCount = requests
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter, today }))
+    .filter((request) => visibleForStatus(request, dashboardStatusFilter))
     .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter: "mine", sessionUser }))
     .length;
   const allCount = requests
-    .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter, today }))
+    .filter((request) => visibleForStatus(request, dashboardStatusFilter))
     .length;
   const nextStatus = dashboardStatusFilter === "open" ? "closed" : "open";
   const nextOwner = dashboardOwnerFilter === "mine" ? "all" : "mine";

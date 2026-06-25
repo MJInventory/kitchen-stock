@@ -196,7 +196,7 @@ export function createOrderingDisplayRender(options) {
       selected: getSelected(),
       defaultQuantity,
       itemUnit,
-      unitOptions: getUnitOptions(),
+      unitOptions: getUnitOptions,
       requestOpenStatsForItem,
       addItemHrefFromSearch,
       sessionPermissions: getSessionPermissions()

@@ -770,6 +770,15 @@ button:hover,
   max-width: 100% !important;
 }
 
+.standing-status-cards .standing-status-toggle--secondary,
+.standing-status-cards .standing-status-toggle--secondary.active,
+.standing-status-cards .standing-status-toggle--secondary:hover,
+.standing-status-cards .standing-status-toggle--secondary:focus-visible {
+  background: linear-gradient(135deg, #e8f1f4 0%, #cfdfe5 100%) !important;
+  border-color: #6f8a94 !important;
+  box-shadow: 0 0 0 1px rgba(111, 138, 148, 0.18), 0 16px 40px rgba(0, 0, 0, 0.1) !important;
+}
+
 .standing-run-table .standing-run-line td {
   background: #e9f7e6;
 }

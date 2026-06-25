@@ -26,6 +26,7 @@ export function initStandingOrdersPage() {
   const standingList = document.querySelector("#standingList");
   const standingRunList = document.querySelector("#standingRunList");
   const standingStatusCards = document.querySelector("#standingStatusCards");
+  const standingHistoryPanel = document.querySelector("#standingHistoryPanel");
 
   let items = [];
   let suppliers = [];
@@ -36,6 +37,7 @@ export function initStandingOrdersPage() {
   let expandedOrderId = requestedOrderId || "";
   let expandedRunId = "";
   let standingStatusFilter = "open";
+  let standingRunsVisible = false;
 
   function setMessage(text, isError = false) {
     message.textContent = text;
@@ -44,6 +46,19 @@ export function initStandingOrdersPage() {
 
   function itemById(itemId) {
     return items.find((item) => item.id === itemId);
+  }
+
+  function renderStandingStatusControls() {
+    renderStandingStatusCards({
+      orders: standingOrders,
+      activeFilter: standingStatusFilter,
+      standingStatusCards,
+      standingRuns,
+      runsVisible: standingRunsVisible
+    });
+    if (standingHistoryPanel) {
+      standingHistoryPanel.hidden = !standingRunsVisible;
+    }
   }
 
   function canAdminStandingOrders() {
@@ -128,7 +143,7 @@ export function initStandingOrdersPage() {
         standingStatusFilter = "all";
       }
     }
-    renderStandingStatusCards({ orders: standingOrders, activeFilter: standingStatusFilter, standingStatusCards });
+    renderStandingStatusControls();
     renderStandingOrders({
       orders: standingOrders,
       standingList,
@@ -144,6 +159,7 @@ export function initStandingOrdersPage() {
   async function loadStandingOrderRuns() {
     const data = await page.api("/api/standing-order-runs");
     standingRuns = data.runs || [];
+    renderStandingStatusControls();
     renderStandingOrderRuns({ runs: standingRuns, standingRunList, expandedRunId });
   }
 
@@ -230,22 +246,29 @@ export function initStandingOrdersPage() {
   });
 
   standingStatusCards?.addEventListener("click", (event) => {
-    const card = event.target.closest("[data-standing-status-filter]");
-    if (!card) return;
-    const nextFilter = card.dataset.standingStatusFilter === "all" ? "all" : "open";
-    if (standingStatusFilter === nextFilter) return;
-    standingStatusFilter = nextFilter;
-    renderStandingStatusCards({ orders: standingOrders, activeFilter: standingStatusFilter, standingStatusCards });
-    renderStandingOrders({
-      orders: standingOrders,
-      standingList,
-      suppliers,
-      requestedOrderId,
-      expandedOrderId,
-      canAdminStandingOrders: canAdminStandingOrders(),
-      itemById,
-      statusFilter: standingStatusFilter
-    });
+    const statusCard = event.target.closest("[data-standing-status-filter]");
+    if (statusCard) {
+      const nextFilter = statusCard.dataset.standingStatusFilter === "all" ? "all" : "open";
+      if (standingStatusFilter === nextFilter) return;
+      standingStatusFilter = nextFilter;
+      renderStandingStatusControls();
+      renderStandingOrders({
+        orders: standingOrders,
+        standingList,
+        suppliers,
+        requestedOrderId,
+        expandedOrderId,
+        canAdminStandingOrders: canAdminStandingOrders(),
+        itemById,
+        statusFilter: standingStatusFilter
+      });
+      return;
+    }
+
+    const runsCard = event.target.closest("[data-standing-runs-toggle]");
+    if (!runsCard) return;
+    standingRunsVisible = runsCard.dataset.standingRunsToggle === "show";
+    renderStandingStatusControls();
   });
 
   standingList.addEventListener("click", (event) => {

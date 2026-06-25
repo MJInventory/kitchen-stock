@@ -143,9 +143,10 @@ export function renderOrderItems({ order, itemById }) {
   `;
 }
 
-export function renderStandingStatusCards({ orders, activeFilter, standingStatusCards }) {
+export function renderStandingStatusCards({ orders, activeFilter, standingStatusCards, standingRuns = [], runsVisible = false }) {
   if (!standingStatusCards) return;
   const allOrders = Array.isArray(orders) ? orders : [];
+  const allRuns = Array.isArray(standingRuns) ? standingRuns : [];
   const openCount = allOrders.filter((order) => standingOrderMatchesStatusFilter(order, "open")).length;
   const showingAll = activeFilter === "all";
   standingStatusCards.innerHTML = `
@@ -153,6 +154,11 @@ export function renderStandingStatusCards({ orders, activeFilter, standingStatus
       <strong>${esc(showingAll ? allOrders.length : openCount)}</strong>
       <span>${esc(showingAll ? "All Standing Orders" : "Open Standing Orders")}</span>
       <small>${esc(showingAll ? "Click to hide completed standing orders" : "Click to show completed standing orders too")}</small>
+    </button>
+    <button class="dashboard-card dashboard-filter-card standing-status-toggle standing-status-toggle--secondary${runsVisible ? " active" : ""}" type="button" data-standing-runs-toggle="${runsVisible ? "hide" : "show"}" aria-pressed="${runsVisible ? "true" : "false"}">
+      <strong>${esc(allRuns.length)}</strong>
+      <span>Recent Standing Order Runs</span>
+      <small>${esc(runsVisible ? "Click to hide recent standing order runs" : "Click to display recent standing order runs")}</small>
     </button>
   `;
 }

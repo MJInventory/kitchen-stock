@@ -37,10 +37,8 @@ export function renderDashboardCards({
   dashboardMode,
   displayRoleMode,
   recentRequests,
-  requestUser,
   matchesDashboardOwnerFilter,
   matchesDashboardStatusFilter,
-  sameUser,
   sessionUser,
   dashboardStatusFilter,
   dashboardOwnerFilter,
@@ -48,7 +46,8 @@ export function renderDashboardCards({
 }) {
   if (!dashboardCards || !dashboardMode) return;
   dashboardMode.textContent = displayRoleMode();
-  const requests = Array.isArray(recentRequests) ? recentRequests : [];
+  const requests = (Array.isArray(recentRequests) ? recentRequests : [])
+    .filter((request) => !request?.standingRunId);
   const openCount = requests
     .filter((request) => matchesDashboardOwnerFilter(request, { dashboardOwnerFilter, sessionUser }))
     .filter((request) => matchesDashboardStatusFilter(request, { dashboardStatusFilter: "open", today }))
@@ -68,15 +67,15 @@ export function renderDashboardCards({
   const nextOwner = dashboardOwnerFilter === "mine" ? "all" : "mine";
 
   dashboardCards.innerHTML = `
-    <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-status-filter="${escapeHtml(nextStatus)}" aria-pressed="true">
-      <strong>${escapeHtml(dashboardStatusFilter === "open" ? openCount : closedCount)}</strong>
-      <span>${escapeHtml(dashboardStatusFilter === "open" ? "Open Items" : "Closed Items")}</span>
-      <small>${escapeHtml(dashboardStatusFilter === "open" ? "Click to show completed, closed, and delivered items" : "Click to show not closed, scheduled, and 2Deliver items")}</small>
-    </button>
     <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-owner-filter="${escapeHtml(nextOwner)}" aria-pressed="true">
       <strong>${escapeHtml(dashboardOwnerFilter === "mine" ? mineCount : allCount)}</strong>
       <span>${escapeHtml(dashboardOwnerFilter === "mine" ? "My Orders" : "All Users Orders")}</span>
       <small>${escapeHtml(dashboardOwnerFilter === "mine" ? "Click to show all users orders for the current status" : "Click to show only your orders for the current status")}</small>
+    </button>
+    <button class="dashboard-card dashboard-filter-card active" type="button" data-dashboard-status-filter="${escapeHtml(nextStatus)}" aria-pressed="true">
+      <strong>${escapeHtml(dashboardStatusFilter === "open" ? openCount : closedCount)}</strong>
+      <span>${escapeHtml(dashboardStatusFilter === "open" ? "Open Items" : "Closed Items")}</span>
+      <small>${escapeHtml(dashboardStatusFilter === "open" ? "Click to show completed, closed, and delivered items" : "Click to show not closed, scheduled, and 2Deliver items")}</small>
     </button>
   `;
 }

@@ -14,6 +14,7 @@
   const message = document.querySelector("#rosterMessage");
   const lockMessage = document.querySelector("#rosterLockMessage");
   const weekRange = document.querySelector("#weekRange");
+  const weekNumberBadge = document.querySelector("#weekNumberBadge");
   const shiftLegend = document.querySelector("#shiftLegend");
   const rosterGrid = document.querySelector("#rosterGrid");
   const shiftAdminPanel = document.querySelector("#shiftAdminPanel");
@@ -26,7 +27,7 @@
   const shiftAdminMessage = document.querySelector("#shiftAdminMessage");
   const shiftAdminList = document.querySelector("#shiftAdminList");
   const shiftAdminResetButton = document.querySelector("#shiftAdminResetButton");
-  const SHIFT_COLOR_FALLBACKS = [
+  const BASE_SHIFT_COLOR_OPTIONS = [
     { value: "#fff1b8", label: "Soft Gold" },
     { value: "#c7f9d4", label: "Mint" },
     { value: "#c7f3f8", label: "Aqua" },
@@ -39,8 +40,7 @@
     { value: "#ffffff", label: "White" },
     { value: "#fde68a", label: "Honey" },
     { value: "#bfdbfe", label: "Powder Blue" },
-    { value: "#fecdd3", label: "Blush" },
-    { value: "#20242c", label: "Night" }
+    { value: "#fecdd3", label: "Blush" }
   ];
 
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
@@ -69,6 +69,11 @@
   function safeCssColor(value) {
     const color = String(value || "").trim();
     return /^#[0-9a-f]{3,8}$/i.test(color) ? color : "";
+  }
+
+  function normalizedSixHex(value) {
+    const color = safeCssColor(value).toLowerCase();
+    return /^#[0-9a-f]{6}$/i.test(color) ? color : "";
   }
 
   function colorBrightness(hex) {
@@ -116,6 +121,15 @@
 
   function todayIso() {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  function isoWeekNumber(value) {
+    const date = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return "";
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    return String(week);
   }
 
   function saveSession(data) {
@@ -172,6 +186,26 @@
     select.style.color = contrastInk(shift?.color || "");
   }
 
+  function updateShiftCellDisplay(select) {
+    if (!select) return;
+    const cell = select.closest(".roster-shift-cell");
+    const shift = shiftById(select.value);
+    const shiftColor = safeCssColor(shift?.color || "");
+    const shiftCode = shift?.code || "";
+    const shiftLabel = shift?.label || "";
+    updateSelectColor(select);
+    if (cell) {
+      cell.dataset.shiftCode = shiftCode;
+      cell.style.background = shiftColor || "";
+      cell.style.setProperty("--shift-bg", shiftColor || "transparent");
+      const printLabel = cell.querySelector(".roster-shift-print-label");
+      if (printLabel) {
+        printLabel.textContent = shiftLabel;
+        printLabel.style.color = contrastInk(shiftColor || "");
+      }
+    }
+  }
+
   function setShiftAdminMessage(text, isError = false) {
     if (!shiftAdminMessage) return;
     shiftAdminMessage.textContent = text || "";
@@ -197,16 +231,8 @@
   }
 
   function shiftAdminColorOptions(selectedColor = "") {
-    const selected = safeCssColor(selectedColor).toLowerCase();
-    const fallbackMap = new Map(
-      SHIFT_COLOR_FALLBACKS.map((entry) => [String(entry.value || "").toLowerCase(), entry])
-    );
-    const apiOptions = Array.isArray(shiftAdminData.colorOptions) ? shiftAdminData.colorOptions : [];
-    for (const entry of apiOptions) {
-      const value = String(entry?.value || "").toLowerCase();
-      if (value) fallbackMap.set(value, entry);
-    }
-    const options = [...fallbackMap.values()];
+    const selected = normalizedSixHex(selectedColor);
+    const options = availableShiftColors(selected);
     if (selected && !options.some((entry) => String(entry?.value || "").toLowerCase() === selected)) {
       options.unshift({ value: selected, label: `Current ${selected}` });
     }
@@ -217,6 +243,66 @@
         return `<option value="${escapeHtml(value)}" data-color="${escapeHtml(value)}" style="background:${escapeHtml(value)}; color:${escapeHtml(contrastInk(value))};"${value.toLowerCase() === selected ? " selected" : ""}>${escapeHtml(label)} - ${escapeHtml(value)}</option>`;
       })
       .join("");
+  }
+
+  function hslToHex(hue, saturation, lightness) {
+    const s = saturation / 100;
+    const l = lightness / 100;
+    const c = (1 - Math.abs((2 * l) - 1)) * s;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = l - (c / 2);
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    if (hue < 60) [red, green, blue] = [c, x, 0];
+    else if (hue < 120) [red, green, blue] = [x, c, 0];
+    else if (hue < 180) [red, green, blue] = [0, c, x];
+    else if (hue < 240) [red, green, blue] = [0, x, c];
+    else if (hue < 300) [red, green, blue] = [x, 0, c];
+    else [red, green, blue] = [c, 0, x];
+    const toHex = (value) => Math.round((value + m) * 255).toString(16).padStart(2, "0");
+    return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+  }
+
+  function generatedSpareColor(index) {
+    return hslToHex((index * 47) % 360, 68, 88);
+  }
+
+  function availableShiftColors(extraColor = "") {
+    const paletteMap = new Map(
+      BASE_SHIFT_COLOR_OPTIONS.map((entry) => [normalizedSixHex(entry.value), { value: normalizedSixHex(entry.value), label: entry.label }])
+    );
+    const usedColors = [];
+    const seen = new Set();
+    for (const shift of shiftAdminData.shiftTypes || []) {
+      const color = normalizedSixHex(shift?.color);
+      if (!color || seen.has(color)) continue;
+      seen.add(color);
+      const match = paletteMap.get(color);
+      usedColors.push({ value: color, label: match?.label || color.toUpperCase() });
+    }
+    const selected = normalizedSixHex(extraColor);
+    if (selected && !seen.has(selected)) {
+      seen.add(selected);
+      const match = paletteMap.get(selected);
+      usedColors.push({ value: selected, label: match?.label || selected.toUpperCase() });
+    }
+    const spares = [];
+    for (const entry of BASE_SHIFT_COLOR_OPTIONS) {
+      const color = normalizedSixHex(entry.value);
+      if (!color || seen.has(color)) continue;
+      spares.push({ value: color, label: entry.label });
+      seen.add(color);
+      if (spares.length >= 3) break;
+    }
+    let generatedIndex = 0;
+    while (spares.length < 3) {
+      const color = generatedSpareColor(generatedIndex++);
+      if (!color || seen.has(color)) continue;
+      spares.push({ value: color, label: `Spare ${spares.length + 1}` });
+      seen.add(color);
+    }
+    return [...usedColors, ...spares];
   }
 
   function applyColorSelectAppearance(select) {
@@ -490,6 +576,10 @@
   function renderRoster() {
     if (!rosterData) return;
     weekRange.textContent = `${rosterData.weekStart} - ${rosterData.weekEnd}`;
+    if (weekNumberBadge) {
+      const weekNumber = isoWeekNumber(rosterData.weekStart);
+      weekNumberBadge.textContent = weekNumber ? `Week ${weekNumber}` : "";
+    }
     renderLegend();
 
     const shiftMap = new Map();
@@ -529,11 +619,13 @@
                 const selectedShift = shiftById(shift?.shift_type_id) || shift;
                 const shiftColor = safeCssColor(selectedShift?.color || selectedShift?.shift_color);
                 const shiftCode = selectedShift?.code || selectedShift?.shift_code || "";
+                const shiftLabel = selectedShift?.label || selectedShift?.shift_label || "";
                 return `
                   <td class="roster-shift-cell" data-shift-code="${escapeHtml(shiftCode)}" style="${shiftColor ? `--shift-bg:${escapeHtml(shiftColor)}; background:${escapeHtml(shiftColor)};` : ""}">
                     <select class="roster-shift-select" data-user-id="${escapeHtml(staff.id)}" data-shift-date="${escapeHtml(day.date)}">
                       ${options(shift?.shift_type_id)}
                     </select>
+                    <span class="roster-shift-print-label" style="color:${escapeHtml(contrastInk(shiftColor || ""))}">${escapeHtml(shiftLabel)}</span>
                   </td>
                 `;
               }).join("")}
@@ -548,9 +640,9 @@
       </div>
     `;
     rosterGrid.querySelectorAll(".roster-shift-select").forEach((select) => {
-      updateSelectColor(select);
+      updateShiftCellDisplay(select);
       select.addEventListener("change", () => {
-        updateSelectColor(select);
+        updateShiftCellDisplay(select);
         setRosterDirty(true);
       });
     });

@@ -4642,6 +4642,20 @@ body.order-app {
   padding-bottom: 8px;
 }
 
+.roster-week-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.roster-week-number {
+  color: var(--muted);
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .kitchen-roster-table {
   width: 100%;
   min-width: 0;
@@ -4746,10 +4760,20 @@ body.order-app {
   font-size: 11px;
   letter-spacing: 0;
   white-space: nowrap;
+  text-align: center;
+  text-align-last: center;
 }
 
 .roster-shift-cell {
   background: var(--shift-bg, transparent);
+  text-align: center;
+}
+
+.roster-shift-print-label {
+  display: none;
+  text-align: center;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 @media (min-width: 1024px) {
@@ -4908,19 +4932,16 @@ body.order-app {
   }
 
   .roster-shift-select {
-    appearance: none;
-    background: transparent !important;
-    border: 0;
-    padding: 2px;
-    min-width: 0;
-    font-size: 8px;
-    font-weight: 500;
-    white-space: nowrap;
-    color: #111827 !important;
+    display: none !important;
   }
 
-  .roster-shift-cell[data-shift-code="OFF"] .roster-shift-select {
-    color: #f8fafc !important;
+  .roster-shift-print-label {
+    display: block !important;
+    font-size: 8px;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+    text-align: center;
   }
 
   .roster-function-legend {

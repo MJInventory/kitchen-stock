@@ -18,13 +18,11 @@
   const rosterGrid = document.querySelector("#rosterGrid");
   const shiftAdminPanel = document.querySelector("#shiftAdminPanel");
   const shiftAdminForm = document.querySelector("#shiftAdminForm");
-  const shiftAdminId = document.querySelector("#shiftAdminId");
   const shiftAdminLabel = document.querySelector("#shiftAdminLabel");
   const shiftAdminCode = document.querySelector("#shiftAdminCode");
   const shiftAdminGroup = document.querySelector("#shiftAdminGroup");
   const shiftAdminColor = document.querySelector("#shiftAdminColor");
   const shiftAdminSortOrder = document.querySelector("#shiftAdminSortOrder");
-  const shiftAdminActive = document.querySelector("#shiftAdminActive");
   const shiftAdminMessage = document.querySelector("#shiftAdminMessage");
   const shiftAdminList = document.querySelector("#shiftAdminList");
   const shiftAdminResetButton = document.querySelector("#shiftAdminResetButton");
@@ -36,6 +34,7 @@
   let rosterDirty = false;
   let canManageRoster = false;
   let shiftAdminData = { shiftTypes: [], colorOptions: [] };
+  let editingShiftId = "";
 
   function setMessage(text, isError = false) {
     message.textContent = text || "";
@@ -183,33 +182,28 @@
       .map((entry) => {
         const value = safeCssColor(entry?.value || "");
         const label = String(entry?.label || value).trim() || value;
-        return `<option value="${escapeHtml(value)}"${value.toLowerCase() === selected ? " selected" : ""}>${escapeHtml(label)} - ${escapeHtml(value)}</option>`;
+        return `<option value="${escapeHtml(value)}" data-color="${escapeHtml(value)}" style="background:${escapeHtml(value)}; color:${escapeHtml(contrastInk(value))};"${value.toLowerCase() === selected ? " selected" : ""}>${escapeHtml(label)} - ${escapeHtml(value)}</option>`;
       })
       .join("");
   }
 
+  function applyColorSelectAppearance(select) {
+    if (!select) return;
+    const color = safeCssColor(select.value || select.selectedOptions?.[0]?.dataset?.color || "");
+    select.style.backgroundColor = color || "";
+    select.style.color = contrastInk(color || "");
+  }
+
   function resetShiftAdminForm() {
     if (!shiftAdminForm) return;
-    shiftAdminId.value = "";
     shiftAdminLabel.value = "";
     shiftAdminCode.value = "";
     shiftAdminGroup.value = "kitchen";
     shiftAdminColor.innerHTML = shiftAdminColorOptions("#c7f9d4");
     shiftAdminColor.value = "#c7f9d4";
+    applyColorSelectAppearance(shiftAdminColor);
     shiftAdminSortOrder.value = "100";
-    shiftAdminActive.checked = true;
-    setShiftAdminMessage("");
-  }
-
-  function fillShiftAdminForm(shift) {
-    shiftAdminId.value = shift?.id || "";
-    shiftAdminLabel.value = shift?.label || "";
-    shiftAdminCode.value = shift?.code || "";
-    shiftAdminGroup.value = String(shift?.shift_group || "kitchen").toLowerCase();
-    shiftAdminColor.innerHTML = shiftAdminColorOptions(shift?.color || "#c7f9d4");
-    shiftAdminColor.value = safeCssColor(shift?.color || "#c7f9d4") || "#c7f9d4";
-    shiftAdminSortOrder.value = String(shift?.sort_order ?? 100);
-    shiftAdminActive.checked = shift?.active !== false;
+    editingShiftId = "";
     setShiftAdminMessage("");
   }
 
@@ -228,32 +222,89 @@
             <th>Type</th>
             <th>Color</th>
             <th>Status</th>
-            <th>Edit</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${shifts.map((shift) => `
-            <tr>
-              <td>
-                <strong>${escapeHtml(shift.label || "")}</strong>
-                <span>${escapeHtml(shift.code || "")}</span>
-              </td>
-              <td>${escapeHtml(shiftGroupLabel(shift.shift_group))}</td>
-              <td>
-                <span class="shift-admin-swatch" style="background:${escapeHtml(safeCssColor(shift.color))}; color:${escapeHtml(contrastInk(shift.color))}">${escapeHtml(safeCssColor(shift.color))}</span>
-              </td>
-              <td>${shift.active === false ? "Inactive" : "Active"}</td>
-              <td><button type="button" class="secondary shift-admin-edit-button" data-shift-id="${escapeHtml(shift.id)}">Edit</button></td>
-            </tr>
-          `).join("")}
+          ${shifts.map((shift) => {
+            const isEditing = shift.id === editingShiftId;
+            if (isEditing) {
+              return `
+                <tr class="shift-admin-editing-row" data-shift-id="${escapeHtml(shift.id)}">
+                  <td>
+                    <input class="shift-admin-inline-label" type="text" value="${escapeHtml(shift.label || "")}" maxlength="80">
+                    <span><input class="shift-admin-inline-code" type="text" value="${escapeHtml(shift.code || "")}" maxlength="40"></span>
+                  </td>
+                  <td>
+                    <select class="shift-admin-inline-group">
+                      <option value="kitchen"${String(shift.shift_group || "").toLowerCase() === "kitchen" ? " selected" : ""}>Kitchen Shift</option>
+                      <option value="foh"${String(shift.shift_group || "").toLowerCase() === "foh" ? " selected" : ""}>FOH Shift</option>
+                      <option value="bar"${String(shift.shift_group || "").toLowerCase() === "bar" ? " selected" : ""}>Bar Shift</option>
+                      <option value="other"${String(shift.shift_group || "").toLowerCase() === "other" ? " selected" : ""}>Others</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select class="shift-admin-inline-color">
+                      ${shiftAdminColorOptions(shift.color || "#c7f9d4")}
+                    </select>
+                    <span><input class="shift-admin-inline-sort" type="number" min="0" step="1" value="${escapeHtml(String(shift.sort_order ?? 100))}"></span>
+                  </td>
+                  <td>
+                    <label class="checkbox shift-admin-inline-active">
+                      <input class="shift-admin-inline-active-input" type="checkbox"${shift.active === false ? "" : " checked"}>
+                      <span>${shift.active === false ? "Inactive" : "Active"}</span>
+                    </label>
+                  </td>
+                  <td class="shift-admin-row-actions">
+                    <button type="button" class="shift-admin-save-row" data-shift-id="${escapeHtml(shift.id)}">Save</button>
+                    <button type="button" class="secondary shift-admin-cancel-row">Cancel</button>
+                    <button type="button" class="danger-soft shift-admin-delete-row" data-shift-id="${escapeHtml(shift.id)}">Delete</button>
+                  </td>
+                </tr>
+              `;
+            }
+            return `
+              <tr data-shift-id="${escapeHtml(shift.id)}">
+                <td>
+                  <strong>${escapeHtml(shift.label || "")}</strong>
+                  <span>${escapeHtml(shift.code || "")}</span>
+                </td>
+                <td>${escapeHtml(shiftGroupLabel(shift.shift_group))}</td>
+                <td>
+                  <span class="shift-admin-swatch" style="background:${escapeHtml(safeCssColor(shift.color))}; color:${escapeHtml(contrastInk(shift.color))}">${escapeHtml(safeCssColor(shift.color))}</span>
+                </td>
+                <td>${shift.active === false ? "Inactive" : "Active"}</td>
+                <td class="shift-admin-row-actions">
+                  <button type="button" class="secondary shift-admin-edit-button" data-shift-id="${escapeHtml(shift.id)}">Edit</button>
+                  <button type="button" class="danger-soft shift-admin-delete-row" data-shift-id="${escapeHtml(shift.id)}">Delete</button>
+                </td>
+              </tr>
+            `;
+          }).join("")}
         </tbody>
       </table>
     `;
     shiftAdminList.querySelectorAll(".shift-admin-edit-button").forEach((button) => {
       button.addEventListener("click", () => {
-        const shift = shifts.find((entry) => entry.id === button.dataset.shiftId);
-        if (shift) fillShiftAdminForm(shift);
+        editingShiftId = button.dataset.shiftId || "";
+        renderShiftAdminList();
       });
+    });
+    shiftAdminList.querySelectorAll(".shift-admin-inline-color").forEach((select) => {
+      applyColorSelectAppearance(select);
+      select.addEventListener("change", () => applyColorSelectAppearance(select));
+    });
+    shiftAdminList.querySelectorAll(".shift-admin-save-row").forEach((button) => {
+      button.addEventListener("click", () => saveShiftRow(button.dataset.shiftId).catch((error) => setShiftAdminMessage(error.message, true)));
+    });
+    shiftAdminList.querySelectorAll(".shift-admin-cancel-row").forEach((button) => {
+      button.addEventListener("click", () => {
+        editingShiftId = "";
+        renderShiftAdminList();
+      });
+    });
+    shiftAdminList.querySelectorAll(".shift-admin-delete-row").forEach((button) => {
+      button.addEventListener("click", () => deactivateShift(button.dataset.shiftId).catch((error) => setShiftAdminMessage(error.message, true)));
     });
   }
 
@@ -262,11 +313,9 @@
     setShiftAdminMessage("Loading shifts...");
     shiftAdminData = await api("/api/kitchen-roster/shifts");
     renderShiftAdminList();
-    const selectedColor = shiftAdminId.value
-      ? shiftAdminData.shiftTypes.find((entry) => entry.id === shiftAdminId.value)?.color
-      : "#c7f9d4";
-    shiftAdminColor.innerHTML = shiftAdminColorOptions(selectedColor || "#c7f9d4");
-    if (!shiftAdminId.value) resetShiftAdminForm();
+    shiftAdminColor.innerHTML = shiftAdminColorOptions("#c7f9d4");
+    applyColorSelectAppearance(shiftAdminColor);
+    resetShiftAdminForm();
     setShiftAdminMessage("");
   }
 
@@ -279,13 +328,12 @@
     shiftAdminData = await api("/api/kitchen-roster/shifts", {
       method: "POST",
       body: JSON.stringify({
-        id: shiftAdminId.value,
         label: shiftAdminLabel.value,
         code: shiftAdminCode.value,
         shiftGroup: shiftAdminGroup.value,
         color: shiftAdminColor.value,
         sortOrder: shiftAdminSortOrder.value,
-        active: shiftAdminActive.checked
+        active: true
       })
     });
     renderShiftAdminList();
@@ -297,6 +345,58 @@
       setMessage("Shift saved and roster refreshed.");
     } else if (rosterDirty) {
       setMessage("Shift saved. Reload the week after saving your roster changes to use the new shift list.");
+    }
+  }
+
+  async function saveShiftRow(shiftId) {
+    const row = shiftAdminList.querySelector(`tr[data-shift-id="${CSS.escape(shiftId || "")}"]`);
+    if (!row) return;
+    setShiftAdminMessage("Saving shift...");
+    const payload = {
+      id: shiftId,
+      label: row.querySelector(".shift-admin-inline-label")?.value || "",
+      code: row.querySelector(".shift-admin-inline-code")?.value || "",
+      shiftGroup: row.querySelector(".shift-admin-inline-group")?.value || "kitchen",
+      color: row.querySelector(".shift-admin-inline-color")?.value || "#c7f9d4",
+      sortOrder: row.querySelector(".shift-admin-inline-sort")?.value || "100",
+      active: Boolean(row.querySelector(".shift-admin-inline-active-input")?.checked)
+    };
+    shiftAdminData = await api("/api/kitchen-roster/shifts", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    editingShiftId = "";
+    renderShiftAdminList();
+    setShiftAdminMessage("Shift saved.");
+    if (rosterData && !rosterDirty) {
+      rosterData = await api(`/api/kitchen-roster?date=${encodeURIComponent(rosterData.weekStart)}`);
+      renderRoster();
+    }
+  }
+
+  async function deactivateShift(shiftId) {
+    const shift = (shiftAdminData.shiftTypes || []).find((entry) => entry.id === shiftId);
+    if (!shift) return;
+    if (!window.confirm(`Delete "${shift.label}" from future use? Existing roster history will keep it.`)) return;
+    setShiftAdminMessage("Deleting shift...");
+    shiftAdminData = await api("/api/kitchen-roster/shifts", {
+      method: "POST",
+      body: JSON.stringify({
+        id: shift.id,
+        label: shift.label,
+        code: shift.code,
+        shiftGroup: shift.shift_group,
+        color: shift.color,
+        sortOrder: shift.sort_order,
+        active: false
+      })
+    });
+    if (editingShiftId === shiftId) editingShiftId = "";
+    renderShiftAdminList();
+    setShiftAdminMessage("Shift deleted from future use.");
+    if (rosterData && !rosterDirty) {
+      rosterData = await api(`/api/kitchen-roster?date=${encodeURIComponent(rosterData.weekStart)}`);
+      renderRoster();
     }
   }
 
@@ -542,6 +642,7 @@
     saveShiftAdminForm().catch((error) => setShiftAdminMessage(error.message, true));
   });
   shiftAdminResetButton?.addEventListener("click", () => resetShiftAdminForm());
+  shiftAdminColor?.addEventListener("change", () => applyColorSelectAppearance(shiftAdminColor));
   printButton.addEventListener("click", () => {
     const footer = document.querySelector("#rosterPrintFooter");
     if (footer) {

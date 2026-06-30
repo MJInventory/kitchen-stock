@@ -24,7 +24,6 @@
     </div>
   </div>
   <form id="shiftAdminForm" class="roster-shift-admin-form">
-    <input id="shiftAdminId" type="hidden">
     <label>
       Shift label
       <input id="shiftAdminLabel" type="text" maxlength="80" placeholder="10:00 - 18:00" required>
@@ -50,13 +49,9 @@
       Sort order
       <input id="shiftAdminSortOrder" type="number" min="0" step="1" value="100">
     </label>
-    <label class="checkbox">
-      <input id="shiftAdminActive" type="checkbox" checked>
-      Active
-    </label>
     <div class="roster-shift-admin-actions">
-      <button id="shiftAdminSaveButton" type="submit">Save Shift</button>
-      <button id="shiftAdminResetButton" type="button" class="secondary">New Shift</button>
+      <button id="shiftAdminSaveButton" type="submit">Add Shift</button>
+      <button id="shiftAdminResetButton" type="button" class="secondary">Clear</button>
     </div>
   </form>
   <p id="shiftAdminMessage" role="status"></p>

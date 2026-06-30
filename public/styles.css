@@ -4527,10 +4527,6 @@ body.order-app {
   align-items: end;
 }
 
-.roster-shift-admin-form .checkbox {
-  align-self: center;
-}
-
 .roster-shift-admin-actions {
   display: flex;
   gap: 10px;
@@ -4561,6 +4557,23 @@ body.order-app {
   font-size: 0.83rem;
 }
 
+.roster-shift-admin-table input,
+.roster-shift-admin-table select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.shift-admin-editing-row {
+  background: color-mix(in srgb, var(--wash) 72%, var(--surface));
+}
+
+.shift-admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .shift-admin-swatch {
   display: inline-flex;
   align-items: center;
@@ -4570,6 +4583,17 @@ body.order-app {
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.84rem;
+}
+
+.shift-admin-inline-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shift-admin-inline-color,
+#shiftAdminColor {
+  font-weight: 700;
 }
 
 .roster-shift-types {

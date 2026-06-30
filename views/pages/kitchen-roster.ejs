@@ -9,10 +9,60 @@
     <button id="loadRosterButton" type="button">Load Week</button>
     <button id="saveRosterButton" type="button">Save Week</button>
     <button id="lockRosterButton" type="button" hidden>Lock Week</button>
+    <button id="shiftAdminToggleButton" type="button" hidden>Shift Admin</button>
     <button id="printRosterButton" type="button">Print / Save PDF</button>
   </div>
   <p id="rosterLockMessage" class="roster-lock-message" hidden></p>
   <p id="rosterMessage" role="status"></p>
+</section>
+
+<section id="shiftAdminPanel" class="panel roster-shift-admin-panel no-print" hidden>
+  <div class="sheet-title-row">
+    <div>
+      <p class="eyebrow">Kitchen Setup</p>
+      <h2>Shift Admin</h2>
+    </div>
+  </div>
+  <form id="shiftAdminForm" class="roster-shift-admin-form">
+    <input id="shiftAdminId" type="hidden">
+    <label>
+      Shift label
+      <input id="shiftAdminLabel" type="text" maxlength="80" placeholder="10:00 - 18:00" required>
+    </label>
+    <label>
+      Shift code
+      <input id="shiftAdminCode" type="text" maxlength="40" placeholder="10_18">
+    </label>
+    <label>
+      Shift type
+      <select id="shiftAdminGroup">
+        <option value="kitchen">Kitchen Shift</option>
+        <option value="foh">FOH Shift</option>
+        <option value="bar">Bar Shift</option>
+        <option value="other">Others</option>
+      </select>
+    </label>
+    <label>
+      Background color
+      <select id="shiftAdminColor"></select>
+    </label>
+    <label>
+      Sort order
+      <input id="shiftAdminSortOrder" type="number" min="0" step="1" value="100">
+    </label>
+    <label class="checkbox">
+      <input id="shiftAdminActive" type="checkbox" checked>
+      Active
+    </label>
+    <div class="roster-shift-admin-actions">
+      <button id="shiftAdminSaveButton" type="submit">Save Shift</button>
+      <button id="shiftAdminResetButton" type="button" class="secondary">New Shift</button>
+    </div>
+  </form>
+  <p id="shiftAdminMessage" role="status"></p>
+  <div id="shiftAdminList" class="roster-shift-admin-list">
+    <p>Loading shifts...</p>
+  </div>
 </section>
 
 <section class="panel kitchen-roster-panel">

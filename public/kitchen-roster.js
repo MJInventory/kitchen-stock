@@ -9,12 +9,25 @@
   const loadButton = document.querySelector("#loadRosterButton");
   const saveButton = document.querySelector("#saveRosterButton");
   const lockButton = document.querySelector("#lockRosterButton");
+  const shiftAdminToggleButton = document.querySelector("#shiftAdminToggleButton");
   const printButton = document.querySelector("#printRosterButton");
   const message = document.querySelector("#rosterMessage");
   const lockMessage = document.querySelector("#rosterLockMessage");
   const weekRange = document.querySelector("#weekRange");
   const shiftLegend = document.querySelector("#shiftLegend");
   const rosterGrid = document.querySelector("#rosterGrid");
+  const shiftAdminPanel = document.querySelector("#shiftAdminPanel");
+  const shiftAdminForm = document.querySelector("#shiftAdminForm");
+  const shiftAdminId = document.querySelector("#shiftAdminId");
+  const shiftAdminLabel = document.querySelector("#shiftAdminLabel");
+  const shiftAdminCode = document.querySelector("#shiftAdminCode");
+  const shiftAdminGroup = document.querySelector("#shiftAdminGroup");
+  const shiftAdminColor = document.querySelector("#shiftAdminColor");
+  const shiftAdminSortOrder = document.querySelector("#shiftAdminSortOrder");
+  const shiftAdminActive = document.querySelector("#shiftAdminActive");
+  const shiftAdminMessage = document.querySelector("#shiftAdminMessage");
+  const shiftAdminList = document.querySelector("#shiftAdminList");
+  const shiftAdminResetButton = document.querySelector("#shiftAdminResetButton");
 
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
@@ -22,6 +35,7 @@
   let rosterData = null;
   let rosterDirty = false;
   let canManageRoster = false;
+  let shiftAdminData = { shiftTypes: [], colorOptions: [] };
 
   function setMessage(text, isError = false) {
     message.textContent = text || "";
@@ -40,6 +54,20 @@
   function safeCssColor(value) {
     const color = String(value || "").trim();
     return /^#[0-9a-f]{3,8}$/i.test(color) ? color : "";
+  }
+
+  function colorBrightness(hex) {
+    const color = safeCssColor(hex);
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return 255;
+    const value = color.slice(1);
+    const red = Number.parseInt(value.slice(0, 2), 16);
+    const green = Number.parseInt(value.slice(2, 4), 16);
+    const blue = Number.parseInt(value.slice(4, 6), 16);
+    return ((red * 299) + (green * 587) + (blue * 114)) / 1000;
+  }
+
+  function contrastInk(hex) {
+    return colorBrightness(hex) < 145 ? "#f8fafc" : "#111827";
   }
 
   function normalizeFunction(value) {
@@ -126,7 +154,150 @@
   function updateSelectColor(select) {
     const shift = shiftById(select.value);
     select.style.backgroundColor = shift?.color || "";
-    select.style.color = String(shift?.code || "").toUpperCase() === "OFF" ? "#f8fafc" : "#111827";
+    select.style.color = contrastInk(shift?.color || "");
+  }
+
+  function setShiftAdminMessage(text, isError = false) {
+    if (!shiftAdminMessage) return;
+    shiftAdminMessage.textContent = text || "";
+    shiftAdminMessage.classList.toggle("error", Boolean(isError));
+  }
+
+  function shiftGroupLabel(value) {
+    const labels = {
+      kitchen: "Kitchen Shift",
+      foh: "FOH Shift",
+      bar: "Bar Shift",
+      other: "Others"
+    };
+    return labels[String(value || "").trim().toLowerCase()] || "Kitchen Shift";
+  }
+
+  function shiftAdminColorOptions(selectedColor = "") {
+    const selected = safeCssColor(selectedColor).toLowerCase();
+    const options = Array.isArray(shiftAdminData.colorOptions) ? [...shiftAdminData.colorOptions] : [];
+    if (selected && !options.some((entry) => String(entry?.value || "").toLowerCase() === selected)) {
+      options.unshift({ value: selected, label: `Current ${selected}` });
+    }
+    return options
+      .map((entry) => {
+        const value = safeCssColor(entry?.value || "");
+        const label = String(entry?.label || value).trim() || value;
+        return `<option value="${escapeHtml(value)}"${value.toLowerCase() === selected ? " selected" : ""}>${escapeHtml(label)} - ${escapeHtml(value)}</option>`;
+      })
+      .join("");
+  }
+
+  function resetShiftAdminForm() {
+    if (!shiftAdminForm) return;
+    shiftAdminId.value = "";
+    shiftAdminLabel.value = "";
+    shiftAdminCode.value = "";
+    shiftAdminGroup.value = "kitchen";
+    shiftAdminColor.innerHTML = shiftAdminColorOptions("#c7f9d4");
+    shiftAdminColor.value = "#c7f9d4";
+    shiftAdminSortOrder.value = "100";
+    shiftAdminActive.checked = true;
+    setShiftAdminMessage("");
+  }
+
+  function fillShiftAdminForm(shift) {
+    shiftAdminId.value = shift?.id || "";
+    shiftAdminLabel.value = shift?.label || "";
+    shiftAdminCode.value = shift?.code || "";
+    shiftAdminGroup.value = String(shift?.shift_group || "kitchen").toLowerCase();
+    shiftAdminColor.innerHTML = shiftAdminColorOptions(shift?.color || "#c7f9d4");
+    shiftAdminColor.value = safeCssColor(shift?.color || "#c7f9d4") || "#c7f9d4";
+    shiftAdminSortOrder.value = String(shift?.sort_order ?? 100);
+    shiftAdminActive.checked = shift?.active !== false;
+    setShiftAdminMessage("");
+  }
+
+  function renderShiftAdminList() {
+    if (!shiftAdminList) return;
+    const shifts = Array.isArray(shiftAdminData.shiftTypes) ? shiftAdminData.shiftTypes : [];
+    if (!shifts.length) {
+      shiftAdminList.innerHTML = "<p>No shifts saved yet.</p>";
+      return;
+    }
+    shiftAdminList.innerHTML = `
+      <table class="roster-shift-admin-table">
+        <thead>
+          <tr>
+            <th>Shift</th>
+            <th>Type</th>
+            <th>Color</th>
+            <th>Status</th>
+            <th>Edit</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shifts.map((shift) => `
+            <tr>
+              <td>
+                <strong>${escapeHtml(shift.label || "")}</strong>
+                <span>${escapeHtml(shift.code || "")}</span>
+              </td>
+              <td>${escapeHtml(shiftGroupLabel(shift.shift_group))}</td>
+              <td>
+                <span class="shift-admin-swatch" style="background:${escapeHtml(safeCssColor(shift.color))}; color:${escapeHtml(contrastInk(shift.color))}">${escapeHtml(safeCssColor(shift.color))}</span>
+              </td>
+              <td>${shift.active === false ? "Inactive" : "Active"}</td>
+              <td><button type="button" class="secondary shift-admin-edit-button" data-shift-id="${escapeHtml(shift.id)}">Edit</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+    shiftAdminList.querySelectorAll(".shift-admin-edit-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const shift = shifts.find((entry) => entry.id === button.dataset.shiftId);
+        if (shift) fillShiftAdminForm(shift);
+      });
+    });
+  }
+
+  async function loadShiftAdminData() {
+    if (!canManageRoster) return;
+    setShiftAdminMessage("Loading shifts...");
+    shiftAdminData = await api("/api/kitchen-roster/shifts");
+    renderShiftAdminList();
+    const selectedColor = shiftAdminId.value
+      ? shiftAdminData.shiftTypes.find((entry) => entry.id === shiftAdminId.value)?.color
+      : "#c7f9d4";
+    shiftAdminColor.innerHTML = shiftAdminColorOptions(selectedColor || "#c7f9d4");
+    if (!shiftAdminId.value) resetShiftAdminForm();
+    setShiftAdminMessage("");
+  }
+
+  async function saveShiftAdminForm() {
+    if (!canManageRoster) {
+      setShiftAdminMessage("Only admins can manage shifts.", true);
+      return;
+    }
+    setShiftAdminMessage("Saving shift...");
+    shiftAdminData = await api("/api/kitchen-roster/shifts", {
+      method: "POST",
+      body: JSON.stringify({
+        id: shiftAdminId.value,
+        label: shiftAdminLabel.value,
+        code: shiftAdminCode.value,
+        shiftGroup: shiftAdminGroup.value,
+        color: shiftAdminColor.value,
+        sortOrder: shiftAdminSortOrder.value,
+        active: shiftAdminActive.checked
+      })
+    });
+    renderShiftAdminList();
+    resetShiftAdminForm();
+    setShiftAdminMessage("Shift saved.");
+    if (rosterData && !rosterDirty) {
+      rosterData = await api(`/api/kitchen-roster?date=${encodeURIComponent(rosterData.weekStart)}`);
+      renderRoster();
+      setMessage("Shift saved and roster refreshed.");
+    } else if (rosterDirty) {
+      setMessage("Shift saved. Reload the week after saving your roster changes to use the new shift list.");
+    }
   }
 
   function setRosterDirty(isDirty) {
@@ -146,6 +317,9 @@
   function applyRosterLockState() {
     const locked = Boolean(rosterData?.locked);
     const readOnly = !canManageRoster;
+    if (shiftAdminToggleButton) {
+      shiftAdminToggleButton.hidden = readOnly;
+    }
     if (lockButton) {
       lockButton.hidden = !rosterData || readOnly;
       lockButton.textContent = locked ? "Unlock Week" : "Lock Week";
@@ -313,6 +487,10 @@
       }
       canManageRoster = Boolean(me.user?.permissions?.canManageKitchenRoster);
       showApp();
+      if (canManageRoster) {
+        resetShiftAdminForm();
+        await loadShiftAdminData();
+      }
       await loadRoster();
     } catch (error) {
       setMessage(error.message, true);
@@ -350,6 +528,20 @@
     setMessage(error.message, true);
   }));
   lockButton?.addEventListener("click", () => toggleRosterLock().catch((error) => setMessage(error.message, true)));
+  shiftAdminToggleButton?.addEventListener("click", () => {
+    if (!canManageRoster) return;
+    const nextHidden = !shiftAdminPanel.hidden;
+    shiftAdminPanel.hidden = nextHidden;
+    shiftAdminToggleButton.textContent = nextHidden ? "Shift Admin" : "Hide Shift Admin";
+    if (!nextHidden && !shiftAdminData.shiftTypes.length) {
+      loadShiftAdminData().catch((error) => setShiftAdminMessage(error.message, true));
+    }
+  });
+  shiftAdminForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveShiftAdminForm().catch((error) => setShiftAdminMessage(error.message, true));
+  });
+  shiftAdminResetButton?.addEventListener("click", () => resetShiftAdminForm());
   printButton.addEventListener("click", () => {
     const footer = document.querySelector("#rosterPrintFooter");
     if (footer) {

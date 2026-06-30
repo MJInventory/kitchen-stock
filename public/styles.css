@@ -4516,6 +4516,62 @@ body.order-app {
   overflow: hidden;
 }
 
+.roster-shift-admin-panel {
+  margin-top: 12px;
+}
+
+.roster-shift-admin-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.roster-shift-admin-form .checkbox {
+  align-self: center;
+}
+
+.roster-shift-admin-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.roster-shift-admin-list {
+  margin-top: 14px;
+}
+
+.roster-shift-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.roster-shift-admin-table th,
+.roster-shift-admin-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.roster-shift-admin-table td span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.shift-admin-swatch {
+  display: inline-flex;
+  align-items: center;
+  min-width: 120px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
 .roster-shift-types {
   display: flex;
   align-items: center;
@@ -4716,6 +4772,14 @@ body.order-app {
 }
 
 @media (max-width: 720px) {
+  .roster-shift-admin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-shift-admin-actions {
+    flex-wrap: wrap;
+  }
+
   .kitchen-roster-panel {
     margin-inline: -6px;
   }

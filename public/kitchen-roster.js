@@ -36,6 +36,7 @@
     { value: "#e9defa", label: "Lavender" },
     { value: "#e5ffc7", label: "Lime" },
     { value: "#e5e7eb", label: "Light Grey" },
+    { value: "#ffffff", label: "White" },
     { value: "#fde68a", label: "Honey" },
     { value: "#bfdbfe", label: "Powder Blue" },
     { value: "#fecdd3", label: "Blush" },

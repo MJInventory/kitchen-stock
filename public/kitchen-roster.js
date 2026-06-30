@@ -26,6 +26,20 @@
   const shiftAdminMessage = document.querySelector("#shiftAdminMessage");
   const shiftAdminList = document.querySelector("#shiftAdminList");
   const shiftAdminResetButton = document.querySelector("#shiftAdminResetButton");
+  const SHIFT_COLOR_FALLBACKS = [
+    { value: "#fff1b8", label: "Soft Gold" },
+    { value: "#c7f9d4", label: "Mint" },
+    { value: "#c7f3f8", label: "Aqua" },
+    { value: "#d9ecff", label: "Sky" },
+    { value: "#ffd9df", label: "Rose" },
+    { value: "#ffe8c7", label: "Peach" },
+    { value: "#e9defa", label: "Lavender" },
+    { value: "#e5ffc7", label: "Lime" },
+    { value: "#fde68a", label: "Honey" },
+    { value: "#bfdbfe", label: "Powder Blue" },
+    { value: "#fecdd3", label: "Blush" },
+    { value: "#20242c", label: "Night" }
+  ];
 
   let sessionToken = localStorage.getItem("kitchenStockToken") || "";
   let sessionUser = localStorage.getItem("kitchenStockUser") || "";
@@ -162,6 +176,14 @@
     shiftAdminMessage.classList.toggle("error", Boolean(isError));
   }
 
+  function closeShiftAdminPanel() {
+    if (!shiftAdminPanel || !shiftAdminToggleButton) return;
+    shiftAdminPanel.hidden = true;
+    shiftAdminToggleButton.textContent = "Shift Admin";
+    editingShiftId = "";
+    resetShiftAdminForm();
+  }
+
   function shiftGroupLabel(value) {
     const labels = {
       kitchen: "Kitchen Shift",
@@ -174,7 +196,15 @@
 
   function shiftAdminColorOptions(selectedColor = "") {
     const selected = safeCssColor(selectedColor).toLowerCase();
-    const options = Array.isArray(shiftAdminData.colorOptions) ? [...shiftAdminData.colorOptions] : [];
+    const fallbackMap = new Map(
+      SHIFT_COLOR_FALLBACKS.map((entry) => [String(entry.value || "").toLowerCase(), entry])
+    );
+    const apiOptions = Array.isArray(shiftAdminData.colorOptions) ? shiftAdminData.colorOptions : [];
+    for (const entry of apiOptions) {
+      const value = String(entry?.value || "").toLowerCase();
+      if (value) fallbackMap.set(value, entry);
+    }
+    const options = [...fallbackMap.values()];
     if (selected && !options.some((entry) => String(entry?.value || "").toLowerCase() === selected)) {
       options.unshift({ value: selected, label: `Current ${selected}` });
     }
@@ -346,6 +376,7 @@
     } else if (rosterDirty) {
       setMessage("Shift saved. Reload the week after saving your roster changes to use the new shift list.");
     }
+    closeShiftAdminPanel();
   }
 
   async function saveShiftRow(shiftId) {
@@ -371,7 +402,9 @@
     if (rosterData && !rosterDirty) {
       rosterData = await api(`/api/kitchen-roster?date=${encodeURIComponent(rosterData.weekStart)}`);
       renderRoster();
+      setMessage("Shift saved and roster refreshed.");
     }
+    closeShiftAdminPanel();
   }
 
   async function deactivateShift(shiftId) {
@@ -397,7 +430,9 @@
     if (rosterData && !rosterDirty) {
       rosterData = await api(`/api/kitchen-roster?date=${encodeURIComponent(rosterData.weekStart)}`);
       renderRoster();
+      setMessage("Shift deleted and roster refreshed.");
     }
+    closeShiftAdminPanel();
   }
 
   function setRosterDirty(isDirty) {

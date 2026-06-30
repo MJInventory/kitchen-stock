@@ -4642,11 +4642,33 @@ body.order-app {
   padding-bottom: 8px;
 }
 
+.roster-header-row {
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.roster-title-block {
+  min-width: 0;
+}
+
+.roster-title-block .eyebrow,
+.roster-title-block h2 {
+  margin: 0;
+}
+
+.roster-title-block h2 {
+  display: none;
+}
+
 .roster-week-meta {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: auto;
+  text-align: right;
 }
 
 .roster-week-number {
@@ -4828,6 +4850,15 @@ body.order-app {
     flex-wrap: wrap;
   }
 
+  .roster-header-row {
+    gap: 8px;
+  }
+
+  .roster-week-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .kitchen-roster-panel {
     margin-inline: -6px;
   }
@@ -4887,6 +4918,36 @@ body.order-app {
     border: 0;
     box-shadow: none;
     padding: 0;
+  }
+
+  .roster-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .roster-title-block .eyebrow {
+    margin: 0;
+    font-size: 10px;
+    line-height: 1.1;
+  }
+
+  .roster-week-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .roster-week-meta strong,
+  .roster-week-number {
+    font-size: 10px;
+    line-height: 1.1;
+    color: #111827 !important;
   }
 
   html,

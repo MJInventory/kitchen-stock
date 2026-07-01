@@ -1,6 +1,6 @@
 # MJ Stock Magic Postgres Migration
 
-This app is currently Airtable-backed. The Postgres migration is being built in a safe side-by-side path.
+This app now has a tracked Postgres migration runner. The goal is to stop doing broad schema/view rebuilds blindly at app startup and move toward explicit, versioned migrations.
 
 ## Environment
 
@@ -19,19 +19,65 @@ From the project root:
 
 ```bash
 npm install
+npm run db:migrate
 npm run db:check
 npm run db:setup
 npm run db:import:airtable
 ```
 
+## Production safety first
+
+Before any schema or migration deploy to Render:
+
+1. Take a manual production backup
+2. Keep the dump local only
+3. Have the restore command ready before deploy
+
+Backup helper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/backup-production-postgres.ps1" -DatabaseUrl "postgresql://..."
+```
+
+Restore helper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps1" -DatabaseUrl "postgresql://..." -BackupFile "C:\path\to\dump.dump" -WhatIfOnly
+```
+
 ## Current migration plan
 
 1. Keep Airtable live as the current source of truth
-2. Apply the Postgres schema
+2. Apply tracked Postgres migrations
 3. Run the Airtable import into Postgres
 4. Add a backend repository layer that can switch by `DATA_BACKEND`
 5. Test the web app on Postgres
 6. Cut over Render from `airtable` to `postgres`
+
+## Current migration runner shape
+
+- `lib/postgres-schema.js`
+  Runs the migration framework only
+- `lib/postgres-migrations.js`
+  Migration registry
+- `lib/postgres-migrations/`
+  Individual migration modules
+- `scripts/run-postgres-migrations.mjs`
+  Manual migration command
+
+## Current tracked migrations
+
+- `001_runtime_schema_bootstrap`
+  Wraps the legacy schema bootstrap in a one-time tracked migration
+- `002_drop_redundant_indexes`
+  Removes duplicate indexes that were duplicating unique constraints
+
+## Next cleanup targets
+
+1. Split the legacy bootstrap into smaller versioned migrations
+2. Move reporting/view rebuilds out of the giant bootstrap
+3. Keep seed/reference data separate from structural schema changes
+4. Remove more startup-only DDL from normal app boot over time
 
 ## Import status
 

@@ -11,12 +11,17 @@ create table if not exists app_users (
   must_change_password boolean not null default false,
   is_driver boolean not null default false,
   is_picker boolean not null default false,
+  is_kitchen_staff boolean not null default false,
+  kitchen_function text not null default '',
+  open_order_days integer not null default 7,
   notify_on_new_orders boolean not null default false,
   notify_on_delivery boolean not null default true,
   notify_area_bar boolean not null default true,
   notify_area_foh boolean not null default true,
   notify_area_kitchen boolean not null default true,
   notify_area_general boolean not null default true,
+  hidden_goto_menu jsonb not null default '[]'::jsonb,
+  hidden_backoffice_menu jsonb not null default '[]'::jsonb,
   source text not null default 'postgres',
   last_login_at timestamptz,
   created_at timestamptz not null default now(),
@@ -98,6 +103,10 @@ create table if not exists inventory_items (
 create index if not exists idx_inventory_items_name on inventory_items (name);
 create index if not exists idx_inventory_items_category on inventory_items (category_id);
 create index if not exists idx_inventory_items_supplier on inventory_items (primary_supplier_id);
+create index if not exists idx_inventory_items_area on inventory_items (inventory_area_id);
+create index if not exists idx_inventory_items_location on inventory_items (storage_location_id);
+create index if not exists idx_inventory_items_unit on inventory_items (unit_of_measure_id);
+create index if not exists idx_inventory_items_shelf on inventory_items (shelf_code_id);
 
 create table if not exists order_requests (
   id uuid primary key default gen_random_uuid(),
@@ -147,6 +156,9 @@ create table if not exists driver_sheet_lines (
   unique (sheet_date, order_request_id)
 );
 
+create index if not exists idx_driver_sheet_lines_supplier on driver_sheet_lines (supplier_id);
+create index if not exists idx_driver_sheet_lines_order_request on driver_sheet_lines (order_request_id);
+
 create table if not exists stock_counts (
   id uuid primary key default gen_random_uuid(),
   inventory_item_id uuid not null references inventory_items(id) on delete cascade,
@@ -156,6 +168,8 @@ create table if not exists stock_counts (
   counted_at timestamptz not null default now(),
   notes text not null default ''
 );
+
+create index if not exists idx_stock_counts_item on stock_counts (inventory_item_id);
 
 create table if not exists standing_orders (
   id uuid primary key default gen_random_uuid(),
@@ -173,6 +187,8 @@ create table if not exists standing_orders (
   updated_at timestamptz not null default now()
 );
 
+create index if not exists idx_standing_orders_supplier on standing_orders (supplier_id);
+
 create table if not exists standing_order_items (
   id uuid primary key default gen_random_uuid(),
   standing_order_id uuid not null references standing_orders(id) on delete cascade,
@@ -182,6 +198,8 @@ create table if not exists standing_order_items (
   updated_at timestamptz not null default now(),
   unique (standing_order_id, inventory_item_id)
 );
+
+create index if not exists idx_standing_order_items_inventory_item on standing_order_items (inventory_item_id);
 
 create table if not exists standing_order_runs (
   id uuid primary key default gen_random_uuid(),
@@ -214,6 +232,12 @@ create table if not exists standing_order_run_lines (
   status text not null default 'Scheduled',
   notes text not null default ''
 );
+
+create index if not exists idx_standing_order_run_lines_run on standing_order_run_lines (standing_order_run_id);
+create index if not exists idx_standing_order_run_lines_standing_order on standing_order_run_lines (standing_order_id);
+create index if not exists idx_standing_order_run_lines_item on standing_order_run_lines (inventory_item_id);
+create index if not exists idx_standing_order_run_lines_request on standing_order_run_lines (order_request_id);
+create index if not exists idx_standing_order_run_lines_driver_sheet_line on standing_order_run_lines (driver_sheet_line_id);
 
 create table if not exists daily_guest_counts (
   id uuid primary key default gen_random_uuid(),
@@ -287,6 +311,12 @@ create table if not exists app_notifications (
 
 create index if not exists idx_app_notifications_user_read_created
   on app_notifications (user_id, is_read, created_at desc);
+create index if not exists idx_app_notifications_related_request
+  on app_notifications (related_request_id);
+create index if not exists idx_app_notifications_related_standing_order
+  on app_notifications (related_standing_order_id);
+create index if not exists idx_app_notifications_related_standing_order_run
+  on app_notifications (related_standing_order_run_id);
 
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -327,6 +357,7 @@ create table if not exists internal_order_lines (
   shortage_item_quantity integer not null default 0,
   status text not null default 'requested' check (status in ('requested', 'partial', 'ready', 'closed', 'cancelled')),
   shortage_request_id uuid references order_requests(id) on delete set null,
+  auto_min_request_id uuid references order_requests(id) on delete set null,
   notes text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -334,9 +365,21 @@ create table if not exists internal_order_lines (
 
 create index if not exists idx_internal_order_batches_status_requested
   on internal_order_batches (status, requested_at desc);
+create index if not exists idx_internal_order_batches_requested_by_user
+  on internal_order_batches (requested_by_user_id);
+create index if not exists idx_internal_order_batches_status_user
+  on internal_order_batches (status, requested_by_username, created_at desc);
 
 create index if not exists idx_internal_order_lines_batch
   on internal_order_lines (internal_order_batch_id);
+create index if not exists idx_internal_order_lines_batch_status
+  on internal_order_lines (internal_order_batch_id, status, created_at);
+create index if not exists idx_internal_order_lines_inventory_item
+  on internal_order_lines (inventory_item_id);
+create index if not exists idx_internal_order_lines_shortage_request
+  on internal_order_lines (shortage_request_id);
+create index if not exists idx_internal_order_lines_auto_min_request
+  on internal_order_lines (auto_min_request_id);
 
 create table if not exists audit_log_entries (
   id uuid primary key default gen_random_uuid(),

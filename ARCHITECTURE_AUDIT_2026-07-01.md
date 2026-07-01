@@ -32,6 +32,7 @@ Why:
 - it is large
 - it mixes tables, seed data, constraints, indexes, and views
 - it still acts as a legacy one-shot catch-all migration
+- it has now been partially split into helper modules, but it is still the main historical bootstrap concentration point
 
 Related split plan:
 

@@ -8,7 +8,9 @@ The goal is to split that file into smaller tracked migrations without changing 
 
 ## Current size
 
-- `001-runtime-schema-bootstrap.js`: about 700 lines
+- `001-runtime-schema-bootstrap.js`: reduced by moving large logical sections into helper modules
+- `lib/postgres-migrations/runtime-bootstrap/ensure-kitchen-roster-bootstrap.js`
+- `lib/postgres-migrations/runtime-bootstrap/ensure-reporting-views.js`
 
 ## Current logical sections
 
@@ -147,4 +149,5 @@ The least risky next production step is:
 1. Keep `001` untouched
 2. Add new migrations only for future schema changes
 3. Move view rebuilds out of startup over time by creating targeted view migrations
-4. Only after several clean releases, consider shrinking or freezing the legacy bootstrap further
+4. Keep extracting logical chunks from `001` into helper modules when that reduces risk without changing behavior
+5. Only after several clean releases, consider shrinking or freezing the legacy bootstrap further

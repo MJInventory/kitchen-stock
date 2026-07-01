@@ -103,7 +103,8 @@ Use `npm run db:setup` instead of applying `schema.sql` alone, because the setup
 1. Split the legacy bootstrap into smaller versioned migrations
 2. Move reporting/view rebuilds out of the giant bootstrap
 3. Keep seed/reference data separate from structural schema changes
-4. Remove more startup-only DDL from normal app boot over time
+4. Audit non-FK reporting/performance indexes as query patterns evolve
+5. Remove more startup-only DDL from normal app boot over time
 
 ## Import status
 
@@ -122,7 +123,13 @@ The first import script covers:
 - stock counts
 - standing orders
 - standing order items
+- standing order runs
+- standing order run lines
 - daily guest counts
+- internal order batches
+- internal order lines
+- app notifications
+- push subscriptions
 
 It is designed as an upsert-based import, so we can rerun it during migration work.
 
@@ -131,6 +138,9 @@ It is designed as an upsert-based import, so we can rerun it during migration wo
 The schema already includes:
 
 - app users
+- kitchen shift types
+- kitchen roster weeks
+- kitchen roster shifts
 - suppliers
 - categories
 - storage locations
@@ -148,6 +158,14 @@ The schema already includes:
 - daily guest counts
 - invoice captures
 - invoice lines
+- invoice OCR rules
+- app notifications
+- push subscriptions
+- driver sheet assignments
+- supplier delivery notes
+- internal order batches
+- internal order lines
+- audit log entries
 
 ## Notes
 

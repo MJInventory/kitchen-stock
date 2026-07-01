@@ -56,13 +56,15 @@ Already improved:
 - migration execution is versioned
 - duplicate indexes started being removed in tracked migrations
 - production audit shows no exact duplicate public indexes remain
+- all public foreign keys now have an index prefix in production
+- baseline schema drift audit now passes for the current audited markers
 
 Still worth auditing next:
 
-1. Add missing foreign-key support indexes in a small tracked migration
-2. Check whether every frequently filtered non-FK column has a deliberate index
-3. Separate seed/reference data changes from structural migrations
-4. Move view rebuilds into narrower migrations over time
+1. Check whether every frequently filtered non-FK column has a deliberate index
+2. Separate seed/reference data changes from structural migrations
+3. Move view rebuilds into narrower migrations over time
+4. Reduce how much schema/view logic still lives inside `001_runtime_schema_bootstrap`
 
 ## Production database audit snapshot
 
@@ -80,6 +82,8 @@ Checked on July 1, 2026:
   - yes
 - public foreign keys with index-prefix coverage:
   - all of them
+- baseline schema drift audit:
+  - current audited markers are clean
 
 The earlier foreign-key backlog has now been backfilled in production.
 

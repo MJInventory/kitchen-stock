@@ -406,7 +406,7 @@ export function initStandingOrdersPage() {
       if (isReceived) {
         receiveButton.disabled = true;
         setMessage("Reopening item...");
-        page.api(`/api/requests/${requestId}/undo-delivery`, { method: "POST" })
+        page.api(runLineId ? `/api/standing-order-run-lines/${runLineId}/undo-delivery` : `/api/requests/${requestId}/undo-delivery`, { method: "POST" })
           .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
           .then(() => setMessage("Standing-order delivery reopened."))
           .catch((error) => setMessage(error.message, true))

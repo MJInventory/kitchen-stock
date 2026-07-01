@@ -396,10 +396,21 @@ export function initStandingOrdersPage() {
       const row = receiveButton.closest(".standing-run-line");
       const requestId = row?.dataset.requestId || "";
       const runLineId = row?.dataset.runLineId || "";
+      const isReceived = row?.dataset.received === "true";
       const qtyInput = row?.querySelector(".standing-run-receive-qty");
       const receiveQty = Number(qtyInput?.value || 0);
       if (!requestId && !runLineId) {
         setMessage("Could not find the standing-order line to update.", true);
+        return;
+      }
+      if (isReceived) {
+        receiveButton.disabled = true;
+        setMessage("Reopening item...");
+        page.api(`/api/requests/${requestId}/undo-delivery`, { method: "POST" })
+          .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
+          .then(() => setMessage("Standing-order delivery reopened."))
+          .catch((error) => setMessage(error.message, true))
+          .finally(() => { receiveButton.disabled = false; });
         return;
       }
       if (!Number.isFinite(receiveQty) || receiveQty <= 0) {
@@ -442,6 +453,32 @@ export function initStandingOrdersPage() {
         .catch((error) => setMessage(error.message, true))
         .finally(() => { deleteButton.disabled = false; });
     }
+  });
+
+  standingRunList.addEventListener("change", (event) => {
+    const qtyInput = event.target.closest(".standing-run-open-qty");
+    if (!qtyInput) return;
+    const row = qtyInput.closest(".standing-run-line");
+    const runLineId = row?.dataset.runLineId || "";
+    const quantity = Number(qtyInput.value || 0);
+    if (!runLineId) {
+      setMessage("Could not find the standing-order line to update.", true);
+      return;
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setMessage("Quantity must be greater than zero.", true);
+      return;
+    }
+    qtyInput.disabled = true;
+    setMessage("Saving quantity...");
+    page.api(`/api/standing-order-run-lines/${runLineId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ quantity })
+    })
+      .then(() => Promise.all([loadStandingOrders(), loadStandingOrderRuns()]))
+      .then(() => setMessage("Standing-order quantity updated."))
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => { qtyInput.disabled = false; });
   });
 
   page.ready(loadOptions);

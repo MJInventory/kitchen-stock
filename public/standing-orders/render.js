@@ -320,15 +320,20 @@ export function renderStandingOrderRuns({ runs, standingRunList, expandedRunId, 
           ${(run.lines || []).map((line) => {
             const areaLocation = [line.inventoryArea, line.storageLocation].filter(Boolean).join(" / ");
             const isReceived = Boolean(line.received);
+            const openQuantity = Number(line.quantity ?? 0);
             return `
-              <tr class="standing-sheet-row standing-run-line${isReceived ? " standing-run-line--received" : ""}" data-request-id="${esc(line.orderRequestId || "")}" data-run-line-id="${esc(line.id || "")}">
+              <tr class="standing-sheet-row standing-run-line${isReceived ? " standing-run-line--received" : ""}" data-request-id="${esc(line.orderRequestId || "")}" data-run-line-id="${esc(line.id || "")}" data-received="${isReceived ? "true" : "false"}">
                 <td class="standing-run-line-received">
-                  <button class="driver-check-button standing-run-received-button${isReceived ? " checked" : ""}" type="button" ${isReceived ? "disabled" : ""} aria-label="Mark ${esc(line.itemName || "item")} received">
+                  <button class="driver-check-button standing-run-received-button${isReceived ? " checked" : ""}" type="button" aria-label="${isReceived ? "Mark not received" : "Mark received"} for ${esc(line.itemName || "item")}">
                     ${isReceived ? "&#10003;" : "&nbsp;"}
                   </button>
                 </td>
                 <td class="standing-sheet-item"><strong>${esc(line.itemName || "Inventory item")}</strong></td>
-                <td class="standing-sheet-open-display">${esc(line.quantity ?? "")}</td>
+                <td class="standing-sheet-open-display">
+                  ${isReceived
+                    ? esc(openQuantity)
+                    : `<input class="standing-line-qty standing-run-open-qty" type="number" min="0.01" step="0.01" value="${esc(openQuantity)}" aria-label="Open quantity for ${esc(line.itemName || "item")}">`}
+                </td>
                 <td class="standing-sheet-open">
                   <input class="standing-line-qty standing-run-receive-qty" type="number" min="0.01" step="0.01" value="${esc(line.quantity ?? "")}" aria-label="Received quantity for ${esc(line.itemName || "item")}" ${isReceived ? "disabled" : ""}>
                 </td>

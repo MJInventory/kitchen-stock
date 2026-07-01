@@ -23,6 +23,7 @@ npm run db:migrate
 npm run db:migrate:status
 npm run db:index:audit
 npm run db:fk:audit
+npm run db:baseline:audit
 npm run db:check
 npm run db:setup
 npm run db:import:airtable
@@ -73,6 +74,8 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
   Shows exact duplicate public indexes before we remove any more
 - `scripts/audit-postgres-fk-indexes.mjs`
   Shows public foreign keys that do not have a supporting index prefix
+- `scripts/audit-postgres-baseline-drift.mjs`
+  Shows which current schema features are still missing from `database/schema.sql`
 - `scripts/setup-postgres.mjs`
   Applies `database/schema.sql` and then the tracked migrations so a fresh database lands on the current schema state
 

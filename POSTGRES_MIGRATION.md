@@ -22,6 +22,7 @@ npm install
 npm run db:migrate
 npm run db:migrate:status
 npm run db:index:audit
+npm run db:fk:audit
 npm run db:check
 npm run db:setup
 npm run db:import:airtable
@@ -70,6 +71,8 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
   Shows which tracked migrations are already applied
 - `scripts/audit-postgres-indexes.mjs`
   Shows exact duplicate public indexes before we remove any more
+- `scripts/audit-postgres-fk-indexes.mjs`
+  Shows public foreign keys that do not have a supporting index prefix
 
 ## Current tracked migrations
 

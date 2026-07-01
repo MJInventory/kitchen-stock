@@ -55,17 +55,51 @@ Already improved:
 - tracked migration table exists
 - migration execution is versioned
 - duplicate indexes started being removed in tracked migrations
+- production audit shows no exact duplicate public indexes remain
 
 Still worth auditing next:
 
-1. Confirm no more duplicate indexes remain beyond the ones already removed
-2. Check whether every frequently filtered foreign key has a deliberate index
+1. Add missing foreign-key support indexes in a small tracked migration
+2. Check whether every frequently filtered non-FK column has a deliberate index
 3. Separate seed/reference data changes from structural migrations
 4. Move view rebuilds into narrower migrations over time
+
+## Production database audit snapshot
+
+Checked on July 1, 2026:
+
+- tracked migrations applied:
+  - `001_runtime_schema_bootstrap`
+  - `002_drop_redundant_indexes`
+- exact duplicate public indexes found:
+  - none
+
+Foreign keys currently missing an index prefix in production include tables such as:
+
+- `app_notifications`
+- `driver_sheet_lines`
+- `internal_order_batches`
+- `internal_order_lines`
+- `inventory_items`
+- `invoice_captures`
+- `invoice_lines`
+- `invoice_ocr_rules`
+- `kitchen_roster_shifts`
+- `order_requests`
+- `push_subscriptions`
+- `shelf_codes`
+- `standing_order_items`
+- `standing_order_run_lines`
+- `standing_order_runs`
+- `standing_orders`
+- `stock_counts`
+
+That does not mean every one of these must be indexed immediately, but it gives us the real candidate list for the next migration instead of guessing.
 
 ## Safe next coding steps
 
 1. Freeze `001_runtime_schema_bootstrap` as historical
 2. Add only small forward migrations from here
-3. Start with view-specific migrations before touching core table history
-4. Keep health-checking each checkpoint before push
+3. Create a narrow migration for the most important missing FK indexes first
+4. Start with view-specific migrations before touching core table history
+5. Keep health-checking each checkpoint before push

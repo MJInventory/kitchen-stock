@@ -10,7 +10,13 @@
   const backofficeItems = menuConfig.backofficeItems || [];
 
   function sortMenuItems(items) {
-    return [...items].sort((left, right) => String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" }));
+    return [...items].sort((left, right) => {
+      const leftHref = String(left?.href || "").trim();
+      const rightHref = String(right?.href || "").trim();
+      if (leftHref === "/" && rightHref !== "/") return -1;
+      if (rightHref === "/" && leftHref !== "/") return 1;
+      return String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" });
+    });
   }
 
   function syncSessionState() {

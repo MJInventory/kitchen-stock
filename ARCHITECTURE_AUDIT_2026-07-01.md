@@ -72,29 +72,21 @@ Checked on July 1, 2026:
   - `001_runtime_schema_bootstrap`
   - `002_drop_redundant_indexes`
   - `003_backfill_supporting_indexes`
+  - `004_backfill_secondary_indexes`
+  - `005_backfill_final_foreign_key_indexes`
 - exact duplicate public indexes found:
   - none
 - first supporting-index backfill applied:
   - yes
+- public foreign keys with index-prefix coverage:
+  - all of them
 
-Foreign keys currently missing an index prefix in production include tables such as:
-
-- `app_notifications`
-- `internal_order_batches`
-- `internal_order_lines`
-- `invoice_captures`
-- `invoice_lines`
-- `invoice_ocr_rules`
-- `kitchen_roster_shifts`
-- `standing_order_items`
-- `standing_order_run_lines`
-
-That does not mean every one of these must be indexed immediately, but it gives us the real candidate list for the next migration instead of guessing.
+The earlier foreign-key backlog has now been backfilled in production.
 
 ## Safe next coding steps
 
 1. Freeze `001_runtime_schema_bootstrap` as historical
 2. Add only small forward migrations from here
-3. Create a second narrow migration only for the remaining high-value FK indexes
+3. Keep new schema/index changes incremental and versioned
 4. Start with view-specific migrations before touching core table history
 5. Keep health-checking each checkpoint before push

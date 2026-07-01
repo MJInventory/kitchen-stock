@@ -40,6 +40,12 @@ Create a narrow migration that adds only the most useful missing indexes first.
 Status on July 1, 2026:
 
 - completed as `003_backfill_supporting_indexes`
+- continued with `004_backfill_secondary_indexes`
+- completed remaining foreign-key gaps with `005_backfill_final_foreign_key_indexes`
+
+Current result:
+
+- all public foreign keys now have an index prefix in production
 
 Recommended first batch:
 

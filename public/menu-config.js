@@ -1,7 +1,7 @@
 (function configureMjStockMenus() {
   window.MJ_STOCK_MENU_ITEMS = {
     gotoItems: [
-      { label: "Front Page", href: "/" },
+      { label: "Home", href: "/" },
       { label: "Ordering", href: "/ordering.html", permission: "canUseSupplierOrdering" },
       { label: "Internal Orders", href: "/internal-orders.html", permission: "canPlaceInternalOrders" },
       { label: "Picker Board", href: "/picker-sheet.html", permission: "canPickInternalOrders" },

@@ -9,6 +9,7 @@
     "db:migrate:status": "node scripts/show-postgres-migrations.mjs",
     "db:index:audit": "node scripts/audit-postgres-indexes.mjs",
     "db:fk:audit": "node scripts/audit-postgres-fk-indexes.mjs",
+    "db:index:expected": "node scripts/audit-postgres-expected-indexes.mjs",
     "db:baseline:audit": "node scripts/audit-postgres-baseline-drift.mjs",
     "db:check": "node scripts/check-postgres.mjs",
     "db:setup": "node scripts/setup-postgres.mjs",

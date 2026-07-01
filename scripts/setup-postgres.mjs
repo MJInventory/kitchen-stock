@@ -2,10 +2,19 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { closePool, getPool } from "../lib/postgres.js";
+import { ensurePostgresSchemaUpgrades } from "../lib/postgres-schema.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const schemaPath = join(__dirname, "..", "database", "schema.sql");
 const schemaSql = await readFile(schemaPath, "utf8");
+
+function db() {
+  return getPool();
+}
+
+function hasPostgres() {
+  return true;
+}
 
 try {
   const client = await getPool().connect();
@@ -19,7 +28,8 @@ try {
   } finally {
     client.release();
   }
-  console.log("Postgres schema applied successfully.");
+  await ensurePostgresSchemaUpgrades({ hasPostgres, db });
+  console.log("Postgres schema baseline and tracked migrations applied successfully.");
 } finally {
   await closePool();
 }

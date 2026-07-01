@@ -73,6 +73,8 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
   Shows exact duplicate public indexes before we remove any more
 - `scripts/audit-postgres-fk-indexes.mjs`
   Shows public foreign keys that do not have a supporting index prefix
+- `scripts/setup-postgres.mjs`
+  Applies `database/schema.sql` and then the tracked migrations so a fresh database lands on the current schema state
 
 ## Current tracked migrations
 
@@ -80,6 +82,18 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
   Wraps the legacy schema bootstrap in a one-time tracked migration
 - `002_drop_redundant_indexes`
   Removes duplicate indexes that were duplicating unique constraints
+- `003_backfill_supporting_indexes`
+  Adds the first batch of concurrent support indexes
+- `004_backfill_secondary_indexes`
+  Adds the second batch of concurrent support indexes
+- `005_backfill_final_foreign_key_indexes`
+  Finishes foreign-key index coverage
+
+## Baseline note
+
+`database/schema.sql` is a baseline bootstrap, not the full final schema by itself.
+
+Use `npm run db:setup` instead of applying `schema.sql` alone, because the setup script now applies the baseline file and then runs the tracked migrations immediately.
 
 ## Next cleanup targets
 

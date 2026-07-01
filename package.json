@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "db:migrate": "node scripts/run-postgres-migrations.mjs",
+    "db:migrate:status": "node scripts/show-postgres-migrations.mjs",
     "db:check": "node scripts/check-postgres.mjs",
     "db:setup": "node scripts/setup-postgres.mjs",
     "db:import:airtable": "node scripts/import-airtable-to-postgres.mjs",

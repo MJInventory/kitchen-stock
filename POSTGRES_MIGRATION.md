@@ -20,6 +20,7 @@ From the project root:
 ```bash
 npm install
 npm run db:migrate
+npm run db:migrate:status
 npm run db:check
 npm run db:setup
 npm run db:import:airtable
@@ -64,6 +65,8 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
   Individual migration modules
 - `scripts/run-postgres-migrations.mjs`
   Manual migration command
+- `scripts/show-postgres-migrations.mjs`
+  Shows which tracked migrations are already applied
 
 ## Current tracked migrations
 

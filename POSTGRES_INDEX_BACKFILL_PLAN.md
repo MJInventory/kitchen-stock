@@ -37,6 +37,10 @@ Examples created by the runtime bootstrap:
 
 Create a narrow migration that adds only the most useful missing indexes first.
 
+Status on July 1, 2026:
+
+- completed as `003_backfill_supporting_indexes`
+
 Recommended first batch:
 
 1. `inventory_items(category_id)`
@@ -48,7 +52,7 @@ Recommended first batch:
 7. `order_requests(inventory_item_id)`
 8. `stock_counts(inventory_item_id)`
 9. `standing_orders(supplier_id)`
-10. `standing_order_runs(standing_order_id, expected_delivery_date)` if not already present
+10. `standing_order_runs(standing_order_id, expected_delivery_date)`
 11. `standing_order_run_lines(standing_order_run_id)`
 12. `standing_order_run_lines(order_request_id)`
 13. `standing_order_run_lines(inventory_item_id)`
@@ -75,13 +79,13 @@ Only after observing production behavior:
 
 ## Important implementation note
 
-The current migration runner applies migrations inside a transaction:
+The current migration runner now supports both transactional and non-transactional migrations:
 
 - `lib/postgres-schema.js`
 
-That is fine for normal DDL, but if we want low-lock production index creation we may prefer:
+That is fine for normal DDL, and it now also allows low-lock production index creation for selected migrations:
 
-1. a manual maintenance step with `create index concurrently`
-2. or a separate migration path that supports non-transactional concurrent index creation
+1. use `transaction: false`
+2. run `create index concurrently` inside the migration
 
 Do not blindly add every missing index in one runtime startup migration without checking lock behavior first.

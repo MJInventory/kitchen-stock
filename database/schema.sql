@@ -453,15 +453,11 @@ create table if not exists internal_order_lines (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists idx_internal_order_batches_status_requested
-  on internal_order_batches (status, requested_at desc);
 create index if not exists idx_internal_order_batches_requested_by_user
   on internal_order_batches (requested_by_user_id);
 create index if not exists idx_internal_order_batches_status_user
   on internal_order_batches (status, requested_by_username, created_at desc);
 
-create index if not exists idx_internal_order_lines_batch
-  on internal_order_lines (internal_order_batch_id);
 create index if not exists idx_internal_order_lines_batch_status
   on internal_order_lines (internal_order_batch_id, status, created_at);
 create index if not exists idx_internal_order_lines_inventory_item

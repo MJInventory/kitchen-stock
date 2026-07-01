@@ -73,13 +73,31 @@ const checks = [
   }
 ];
 
+const forbiddenChecks = [
+  {
+    name: "obsolete idx_internal_order_batches_status_requested",
+    pattern: /create index if not exists idx_internal_order_batches_status_requested/i
+  },
+  {
+    name: "obsolete idx_internal_order_lines_batch",
+    pattern: /create index if not exists idx_internal_order_lines_batch\s/i
+  }
+];
+
 const missing = checks
   .filter((check) => !check.pattern.test(schemaSql))
   .map((check) => check.name);
 
-if (!missing.length) {
+const obsolete = forbiddenChecks
+  .filter((check) => check.pattern.test(schemaSql))
+  .map((check) => check.name);
+
+if (!missing.length && !obsolete.length) {
   console.log("Baseline schema file includes all audited drift markers.");
 } else {
-  console.table(missing.map((name) => ({ missing: name })));
+  console.table([
+    ...missing.map((name) => ({ type: "missing", item: name })),
+    ...obsolete.map((name) => ({ type: "obsolete", item: name }))
+  ]);
   process.exitCode = 1;
 }

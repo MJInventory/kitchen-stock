@@ -105,7 +105,11 @@ export function dateOnly(value) {
 export function receivingItemDateLabel(request) {
   const originType = String(request?.originType || "").trim().toLowerCase();
   if (originType === "standing") {
-    const scheduledDate = dateOnly(request?.deliveryDay);
+    const notesMatch = String(request?.notes || "").match(/Expected arrival:\s*(\d{4}-\d{2}-\d{2})/i);
+    const scheduledDate = dateOnly(request?.deliveryDay)
+      || dateOnly(request?.expectedDate)
+      || (notesMatch ? notesMatch[1] : "")
+      || dateOnly(request?.requestDay);
     return scheduledDate ? `Scheduled ${scheduledDate}` : "";
   }
   const orderedDate = dateOnly(request?.orderedAt) || dateOnly(request?.requestedAt) || dateOnly(request?.requestDay);

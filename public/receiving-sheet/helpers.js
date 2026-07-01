@@ -91,3 +91,23 @@ export function supplierOptions(selectedSupplier, suppliers = []) {
     })
     .join("");
 }
+
+export function dateOnly(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const isoMatch = raw.match(/^\d{4}-\d{2}-\d{2}/);
+  if (isoMatch) return isoMatch[0];
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+export function receivingItemDateLabel(request) {
+  const originType = String(request?.originType || "").trim().toLowerCase();
+  if (originType === "standing") {
+    const scheduledDate = dateOnly(request?.deliveryDay);
+    return scheduledDate ? `Scheduled ${scheduledDate}` : "";
+  }
+  const orderedDate = dateOnly(request?.orderedAt) || dateOnly(request?.requestedAt) || dateOnly(request?.requestDay);
+  return orderedDate ? `Ordered ${orderedDate}` : "";
+}

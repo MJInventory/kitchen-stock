@@ -3,6 +3,7 @@ import {
   formatUserDisplay,
   groupBySupplier,
   logicalRequestCompare,
+  receivingItemDateLabel,
   receivingOriginClass,
   receivingOriginTitle,
   supplierNoteMap
@@ -17,6 +18,7 @@ function buildReceivingDisplayRows(requests = []) {
       rowClass: receivingOriginClass(request),
       supplierName: request.supplierName || "",
       itemName: request.itemName || "",
+      itemDateLabel: receivingItemDateLabel(request),
       openQuantity: Number(request.quantity || 0),
       receiveQuantity: Number(request.quantity || 0),
       unit: request.unit || "",
@@ -91,7 +93,10 @@ export function renderReceivingSheet({
                       &nbsp;
                     </button>
                   </td>
-                  <td>${escapeHtml(row.itemName)}</td>
+                  <td>
+                    <div class="receiving-item-name">${escapeHtml(row.itemName)}</div>
+                    ${row.itemDateLabel ? `<div class="receiving-item-date">${escapeHtml(row.itemDateLabel)}</div>` : ""}
+                  </td>
                   <td>${escapeHtml(row.openQuantity)}</td>
                   <td>
                     <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" aria-label="Received quantity for ${escapeHtml(row.itemName)}">

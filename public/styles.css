@@ -1459,6 +1459,17 @@ button:hover,
   background: #fde7e7;
 }
 
+.receiving-item-name {
+  font-weight: 500;
+}
+
+.receiving-item-date {
+  margin-top: 4px;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
 .sheet-group h2 {
   margin: 0 0 8px;
   font-size: 18px;

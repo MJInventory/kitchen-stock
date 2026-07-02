@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { receivingItemDateLabel } from "../public/receiving-sheet/helpers.js";
 import { renderStandingOrderRuns } from "../public/standing-orders/render.js";
 import { createMutationApi } from "../lib/mutation-api.js";
+import { createRequestDomain } from "../lib/request-domain.js";
+import { createStandingOrderDomain } from "../lib/standing-order-domain.js";
 
 test("receivingItemDateLabel shows scheduled date for standing orders from expectedDate", () => {
   const label = receivingItemDateLabel({
@@ -158,4 +160,128 @@ test("mutation api routes standing-order run line quantity edits through updateS
     "Enno"
   ]]);
   assert.equal(getSent()?.status, 200);
+});
+
+test("request domain can reopen a received standing-order run line without a request id", async () => {
+  const executed = [];
+  const queryImpl = async (sql, params = []) => {
+    const text = String(sql);
+    executed.push({ sql: text, params });
+    if (text.includes("from standing_order_run_lines sorl")) {
+      return {
+        rows: [{
+          id: "line-1",
+          standing_order_run_id: "run-1",
+          inventory_item_id: "item-1",
+          order_request_id: null,
+          quantity: 2,
+          received: true,
+          status: "Received",
+          unit: "bag",
+          item_name: "Mint Fresh",
+          current_quantity: 10,
+          resolved_request_id: null
+        }]
+      };
+    }
+    return { rows: [], rowCount: 1 };
+  };
+  const client = {
+    query: queryImpl,
+    release() {}
+  };
+  const dbHandle = {
+    query: queryImpl,
+    connect: async () => client
+  };
+  const domain = createRequestDomain({
+    db: () => dbHandle,
+    cache: { items: { expiresAt: 1 }, requests: { expiresAt: 1 } },
+    allowedUnits: [],
+    isValidId: (value) => Boolean(String(value || "").trim()),
+    pgRequestFromRow: (row) => row,
+    pgNumber: Number,
+    pgRecordAuditEntry: async () => {},
+    pgAreasForInventoryItemIds: async () => [],
+    pgNotificationUsers: async () => [],
+    pgCreateNotificationsForUsers: async () => {},
+    presentUserName: (value) => value,
+    getPgCloseStandingOrderRunIfCompleteTx: () => null
+  });
+
+  const result = await domain.pgUndoDeliveredStandingOrderRunLine("line-1", "Enno");
+  assert.deepEqual(result, { id: "line-1", reopened: true });
+  assert.ok(executed.some((entry) => entry.sql.includes("insert into stock_counts")));
+  assert.ok(executed.some((entry) => entry.sql.includes("update standing_order_run_lines")));
+  assert.ok(executed.some((entry) => entry.sql.includes("update standing_order_runs")));
+});
+
+test("standing-order rebuild recreates stale request links instead of updating missing requests", async () => {
+  const executed = [];
+  const client = {
+    async query(sql, params = []) {
+      const text = String(sql);
+      executed.push({ sql: text, params });
+      if (text.includes("from standing_order_run_lines sorl")) {
+        return {
+          rows: [{
+            id: "line-stale",
+            inventory_item_id: "item-1",
+            order_request_id: "missing-request",
+            quantity: 4,
+            unit: "box",
+            supplier_name: "Deli Nova",
+            received: false,
+            status: "Scheduled",
+            resolved_request_id: null,
+            partial_receipt: false
+          }]
+        };
+      }
+      if (text.includes("insert into order_requests")) {
+        return { rows: [{ id: "new-request-1" }] };
+      }
+      if (text.includes("insert into standing_order_run_lines")) {
+        return { rows: [{ id: "new-line-1" }] };
+      }
+      return { rows: [], rowCount: 1 };
+    }
+  };
+
+  const domain = createStandingOrderDomain({
+    db: {
+      query: async () => ({ rows: [] }),
+      connect: async () => client
+    },
+    cache: { requests: { expiresAt: 1 } },
+    todayIso: () => "2026-07-02",
+    isValidId: (value) => Boolean(String(value || "").trim()),
+    ensurePostgresSchemaUpgrades: async () => {},
+    pgStandingOrderFromRow: (row) => row,
+    pgFindOrCreateSupplierByName: async () => ({ id: "supplier-1" }),
+    pgCreateRequest: async () => ({ id: "unused" }),
+    pgCreateNotificationsForUsers: async () => {},
+    pgNotificationUsers: async () => [],
+    pgRecordAuditEntry: async () => {}
+  });
+
+  await domain.pgRebuildStandingOrderRunTx(
+    client,
+    "run-1",
+    "order-1",
+    "2026-07-02",
+    {
+      schedule: "Weekly",
+      name: "Weekly produce",
+      supplierName: "Deli Nova",
+      otherSchedule: "",
+      notes: "",
+      items: [{ itemId: "item-1", quantity: 6 }]
+    },
+    "Enno"
+  );
+
+  assert.ok(executed.some((entry) => entry.sql.includes("insert into order_requests")));
+  assert.ok(executed.some((entry) => entry.sql.includes("insert into standing_order_run_lines")));
+  assert.ok(executed.every((entry) => !entry.sql.includes("update order_requests\n          set quantity_needed")));
 });

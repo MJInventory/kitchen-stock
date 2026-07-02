@@ -105,18 +105,18 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
 - `010_refresh_app_user_schema`
   Tracks app user schema updates
 
-## Baseline note
+## Schema snapshot note
 
-`database/schema.sql` is a baseline bootstrap, not the full final schema by itself.
+`database/schema.sql` is now intended to be a full schema snapshot, including the current reporting and compatibility views.
 
-Use `npm run db:setup` instead of applying `schema.sql` alone, because the setup script now applies the baseline file and then runs the tracked migrations immediately.
+Use `npm run db:setup` for fresh environments anyway, because the setup script still applies the schema file and then the tracked migrations in order, which preserves production parity and migration history.
 
 ## Next cleanup targets
 
 1. Keep `006_refresh_reporting_views` as the only remaining extracted helper unless we have a concrete reason to split it
 2. Keep seed/reference data separate from structural schema changes
 3. Audit non-FK reporting/performance indexes as query patterns evolve
-4. Continue aligning `database/schema.sql` with the live migrated schema when drift is found
+4. Keep `database/schema.sql` aligned with the live migrated schema when future drift is found
 
 ## Import status
 

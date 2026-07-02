@@ -14,6 +14,8 @@ const shelfLocation = document.querySelector("#shelfLocation");
 const shelfMessage = document.querySelector("#shelfMessage");
 
 let storageLocations = [];
+let locationRecords = [];
+let shelfRecords = [];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -37,11 +39,11 @@ function locationOptions(selected = "") {
 
 function renderLocations(locations) {
   storageLocations = [...locations].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }));
+  locationRecords = locations || [];
   locationList.innerHTML = storageLocations.map((location) => `
     <article class="setting-row setup-admin-row" data-location-id="${escapeHtml(location.id)}">
       <label>Name <input class="location-name" type="text" value="${escapeHtml(location.name)}"></label>
       <label class="check-label"><input class="location-active" type="checkbox" ${location.active ? "checked" : ""}> Active</label>
-      <button class="save-location" type="button">Save</button>
     </article>
   `).join("");
 
@@ -58,6 +60,7 @@ function renderLocations(locations) {
 }
 
 function renderShelves(shelves) {
+  shelfRecords = shelves || [];
   shelfLocation.innerHTML = locationOptions(shelfLocation.value);
   shelfList.innerHTML = shelves
     .sort((a, b) => {
@@ -70,7 +73,6 @@ function renderShelves(shelves) {
         <label>Shelf code <input class="shelf-name" type="text" value="${escapeHtml(shelf.name)}"></label>
         <label>Storage location <select class="shelf-location" data-current-value="${escapeHtml(shelf.storageLocation)}">${locationOptions(shelf.storageLocation)}</select></label>
         <label class="check-label"><input class="shelf-active" type="checkbox" ${shelf.active ? "checked" : ""}> Active</label>
-        <button class="save-shelf" type="button">Save</button>
       </article>
     `).join("");
 
@@ -90,6 +92,70 @@ async function loadEverything() {
   renderShelves(shelfData.shelfCodes || []);
   setLocationMessage("");
   setShelfMessage("");
+}
+
+function getLocationRecord(row) {
+  return locationRecords.find((location) => location.id === row.dataset.locationId);
+}
+
+function isLocationDirty(row) {
+  const record = getLocationRecord(row);
+  if (!record) return false;
+  return (row.querySelector(".location-name")?.value || "") !== String(record.name || "")
+    || Boolean(row.querySelector(".location-active")?.checked) !== Boolean(record.active);
+}
+
+async function saveLocationRow(row) {
+  if (!row || row.dataset.saving === "true" || !isLocationDirty(row)) return;
+  row.dataset.saving = "true";
+  row.classList.add("dirty");
+  setLocationMessage("Saving location...");
+  try {
+    await page.api(`/api/setup/storage-locations/${row.dataset.locationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: row.querySelector(".location-name").value,
+        active: row.querySelector(".location-active").checked
+      })
+    });
+    await loadEverything();
+    setLocationMessage("Storage location saved.");
+  } finally {
+    row.dataset.saving = "false";
+  }
+}
+
+function getShelfRecord(row) {
+  return shelfRecords.find((shelf) => shelf.id === row.dataset.shelfId);
+}
+
+function isShelfDirty(row) {
+  const record = getShelfRecord(row);
+  if (!record) return false;
+  return (row.querySelector(".shelf-name")?.value || "") !== String(record.name || "")
+    || (row.querySelector(".shelf-location")?.value || "") !== String(record.storageLocation || "")
+    || Boolean(row.querySelector(".shelf-active")?.checked) !== Boolean(record.active);
+}
+
+async function saveShelfRow(row) {
+  if (!row || row.dataset.saving === "true" || !isShelfDirty(row)) return;
+  row.dataset.saving = "true";
+  row.classList.add("dirty");
+  setShelfMessage("Saving shelf...");
+  try {
+    await page.api(`/api/setup/shelf-codes/${row.dataset.shelfId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: row.querySelector(".shelf-name").value,
+        storageLocation: row.querySelector(".shelf-location").value,
+        active: row.querySelector(".shelf-active").checked
+      })
+    });
+    await loadEverything();
+    setShelfMessage("Shelf code saved.");
+  } finally {
+    row.dataset.saving = "false";
+  }
 }
 
 locationForm.addEventListener("submit", async (event) => {
@@ -112,22 +178,24 @@ locationForm.addEventListener("submit", async (event) => {
   }
 });
 
-locationList.addEventListener("click", (event) => {
-  const button = event.target.closest(".save-location");
-  if (!button) return;
-  const row = button.closest(".setup-admin-row");
-  button.disabled = true;
-  page.api(`/api/setup/storage-locations/${row.dataset.locationId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      name: row.querySelector(".location-name").value,
-      active: row.querySelector(".location-active").checked
-    })
-  })
-    .then(loadEverything)
-    .then(() => setLocationMessage("Storage location saved."))
-    .catch((error) => setLocationMessage(error.message, true))
-    .finally(() => { button.disabled = false; });
+locationList.addEventListener("input", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isLocationDirty(row));
+});
+
+locationList.addEventListener("change", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isLocationDirty(row));
+});
+
+locationList.addEventListener("focusout", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  const next = event.relatedTarget;
+  if (next && row.contains(next)) return;
+  saveLocationRow(row).catch((error) => setLocationMessage(error.message, true));
 });
 
 shelfForm.addEventListener("submit", async (event) => {
@@ -152,23 +220,24 @@ shelfForm.addEventListener("submit", async (event) => {
   }
 });
 
-shelfList.addEventListener("click", (event) => {
-  const button = event.target.closest(".save-shelf");
-  if (!button) return;
-  const row = button.closest(".setup-admin-row");
-  button.disabled = true;
-  page.api(`/api/setup/shelf-codes/${row.dataset.shelfId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      name: row.querySelector(".shelf-name").value,
-      storageLocation: row.querySelector(".shelf-location").value,
-      active: row.querySelector(".shelf-active").checked
-    })
-  })
-    .then(loadEverything)
-    .then(() => setShelfMessage("Shelf code saved."))
-    .catch((error) => setShelfMessage(error.message, true))
-    .finally(() => { button.disabled = false; });
+shelfList.addEventListener("input", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isShelfDirty(row));
+});
+
+shelfList.addEventListener("change", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isShelfDirty(row));
+});
+
+shelfList.addEventListener("focusout", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  const next = event.relatedTarget;
+  if (next && row.contains(next)) return;
+  saveShelfRow(row).catch((error) => setShelfMessage(error.message, true));
 });
 
 page.ready(loadEverything);

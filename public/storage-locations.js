@@ -8,6 +8,7 @@ const page = authPage({
 const form = document.querySelector("#locationForm");
 const locationList = document.querySelector("#locationList");
 const message = document.querySelector("#locationMessage");
+let locationRecords = [];
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -19,11 +20,11 @@ function setMessage(text, isError = false) {
 }
 
 function renderLocations(locations) {
+  locationRecords = locations || [];
   locationList.innerHTML = locations.map((location) => `
     <article class="setting-row setup-admin-row" data-location-id="${escapeHtml(location.id)}">
       <label>Name <input class="location-name" type="text" value="${escapeHtml(location.name)}"></label>
       <label class="check-label"><input class="location-active" type="checkbox" ${location.active ? "checked" : ""}> Active</label>
-      <button class="save-location" type="button">Save</button>
     </article>
   `).join("");
 
@@ -37,6 +38,37 @@ async function loadLocations() {
   const data = await page.api("/api/setup/storage-locations");
   renderLocations(data.storageLocations || []);
   setMessage("");
+}
+
+function getLocationRecord(row) {
+  return locationRecords.find((location) => location.id === row.dataset.locationId);
+}
+
+function isLocationDirty(row) {
+  const record = getLocationRecord(row);
+  if (!record) return false;
+  return (row.querySelector(".location-name")?.value || "") !== String(record.name || "")
+    || Boolean(row.querySelector(".location-active")?.checked) !== Boolean(record.active);
+}
+
+async function saveLocationRow(row) {
+  if (!row || row.dataset.saving === "true" || !isLocationDirty(row)) return;
+  row.dataset.saving = "true";
+  row.classList.add("dirty");
+  setMessage("Saving location...");
+  try {
+    await page.api(`/api/setup/storage-locations/${row.dataset.locationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: row.querySelector(".location-name").value,
+        active: row.querySelector(".location-active").checked
+      })
+    });
+    await loadLocations();
+    setMessage("Storage location saved.");
+  } finally {
+    row.dataset.saving = "false";
+  }
 }
 
 form.addEventListener("submit", async (event) => {
@@ -59,22 +91,24 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-locationList.addEventListener("click", (event) => {
-  const button = event.target.closest(".save-location");
-  if (!button) return;
-  const row = button.closest(".setup-admin-row");
-  button.disabled = true;
-  page.api(`/api/setup/storage-locations/${row.dataset.locationId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      name: row.querySelector(".location-name").value,
-      active: row.querySelector(".location-active").checked
-    })
-  })
-    .then(loadLocations)
-    .then(() => setMessage("Storage location saved."))
-    .catch((error) => setMessage(error.message, true))
-    .finally(() => { button.disabled = false; });
+locationList.addEventListener("input", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isLocationDirty(row));
+});
+
+locationList.addEventListener("change", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isLocationDirty(row));
+});
+
+locationList.addEventListener("focusout", (event) => {
+  const row = event.target.closest(".setup-admin-row");
+  if (!row) return;
+  const next = event.relatedTarget;
+  if (next && row.contains(next)) return;
+  saveLocationRow(row).catch((error) => setMessage(error.message, true));
 });
 
 page.ready(loadLocations);

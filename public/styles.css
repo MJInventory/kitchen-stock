@@ -685,7 +685,7 @@ button:hover,
   margin-top: 14px;
 }
 
-.user-admin-actions .save-user {
+.user-admin-actions button {
   width: auto;
   min-width: 180px;
 }
@@ -1271,7 +1271,7 @@ button:hover,
   min-height: 44px;
 }
 
-.delete-item-label {
+.delete-item-button {
   align-self: center;
 }
 
@@ -3768,7 +3768,7 @@ body.order-app {
     gap: 6px;
   }
 
-  .delete-item-label {
+  .delete-item-button {
     align-self: start;
   }
 
@@ -3799,7 +3799,7 @@ body.order-app {
     align-items: stretch;
   }
 
-  .user-admin-actions .save-user {
+  .user-admin-actions button {
     width: 100%;
     min-width: 0;
   }

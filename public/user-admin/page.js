@@ -107,19 +107,10 @@ export function initUserAdminPage() {
 
   async function saveUser(row) {
     const id = row.dataset.userId;
-    const name = row.querySelector("strong").textContent;
-    const wantsDelete = row.querySelector(".user-delete")?.checked;
-    if (wantsDelete) {
-      if (!confirm(`Delete user ${name}?`)) return { deleted: false };
-      if (!confirm(`Really delete ${name}? This cannot be undone.`)) return { deleted: false };
-      await api(`/api/app-users/${id}`, { method: "DELETE" });
-      return { deleted: true };
-    }
-
     const data = await api(`/api/app-users/${id}`, {
       method: "PATCH",
       body: JSON.stringify({
-        name,
+        name: row.dataset.userName || row.querySelector("strong").textContent,
         password: row.querySelector(".user-password").value,
         role: row.querySelector(".user-role").value,
         theme: "light",
@@ -141,6 +132,39 @@ export function initUserAdminPage() {
     });
     row.querySelector(".user-password").value = "";
     row.querySelector(".user-must-change").checked = data.user.mustChangePassword;
+  }
+
+  function getUserRecord(row) {
+    return allUsers.find((user) => user.id === row.dataset.userId);
+  }
+
+  function isUserDirty(row) {
+    const user = getUserRecord(row);
+    if (!user) return false;
+    return (row.querySelector(".user-password")?.value || "") !== ""
+      || (row.querySelector(".user-role")?.value || "") !== String(user.role || "")
+      || Boolean(row.querySelector(".user-is-driver")?.checked) !== Boolean(user.isDriver)
+      || Boolean(row.querySelector(".user-is-picker")?.checked) !== Boolean(user.isPicker)
+      || Boolean(row.querySelector(".user-is-kitchen-staff")?.checked) !== Boolean(user.isKitchenStaff)
+      || (row.querySelector(".user-kitchen-function")?.value || "") !== String(user.kitchenFunction || "")
+      || Boolean(row.querySelector(".user-notify-orders")?.checked) !== Boolean(user.notifyOnNewOrders)
+      || Boolean(row.querySelector(".user-notify-delivery")?.checked) !== Boolean(user.notifyOnDelivery)
+      || Boolean(row.querySelector(".user-notify-area-bar")?.checked) !== (user.notifyAreas?.bar !== false)
+      || Boolean(row.querySelector(".user-notify-area-foh")?.checked) !== (user.notifyAreas?.foh !== false)
+      || Boolean(row.querySelector(".user-notify-area-kitchen")?.checked) !== (user.notifyAreas?.kitchen !== false)
+      || Boolean(row.querySelector(".user-notify-area-general")?.checked) !== (user.notifyAreas?.general !== false)
+      || Boolean(row.querySelector(".user-active")?.checked) !== Boolean(user.active)
+      || Boolean(row.querySelector(".user-must-change")?.checked) !== Boolean(user.mustChangePassword);
+  }
+
+  async function deleteUser(row) {
+    const id = row.dataset.userId;
+    const name = row.dataset.userName || row.querySelector("strong").textContent;
+    if (!confirm(`Delete user ${name}?`)) return;
+    if (!confirm(`Really delete ${name}? This cannot be undone.`)) return;
+    await api(`/api/app-users/${id}`, { method: "DELETE" });
+    await loadUsers();
+    setMessage("User deleted.");
   }
 
   loginForm.addEventListener("submit", async (event) => {
@@ -212,14 +236,41 @@ export function initUserAdminPage() {
       if (hint) hint.textContent = expanded ? "Hide details" : "Open details";
       return;
     }
-    const button = event.target.closest(".save-user");
-    if (!button) return;
-    const row = button.closest(".user-admin-card");
-    button.disabled = true;
-    saveUser(row)
-      .then((result) => loadUsers().then(() => setMessage(result?.deleted ? "User deleted." : "User saved.")))
+    const deleteButton = event.target.closest(".delete-user");
+    if (!deleteButton) return;
+    const row = deleteButton.closest(".user-admin-card");
+    deleteButton.disabled = true;
+    deleteUser(row)
       .catch((error) => setMessage(error.message, true))
-      .finally(() => { button.disabled = false; });
+      .finally(() => { deleteButton.disabled = false; });
+  });
+
+  userList.addEventListener("input", (event) => {
+    const row = event.target.closest(".user-admin-card");
+    if (!row) return;
+    row.classList.toggle("dirty", isUserDirty(row));
+  });
+
+  userList.addEventListener("change", (event) => {
+    const row = event.target.closest(".user-admin-card");
+    if (!row) return;
+    row.classList.toggle("dirty", isUserDirty(row));
+  });
+
+  userList.addEventListener("focusout", (event) => {
+    const row = event.target.closest(".user-admin-card");
+    if (!row) return;
+    const next = event.relatedTarget;
+    if (next && row.contains(next)) return;
+    if (!isUserDirty(row) || row.dataset.saving === "true") return;
+    row.dataset.saving = "true";
+    row.classList.add("dirty");
+    setMessage("Saving user...");
+    saveUser(row)
+      .then(() => loadUsers())
+      .then(() => setMessage("User saved."))
+      .catch((error) => setMessage(error.message, true))
+      .finally(() => { row.dataset.saving = "false"; });
   });
 
   [userSearch, roleFilter, statusFilter].forEach((control) => {

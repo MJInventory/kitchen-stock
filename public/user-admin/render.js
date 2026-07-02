@@ -114,8 +114,7 @@ export function renderUsers({
           </section>
         </div>
         <div class="user-admin-actions">
-          <label class="check-label delete-check"><input class="user-delete" type="checkbox" ${user.editable && user.canDelete ? "" : "disabled"}> Delete user</label>
-          <button class="save-user" type="button" ${user.canSave || user.canDelete ? "" : "disabled"}>Save Changes</button>
+          ${user.canDelete ? '<button class="danger-button delete-user" type="button">Delete User</button>' : ""}
         </div>
       </div>
     </article>

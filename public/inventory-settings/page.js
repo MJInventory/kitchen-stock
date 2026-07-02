@@ -91,7 +91,7 @@ export function initInventorySettingsPage() {
     } else {
       dirtyIds.delete(itemId);
     }
-    saveAllButton.disabled = dirtyIds.size === 0;
+    if (saveAllButton) saveAllButton.disabled = dirtyIds.size === 0;
   }
 
   function currentValuesFromArticle(article) {
@@ -103,8 +103,7 @@ export function initInventorySettingsPage() {
       shelfCode: article.querySelector(".shelf-select")?.value || "",
       supplierId: article.querySelector(".supplier-select")?.value || "",
       minimumThreshold: String(article.querySelector(".minimum-input")?.value || "0"),
-      unit: article.querySelector(".unit-select")?.value || "",
-      deleteRequested: article.querySelector(".delete-item-check")?.checked || false
+      unit: article.querySelector(".unit-select")?.value || ""
     };
   }
 
@@ -117,8 +116,7 @@ export function initInventorySettingsPage() {
       shelfCode: item.shelfCode || "",
       supplierId: item.supplierId || "",
       minimumThreshold: String(item.minimum ?? 0),
-      unit: item.unit || "",
-      deleteRequested: false
+      unit: item.unit || ""
     };
   }
 
@@ -175,13 +173,14 @@ export function initInventorySettingsPage() {
       searchValue: normalize(searchFilter?.value)
     };
     renderItemList();
-    saveAllButton.disabled = true;
+    if (saveAllButton) saveAllButton.disabled = true;
     setSetupMessage("");
   }
 
   async function saveItem(article) {
     const id = article.dataset.itemId;
     const payload = draftValues.get(id) || currentValuesFromArticle(article);
+    if (!payload) return;
     const data = await api(`/api/items/${id}`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -198,52 +197,19 @@ export function initInventorySettingsPage() {
     items = items.map((item) => (item.id === id ? data.item : item));
     draftValues.delete(id);
     markDirty(id, false);
+    article.classList.remove("dirty");
   }
 
-  async function saveAllChanges() {
-    const dirtyItemIds = [...dirtyIds];
-    if (!dirtyItemIds.length) return;
-    const deletions = dirtyItemIds.filter((itemId) => draftValues.get(itemId)?.deleteRequested);
-    if (deletions.length && !window.confirm(`Delete ${deletions.length} inventory item(s)? This cannot be undone.`)) {
-      saveAllButton.disabled = false;
-      return;
-    }
-    saveAllButton.disabled = true;
-    setSetupMessage(`Saving ${dirtyItemIds.length} item change(s)...`);
-    for (const itemId of dirtyItemIds) {
-      const payload = draftValues.get(itemId);
-      if (payload?.deleteRequested) {
-        await api(`/api/items/${itemId}`, { method: "DELETE" });
-        items = items.filter((item) => item.id !== itemId);
-        draftValues.delete(itemId);
-        markDirty(itemId, false);
-        continue;
-      }
-      const article = itemSettingsList.querySelector(`.settings-item[data-item-id="${itemId}"]`);
-      if (article) {
-        await saveItem(article);
-        continue;
-      }
-      if (!payload) continue;
-      const data = await api(`/api/items/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: payload.name,
-          minimumThreshold: payload.minimumThreshold,
-          unit: payload.unit,
-          inventoryArea: payload.inventoryArea,
-          storageLocation: payload.storageLocation,
-          category: payload.category,
-          shelfCode: payload.shelfCode,
-          supplierId: payload.supplierId
-        })
-      });
-      items = items.map((item) => (item.id === itemId ? data.item : item));
-      draftValues.delete(itemId);
-      markDirty(itemId, false);
-    }
+  async function deleteItem(article) {
+    const id = article.dataset.itemId;
+    const name = article.querySelector(".item-name-input")?.value?.trim() || "this item";
+    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
+    await api(`/api/items/${id}`, { method: "DELETE" });
+    items = items.filter((item) => item.id !== id);
+    draftValues.delete(id);
+    markDirty(id, false);
     renderItemList();
-    setSetupMessage("All item settings saved.");
+    setSetupMessage("Item deleted.");
   }
 
   window.addEventListener("beforeunload", (event) => {
@@ -309,11 +275,27 @@ export function initInventorySettingsPage() {
     event.preventDefault();
     searchItemsButton?.click();
   });
-  saveAllButton.addEventListener("click", () => {
-    saveAllChanges().catch((error) => {
-      saveAllButton.disabled = false;
-      setSetupMessage(error.message, true);
-    });
+  saveAllButton?.addEventListener("click", () => {
+    const dirtyRows = [...itemSettingsList.querySelectorAll(".settings-item.dirty")];
+    if (!dirtyRows.length) return;
+    setSetupMessage(`Saving ${dirtyRows.length} item change(s)...`);
+    Promise.all(dirtyRows.map((row) => saveItem(row)))
+      .then(() => setSetupMessage("All item settings saved."))
+      .catch((error) => {
+        if (saveAllButton) saveAllButton.disabled = false;
+        setSetupMessage(error.message, true);
+      });
+  });
+
+  itemSettingsList.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest(".delete-item-button");
+    if (!deleteButton) return;
+    const article = deleteButton.closest(".settings-item");
+    if (!article) return;
+    deleteButton.disabled = true;
+    deleteItem(article)
+      .catch((error) => setSetupMessage(error.message, true))
+      .finally(() => { deleteButton.disabled = false; });
   });
 
   itemSettingsList.addEventListener("change", (event) => {
@@ -335,6 +317,18 @@ export function initInventorySettingsPage() {
     const article = event.target.closest(".settings-item");
     if (!article) return;
     syncDirtyState(article);
+  });
+
+  itemSettingsList.addEventListener("focusout", (event) => {
+    const article = event.target.closest(".settings-item");
+    if (!article) return;
+    const next = event.relatedTarget;
+    if (next && article.contains(next)) return;
+    if (!article.classList.contains("dirty")) return;
+    setSetupMessage("Saving item...");
+    saveItem(article)
+      .then(() => setSetupMessage("Item saved."))
+      .catch((error) => setSetupMessage(error.message, true));
   });
 
   if (sessionToken && sessionUser) {

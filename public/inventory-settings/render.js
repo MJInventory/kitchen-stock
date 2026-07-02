@@ -106,10 +106,7 @@ export function renderItems({
             ${optionList(optionsData.units || [], item.unit, "Choose unit")}
           </select>
         </label>
-        <label class="check-label delete-item-label">
-          <input class="delete-item-check" type="checkbox">
-          Delete item
-        </label>
+        <button class="danger-button delete-item-button" type="button">Delete item</button>
       </article>
     `)
     .join("");

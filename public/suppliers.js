@@ -8,6 +8,7 @@ const page = authPage({
 const supplierForm = document.querySelector("#supplierForm");
 const supplierList = document.querySelector("#supplierList");
 const supplierMessage = document.querySelector("#supplierMessage");
+let supplierRecords = [];
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -19,6 +20,7 @@ function setSupplierMessage(text, isError = false) {
 }
 
 function renderSuppliers(suppliers) {
+  supplierRecords = suppliers || [];
   supplierList.innerHTML = (suppliers || [])
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }))
     .map((supplier) => `
@@ -30,8 +32,7 @@ function renderSuppliers(suppliers) {
           <textarea class="supplier-contact" rows="3">${esc(supplier.contact || "")}</textarea>
         </label>
         <label class="check-label"><input class="supplier-active" type="checkbox" ${supplier.active ? "checked" : ""}> Active</label>
-        <label class="check-label delete-check"><input class="supplier-delete" type="checkbox"> Delete supplier</label>
-        <button class="save-supplier" type="button">Save</button>
+        <button class="danger-button delete-supplier" type="button">Delete</button>
       </article>
     `)
     .join("");
@@ -46,6 +47,39 @@ async function loadSuppliers() {
   const data = await page.api("/api/setup/suppliers");
   renderSuppliers(data.suppliers || []);
   setSupplierMessage("");
+}
+
+function getSupplierRecord(row) {
+  return supplierRecords.find((supplier) => supplier.id === row.dataset.supplierId);
+}
+
+function isSupplierDirty(row) {
+  const record = getSupplierRecord(row);
+  if (!record) return false;
+  return (row.querySelector(".supplier-name")?.value || "") !== String(record.name || "")
+    || (row.querySelector(".supplier-contact")?.value || "") !== String(record.contact || "")
+    || Boolean(row.querySelector(".supplier-active")?.checked) !== Boolean(record.active);
+}
+
+async function saveSupplierRow(row) {
+  if (!row || row.dataset.saving === "true" || !isSupplierDirty(row)) return;
+  row.dataset.saving = "true";
+  row.classList.add("dirty");
+  setSupplierMessage("Saving supplier...");
+  try {
+    await page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: row.querySelector(".supplier-name").value,
+        contact: row.querySelector(".supplier-contact").value,
+        active: row.querySelector(".supplier-active").checked
+      })
+    });
+    await loadSuppliers();
+    setSupplierMessage("Supplier saved.");
+  } finally {
+    row.dataset.saving = "false";
+  }
 }
 
 supplierForm.addEventListener("submit", async (event) => {
@@ -70,36 +104,38 @@ supplierForm.addEventListener("submit", async (event) => {
 });
 
 supplierList.addEventListener("click", (event) => {
-  const saveButton = event.target.closest(".save-supplier");
-  if (!saveButton) return;
-  const row = saveButton.closest(".supplier-row");
-  saveButton.disabled = true;
-  const deleteBox = row.querySelector(".supplier-delete");
-  const request = deleteBox?.checked
-    ? (window.confirm(`Delete supplier ${row.querySelector(".supplier-name").value.trim() || "this supplier"}?`)
-      && window.confirm("Really delete this supplier? This cannot be undone.")
-        ? page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, { method: "DELETE" })
-        : Promise.resolve({ cancelled: true }))
-    : page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: row.querySelector(".supplier-name").value,
-          contact: row.querySelector(".supplier-contact").value,
-          active: row.querySelector(".supplier-active").checked
-        })
-      });
-  request
+  const deleteButton = event.target.closest(".delete-supplier");
+  if (!deleteButton) return;
+  const row = deleteButton.closest(".supplier-row");
+  const supplierName = row.querySelector(".supplier-name").value.trim() || "this supplier";
+  if (!window.confirm(`Delete supplier ${supplierName}?`)) return;
+  if (!window.confirm("Really delete this supplier? This cannot be undone.")) return;
+  deleteButton.disabled = true;
+  page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, { method: "DELETE" })
     .then(loadSuppliers)
-    .then((result) => {
-      if (result?.cancelled) {
-        deleteBox.checked = false;
-        setSupplierMessage("Delete cancelled.");
-        return;
-      }
-      setSupplierMessage(deleteBox?.checked ? "Supplier deleted." : "Supplier saved.");
-    })
+    .then(() => setSupplierMessage("Supplier deleted."))
     .catch((error) => setSupplierMessage(error.message, true))
-    .finally(() => { saveButton.disabled = false; });
+    .finally(() => { deleteButton.disabled = false; });
+});
+
+supplierList.addEventListener("input", (event) => {
+  const row = event.target.closest(".supplier-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isSupplierDirty(row));
+});
+
+supplierList.addEventListener("change", (event) => {
+  const row = event.target.closest(".supplier-row");
+  if (!row) return;
+  row.classList.toggle("dirty", isSupplierDirty(row));
+});
+
+supplierList.addEventListener("focusout", (event) => {
+  const row = event.target.closest(".supplier-row");
+  if (!row) return;
+  const next = event.relatedTarget;
+  if (next && row.contains(next)) return;
+  saveSupplierRow(row).catch((error) => setSupplierMessage(error.message, true));
 });
 
 page.ready(loadSuppliers);

@@ -8,6 +8,7 @@ const page = authPage({
 const unitForm = document.querySelector("#unitForm");
 const unitList = document.querySelector("#unitList");
 const unitMessage = document.querySelector("#unitMessage");
+let unitRecords = [];
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -19,6 +20,7 @@ function setUnitMessage(text, isError = false) {
 }
 
 function renderUnits(units) {
+  unitRecords = units || [];
   unitList.innerHTML = (units || [])
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true }))
     .map((unit) => `
@@ -27,7 +29,6 @@ function renderUnits(units) {
           <input class="unit-name" type="text" value="${esc(unit.name)}">
         </label>
         <label class="check-label"><input class="unit-active" type="checkbox" ${unit.active ? "checked" : ""}> Active</label>
-        <button class="save-unit" type="button">Save</button>
         <button class="danger-button delete-unit" type="button">Delete</button>
       </article>
     `)
@@ -43,6 +44,37 @@ async function loadUnits() {
   const data = await page.api("/api/setup/units-of-measure");
   renderUnits(data.units || []);
   setUnitMessage("");
+}
+
+function getUnitRecord(row) {
+  return unitRecords.find((unit) => unit.id === row.dataset.unitId);
+}
+
+function isUnitDirty(row) {
+  const record = getUnitRecord(row);
+  if (!record) return false;
+  return (row.querySelector(".unit-name")?.value || "") !== String(record.name || "")
+    || Boolean(row.querySelector(".unit-active")?.checked) !== Boolean(record.active);
+}
+
+async function saveUnitRow(row) {
+  if (!row || row.dataset.saving === "true" || !isUnitDirty(row)) return;
+  row.dataset.saving = "true";
+  row.classList.add("dirty");
+  setUnitMessage("Saving unit...");
+  try {
+    await page.api(`/api/setup/units-of-measure/${row.dataset.unitId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: row.querySelector(".unit-name").value,
+        active: row.querySelector(".unit-active").checked
+      })
+    });
+    await loadUnits();
+    setUnitMessage("Unit saved.");
+  } finally {
+    row.dataset.saving = "false";
+  }
 }
 
 unitForm.addEventListener("submit", async (event) => {
@@ -66,24 +98,6 @@ unitForm.addEventListener("submit", async (event) => {
 });
 
 unitList.addEventListener("click", (event) => {
-  const saveButton = event.target.closest(".save-unit");
-  if (saveButton) {
-    const row = saveButton.closest("[data-unit-id]");
-    saveButton.disabled = true;
-    page.api(`/api/setup/units-of-measure/${row.dataset.unitId}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        name: row.querySelector(".unit-name").value,
-        active: row.querySelector(".unit-active").checked
-      })
-    })
-      .then(loadUnits)
-      .then(() => setUnitMessage("Unit saved."))
-      .catch((error) => setUnitMessage(error.message, true))
-      .finally(() => { saveButton.disabled = false; });
-    return;
-  }
-
   const deleteButton = event.target.closest(".delete-unit");
   if (!deleteButton) return;
   const row = deleteButton.closest("[data-unit-id]");
@@ -97,6 +111,26 @@ unitList.addEventListener("click", (event) => {
     .then(() => setUnitMessage("Unit deleted."))
     .catch((error) => setUnitMessage(error.message, true))
     .finally(() => { deleteButton.disabled = false; });
+});
+
+unitList.addEventListener("input", (event) => {
+  const row = event.target.closest("[data-unit-id]");
+  if (!row) return;
+  row.classList.toggle("dirty", isUnitDirty(row));
+});
+
+unitList.addEventListener("change", (event) => {
+  const row = event.target.closest("[data-unit-id]");
+  if (!row) return;
+  row.classList.toggle("dirty", isUnitDirty(row));
+});
+
+unitList.addEventListener("focusout", (event) => {
+  const row = event.target.closest("[data-unit-id]");
+  if (!row) return;
+  const next = event.relatedTarget;
+  if (next && row.contains(next)) return;
+  saveUnitRow(row).catch((error) => setUnitMessage(error.message, true));
 });
 
 page.ready(loadUnits);

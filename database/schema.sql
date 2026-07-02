@@ -217,6 +217,7 @@ create table if not exists order_requests (
   to_deliver boolean not null default false,
   delivery_day date,
   notes text not null default '',
+  partial_receipt boolean not null default false,
   standing_order_run_id uuid,
   standing_order_run_line_id uuid,
   created_at timestamptz not null default now(),
@@ -422,10 +423,29 @@ create table if not exists push_subscriptions (
 create index if not exists idx_push_subscriptions_user
   on push_subscriptions (user_id, updated_at desc);
 
+create table if not exists driver_sheet_assignments (
+  sheet_date date primary key,
+  driver_username text not null,
+  assigned_by_username text not null default '',
+  assigned_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists supplier_delivery_notes (
+  id uuid primary key default gen_random_uuid(),
+  delivery_date date not null,
+  supplier_name text not null,
+  memo text not null default '',
+  entered_by_username text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (delivery_date, supplier_name)
+);
+
 create table if not exists internal_order_batches (
   id uuid primary key default gen_random_uuid(),
   requested_by_user_id uuid references app_users(id) on delete set null,
-  requested_by_username text not null,
+  requested_by_username text not null default '',
   status text not null default 'open' check (status in ('open', 'ready', 'closed', 'partial')),
   notes text not null default '',
   picker_username text not null default '',
@@ -442,9 +462,9 @@ create table if not exists internal_order_lines (
   id uuid primary key default gen_random_uuid(),
   internal_order_batch_id uuid not null references internal_order_batches(id) on delete cascade,
   inventory_item_id uuid not null references inventory_items(id) on delete restrict,
-  requested_item_quantity integer not null default 0,
-  picked_item_quantity integer not null default 0,
-  shortage_item_quantity integer not null default 0,
+  requested_item_quantity numeric not null default 0,
+  picked_item_quantity numeric not null default 0,
+  shortage_item_quantity numeric not null default 0,
   status text not null default 'requested' check (status in ('requested', 'partial', 'ready', 'closed', 'cancelled')),
   shortage_request_id uuid references order_requests(id) on delete set null,
   auto_min_request_id uuid references order_requests(id) on delete set null,

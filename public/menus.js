@@ -111,6 +111,7 @@
 
     const logoutButton = document.querySelector("#logoutButton");
     if (logoutButton) logoutButton.hidden = true;
+    document.documentElement.classList.remove("menus-loading");
   }
 
   async function refreshPermissions() {
@@ -143,13 +144,22 @@
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      boot().catch(() => mountMenus());
+      boot().catch(() => {
+        mountMenus();
+        document.documentElement.classList.remove("menus-loading");
+      });
     }, { once: true });
   } else {
-    boot().catch(() => mountMenus());
+    boot().catch(() => {
+      mountMenus();
+      document.documentElement.classList.remove("menus-loading");
+    });
   }
 
   window.refreshKitchenMenus = () => {
-    boot().catch(() => mountMenus());
+    boot().catch(() => {
+      mountMenus();
+      document.documentElement.classList.remove("menus-loading");
+    });
   };
 }());

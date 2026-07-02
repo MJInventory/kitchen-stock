@@ -2007,6 +2007,11 @@ body.order-app {
   justify-self: end;
 }
 
+html.menus-loading .order-topbar > .menu-duo,
+html.menus-loading .order-topbar > .top-actions {
+  visibility: hidden;
+}
+
 .order-topbar > .menu-duo {
   justify-self: center;
 }

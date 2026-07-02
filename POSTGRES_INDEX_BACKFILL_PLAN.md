@@ -4,20 +4,17 @@ This file captures the next likely schema cleanup after the migration framework 
 
 ## Why this exists
 
-Production currently shows:
+This plan originally existed because production had drift between:
 
-- no exact duplicate public indexes
-- several foreign keys without a supporting index prefix
+- `database/schema.sql`
+- the tracked migration path
+- the old historical bootstrap behavior
 
-The main reason is that `database/schema.sql` contains indexes that were never backfilled by the legacy runtime bootstrap in:
+That mismatch meant production could be structurally correct but still miss performance-supporting indexes.
 
-- `lib/postgres-migrations/001-runtime-schema-bootstrap.js`
+## Historical drift pattern
 
-That means production can be structurally correct but still missing performance-supporting indexes.
-
-## Confirmed schema drift pattern
-
-Examples already present in `database/schema.sql` but not created by the runtime bootstrap path:
+Examples that were already present in `database/schema.sql` but had not been backfilled yet:
 
 - `idx_inventory_items_name`
 - `idx_inventory_items_category`
@@ -26,16 +23,12 @@ Examples already present in `database/schema.sql` but not created by the runtime
 - `idx_order_requests_item`
 - `idx_standing_order_runs_once_per_day`
 
-Examples created by the runtime bootstrap:
+Examples that were already present through the tracked/migrated schema path:
 
 - `idx_app_notifications_user_read_created`
 - `idx_push_subscriptions_user`
 - `idx_audit_log_entries_date_created`
 - `idx_internal_order_lines_batch_status`
-
-## Recommended first backfill migration
-
-Create a narrow migration that adds only the most useful missing indexes first.
 
 Status on July 1, 2026:
 
@@ -46,8 +39,9 @@ Status on July 1, 2026:
 Current result:
 
 - all public foreign keys now have an index prefix in production
+- the original first/second batch recommendations below are now retained mainly as historical notes
 
-Recommended first batch:
+Historical first batch:
 
 1. `inventory_items(category_id)`
 2. `inventory_items(primary_supplier_id)`
@@ -65,7 +59,7 @@ Recommended first batch:
 14. `driver_sheet_lines(supplier_id)`
 15. `shelf_codes(storage_location_id)`
 
-## Recommended second batch
+## Historical second batch
 
 Only after observing production behavior:
 
@@ -83,7 +77,7 @@ Only after observing production behavior:
 12. `app_notifications(related_standing_order_id)`
 13. `app_notifications(related_standing_order_run_id)`
 
-## Important implementation note
+## Current note
 
 The current migration runner now supports both transactional and non-transactional migrations:
 
@@ -94,4 +88,4 @@ That is fine for normal DDL, and it now also allows low-lock production index cr
 1. use `transaction: false`
 2. run `create index concurrently` inside the migration
 
-Do not blindly add every missing index in one runtime startup migration without checking lock behavior first.
+Do not blindly add future indexes in one startup-time migration without checking lock behavior first.

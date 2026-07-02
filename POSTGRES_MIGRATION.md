@@ -85,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
 ## Current tracked migrations
 
 - `001_runtime_schema_bootstrap`
-  Wraps the legacy schema bootstrap in a one-time tracked migration
+  Historical placeholder only
 - `002_drop_redundant_indexes`
   Removes duplicate indexes that were duplicating unique constraints
 - `003_backfill_supporting_indexes`
@@ -94,6 +94,16 @@ powershell -ExecutionPolicy Bypass -File "scripts/restore-production-postgres.ps
   Adds the second batch of concurrent support indexes
 - `005_backfill_final_foreign_key_indexes`
   Finishes foreign-key index coverage
+- `006_refresh_reporting_views`
+  Tracks reporting/workflow view rebuilds
+- `007_refresh_kitchen_roster_schema`
+  Tracks kitchen roster schema and views
+- `008_refresh_supporting_domain_schema`
+  Tracks supporting domain schema updates
+- `009_refresh_internal_order_schema`
+  Tracks internal order schema updates
+- `010_refresh_app_user_schema`
+  Tracks app user schema updates
 
 ## Baseline note
 
@@ -103,11 +113,10 @@ Use `npm run db:setup` instead of applying `schema.sql` alone, because the setup
 
 ## Next cleanup targets
 
-1. Split the legacy bootstrap into smaller versioned migrations
-2. Move reporting/view rebuilds out of the giant bootstrap
-3. Keep seed/reference data separate from structural schema changes
-4. Audit non-FK reporting/performance indexes as query patterns evolve
-5. Remove more startup-only DDL from normal app boot over time
+1. Keep `006_refresh_reporting_views` as the only remaining extracted helper unless we have a concrete reason to split it
+2. Keep seed/reference data separate from structural schema changes
+3. Audit non-FK reporting/performance indexes as query patterns evolve
+4. Continue aligning `database/schema.sql` with the live migrated schema when drift is found
 
 ## Import status
 

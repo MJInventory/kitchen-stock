@@ -8,6 +8,7 @@ import {
 } from "../public/session-shell.js";
 import { createJsonApiClient } from "../public/api-client.js";
 import { requestKitchenLogin, bindKitchenLogin } from "../public/login-flow.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "../public/session-bootstrap.js";
 
 function createStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -138,4 +139,44 @@ test("bindKitchenLogin submits credentials and forwards success result", async (
 
   assert.deepEqual(results, ["Freddy"]);
   assert.deepEqual(messages, [{ text: "Logging in...", isError: false }]);
+});
+
+test("bindAuthenticatedBootstrap shows login when session is missing", () => {
+  const events = [];
+  bindAuthenticatedBootstrap({
+    hasSession: () => false,
+    showApp: () => events.push("app"),
+    showLogin: () => events.push("login"),
+    load: () => events.push("load"),
+    onError: () => events.push("error")
+  });
+  assert.deepEqual(events, ["login"]);
+});
+
+test("bindAuthenticatedBootstrap shows app and runs loader when session exists", async () => {
+  const events = [];
+  bindAuthenticatedBootstrap({
+    hasSession: () => true,
+    showApp: () => events.push("app"),
+    showLogin: () => events.push("login"),
+    load: async () => {
+      events.push("load");
+    },
+    onError: () => events.push("error")
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(events, ["app", "load"]);
+});
+
+test("bindLogoutButton wires the click handler to showLogin", async () => {
+  const handlers = new Map();
+  const button = {
+    addEventListener(type, callback) {
+      handlers.set(type, callback);
+    }
+  };
+  const events = [];
+  bindLogoutButton(button, () => events.push("login"));
+  handlers.get("click")();
+  assert.deepEqual(events, ["login"]);
 });

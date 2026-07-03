@@ -18,33 +18,47 @@
     <button id="saveGuestsButton" type="button" hidden>Save Guests</button>
     <button id="printReportButton" type="button">Print / Save PDF</button>
   </div>
+  <div id="reportViewToggle" class="report-view-toggle" aria-label="Report view">
+    <button class="report-view-button active" type="button" data-report-view="status">Daily order status</button>
+    <button class="report-view-button" type="button" data-report-view="deliveries">Scheduled deliveries</button>
+    <button class="report-view-button" type="button" data-report-view="changes">Daily changes</button>
+  </div>
+  <div id="activityScopeToggle" class="report-view-toggle report-sub-toggle" aria-label="Daily changes filter" hidden>
+    <button class="report-view-button active" type="button" data-activity-scope="all">All changes</button>
+    <button class="report-view-button" type="button" data-activity-scope="received">Received items</button>
+  </div>
   <p id="reportMessage" role="status"></p>
 </section>
 
 <section class="print-sheet order-report-sheet">
-  <div class="sheet-header">
-    <div>
-      <p class="eyebrow">Daily Order Status</p>
-      <h1>Order Report</h1>
-    </div>
-    <div class="sheet-meta">
-      <span id="printDate"></span>
-    </div>
-  </div>
-
-  <div id="reportSummary" class="report-summary"></div>
-  <div id="reportList" class="sheet-list"></div>
-  <div class="standing-report-section">
-    <div class="sheet-header standing-report-header">
+  <div class="report-view-section" data-report-view-section="status">
+    <div class="sheet-header">
       <div>
-        <p class="eyebrow">Scheduled Deliveries</p>
-        <h2>Standing Orders</h2>
+        <p class="eyebrow">Daily Order Status</p>
+        <h1>Order Report</h1>
+      </div>
+      <div class="sheet-meta">
+        <span id="printDate"></span>
       </div>
     </div>
-    <div id="standingReportSummaryList" class="sheet-list no-print"></div>
-    <div id="standingReportList" class="sheet-list print-only"></div>
+
+    <div id="reportSummary" class="report-summary"></div>
+    <div id="reportList" class="sheet-list"></div>
   </div>
-  <div class="standing-report-section">
+
+  <div class="standing-report-section report-view-section" data-report-view-section="deliveries" hidden>
+    <div>
+      <div class="sheet-header standing-report-header">
+        <div>
+          <p class="eyebrow">Scheduled Deliveries</p>
+          <h2>Standing Orders</h2>
+        </div>
+      </div>
+      <div id="standingReportSummaryList" class="sheet-list no-print"></div>
+      <div id="standingReportList" class="sheet-list print-only"></div>
+    </div>
+  </div>
+  <div class="standing-report-section report-view-section" data-report-view-section="changes" hidden>
     <div class="sheet-header standing-report-header">
       <div>
         <p class="eyebrow">Daily Changes</p>

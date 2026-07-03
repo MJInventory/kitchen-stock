@@ -2127,6 +2127,32 @@ html.menus-loading .order-topbar > .top-actions {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.report-view-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.report-sub-toggle {
+  margin-top: 10px;
+}
+
+.report-view-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 16px;
+  font: 12px Arial, Helvetica, sans-serif;
+  font-weight: 700;
+}
+
+.report-view-button.active {
+  border-color: #d4a514;
+  background: #fff8e1;
+}
+
 .activity-row {
   border: 1px solid #d8caa6;
   border-radius: 16px;

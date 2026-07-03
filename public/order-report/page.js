@@ -29,6 +29,8 @@ export function initOrderReportPage() {
   const guestCountInput = document.querySelector("#guestCountInput");
   const guestNotesInput = document.querySelector("#guestNotesInput");
   const printDate = document.querySelector("#printDate");
+  const reportViewToggle = document.querySelector("#reportViewToggle");
+  const activityScopeToggle = document.querySelector("#activityScopeToggle");
   const reportSummary = document.querySelector("#reportSummary");
   const reportList = document.querySelector("#reportList");
   const standingReportSummaryList = document.querySelector("#standingReportSummaryList");
@@ -47,6 +49,8 @@ export function initOrderReportPage() {
   let currentGuestCount = { guests: "", notes: "" };
   let activeReportFilter = "all";
   let activeActivityFilter = "all";
+  let activeReportView = "status";
+  let activeActivityScope = "all";
 
   function setMessage(text, isError = false) {
     reportMessage.textContent = text;
@@ -86,6 +90,23 @@ export function initOrderReportPage() {
     }
   });
 
+  function renderReportViewState() {
+    document.querySelectorAll("[data-report-view-section]").forEach((section) => {
+      section.hidden = section.dataset.reportViewSection !== activeReportView;
+    });
+    reportViewToggle?.querySelectorAll("[data-report-view]").forEach((button) => {
+      const active = button.dataset.reportView === activeReportView;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    if (activityScopeToggle) activityScopeToggle.hidden = activeReportView !== "changes";
+    activityScopeToggle?.querySelectorAll("[data-activity-scope]").forEach((button) => {
+      const active = button.dataset.activityScope === activeActivityScope;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
   async function loadReport() {
     setMessage("Loading report...");
     const data = await api(`/api/order-report?date=${encodeURIComponent(reportDate.value)}`);
@@ -106,8 +127,10 @@ export function initOrderReportPage() {
       activitySummary,
       activityReportList,
       activeReportFilter,
-      activeActivityFilter
+      activeActivityFilter,
+      activeActivityScope
     });
+    renderReportViewState();
     setMessage("");
   }
 
@@ -140,7 +163,8 @@ export function initOrderReportPage() {
       activitySummary,
       activityReportList,
       activeReportFilter,
-      activeActivityFilter
+      activeActivityFilter,
+      activeActivityScope
     });
   }
 
@@ -151,7 +175,21 @@ export function initOrderReportPage() {
       summary: currentActivitySummary,
       activitySummary,
       activityReportList,
-      activeActivityFilter
+      activeActivityFilter,
+      activeActivityScope
+    });
+  }
+
+  function updateActivityScope(scope) {
+    activeActivityScope = scope === "received" ? "received" : "all";
+    renderReportViewState();
+    renderActivity({
+      entries: currentActivityEntries,
+      summary: currentActivitySummary,
+      activitySummary,
+      activityReportList,
+      activeActivityFilter,
+      activeActivityScope
     });
   }
 
@@ -202,6 +240,17 @@ export function initOrderReportPage() {
     if (!card) return;
     const nextFilter = card.dataset.activityFilter || "all";
     updateActivityFilter(activeActivityFilter === nextFilter ? "all" : nextFilter);
+  });
+  reportViewToggle?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-report-view]");
+    if (!button) return;
+    activeReportView = button.dataset.reportView || "status";
+    renderReportViewState();
+  });
+  activityScopeToggle?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-activity-scope]");
+    if (!button) return;
+    updateActivityScope(button.dataset.activityScope || "all");
   });
   activityReportList?.addEventListener("click", async (event) => {
     const button = event.target.closest(".undo-delivery-button");

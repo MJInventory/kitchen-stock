@@ -164,7 +164,7 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
     .join("");
 }
 
-export function renderActivity({ entries, summary, activitySummary, activityReportList, activeActivityFilter }) {
+export function renderActivity({ entries, summary, activitySummary, activityReportList, activeActivityFilter, activeActivityScope = "all" }) {
   const list = Array.isArray(entries) ? entries : [];
   const counts = summary || {};
 
@@ -180,9 +180,13 @@ export function renderActivity({ entries, summary, activitySummary, activityRepo
     </article>
   `).join("");
 
+  const scoped = activeActivityScope === "received"
+    ? list.filter((entry) => canUndoDeliveryEntry(entry))
+    : list;
+
   const visible = activeActivityFilter === "all"
-    ? list
-    : list.filter((entry) => entry.actionType === activeActivityFilter);
+    ? scoped
+    : scoped.filter((entry) => entry.actionType === activeActivityFilter);
 
   if (!visible.length) {
     activityReportList.innerHTML = '<p class="empty-sheet">No recorded adds, changes, or deletes for this day.</p>';
@@ -225,7 +229,8 @@ export function renderReport({
   activitySummary,
   activityReportList,
   activeReportFilter,
-  activeActivityFilter
+  activeActivityFilter,
+  activeActivityScope = "all"
 }) {
   const rows = Array.isArray(data.rows) ? data.rows : [];
   const standingOrders = Array.isArray(data.standingOrders) ? data.standingOrders : [];
@@ -235,7 +240,14 @@ export function renderReport({
 
   renderSummary({ reportSummary, summary: data.summary || {}, activeReportFilter });
   renderStandingOrders({ orders: standingOrders, standingReportSummaryList, standingReportList });
-  renderActivity({ entries: data.activity || [], summary: data.activitySummary || {}, activitySummary, activityReportList, activeActivityFilter });
+  renderActivity({
+    entries: data.activity || [],
+    summary: data.activitySummary || {},
+    activitySummary,
+    activityReportList,
+    activeActivityFilter,
+    activeActivityScope
+  });
 
   const today = String(data.date || "").trim();
   const visibleRows = reportRowsForFilter(rows, activeReportFilter);

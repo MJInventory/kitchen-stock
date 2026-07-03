@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { readKitchenSession } from "/session-shell.js";
 import { esc, sortByLabel, todayLocal } from "./helpers.js";
 import {
   optionsForSuppliers,
@@ -58,12 +59,7 @@ export function initStandingOrdersPage() {
   }
 
   function canAdminStandingOrders() {
-    try {
-      const permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-      return Boolean(permissions.canAdminUsers);
-    } catch {
-      return false;
-    }
+    return Boolean(readKitchenSession().permissions.canAdminUsers);
   }
 
   function addItemToSelection(itemId, quantity, targetItems) {

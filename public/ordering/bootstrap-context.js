@@ -1,3 +1,5 @@
+import { readKitchenSession } from "/session-shell.js";
+
 export function createOrderingBootstrapContext({
   window = globalThis.window,
   document = globalThis.document,
@@ -40,6 +42,7 @@ export function createOrderingBootstrapContext({
   };
 
   const pageParams = new URLSearchParams(window.location.search);
+  const session = readKitchenSession(localStorage);
 
   const state = {
     allItems: [],
@@ -49,10 +52,10 @@ export function createOrderingBootstrapContext({
     summary: null,
     activeCategory: "",
     selected: new Map(),
-    sessionToken: localStorage.getItem("kitchenStockToken") || "",
-    sessionUser: localStorage.getItem("kitchenStockUser") || "",
-    sessionRole: localStorage.getItem("kitchenStockRole") || "user",
-    sessionPermissions: JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}"),
+    sessionToken: session.token,
+    sessionUser: session.user,
+    sessionRole: session.role,
+    sessionPermissions: session.permissions,
     orderingSummaryFilter: "all",
     bootstrapCacheKey: "kitchenStockOrderingBootstrap",
     pendingJumpItemId: String(pageParams.get("itemId") || "").trim(),

@@ -35,7 +35,8 @@ import {
 import {
   applyAuthenticatedShell,
   applyLoggedOutShell,
-  persistKitchenSession
+  persistKitchenSession,
+  readKitchenSession
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
@@ -66,15 +67,16 @@ export function initDashboardPage() {
   const enablePushButton = document.querySelector("#enablePushButton");
   const message = document.querySelector("#message");
 
+  const initialSession = readKitchenSession();
   let allItems = [];
   let recentRequests = [];
   let standingOrders = [];
   let notifications = [];
   let summary = null;
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let sessionRole = localStorage.getItem("kitchenStockRole") || "user";
-  let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
+  let sessionRole = initialSession.role;
+  let sessionPermissions = initialSession.permissions;
   function requestArea(request) {
     return resolveRequestArea(request, allItems);
   }

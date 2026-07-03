@@ -1,7 +1,8 @@
 import {
   applyAuthenticatedShell,
   applyLoggedOutShell,
-  persistKitchenSession
+  persistKitchenSession,
+  readKitchenSession
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
@@ -50,9 +51,10 @@ import { createJsonApiClient } from "/api-client.js";
     { value: "#fecdd3", label: "Blush" }
   ];
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
+  let permissions = initialSession.permissions;
   let rosterData = null;
   let rosterDirty = false;
   let canManageRoster = false;

@@ -7,7 +7,7 @@ import {
 } from "./helpers.js";
 import { renderSheet } from "./render.js";
 import { createDriverSheetActions } from "./actions.js";
-import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession } from "/session-shell.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
 export function initDriverSheetPage() {
@@ -27,9 +27,10 @@ export function initDriverSheetPage() {
   const printDate = document.querySelector("#printDate");
   const printDriver = document.querySelector("#printDriver");
   const sheetList = document.querySelector("#sheetList");
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
+  let sessionPermissions = initialSession.permissions;
   let currentSheet = { date: "", requests: [], suppliers: [], units: [] };
 
   function setMessage(text, isError = false) {

@@ -1,7 +1,8 @@
 import {
   applyAuthenticatedShell,
   applyLoggedOutShell,
-  persistKitchenSession
+  persistKitchenSession,
+  readKitchenSession
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
@@ -15,8 +16,9 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
   const logoutButton = document.querySelector("#logoutButton");
   const pageMessage = messageSelector ? document.querySelector(messageSelector) : null;
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
 
   function formatUserDisplay(value) {
     const raw = String(value || "").trim();
@@ -30,7 +32,7 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
         .join("-"))
       .join(" ");
   }
-  let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  let permissions = initialSession.permissions;
 
   function setLoginMessage(text, isError = false) {
     if (!loginMessage) return;

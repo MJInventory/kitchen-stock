@@ -1,6 +1,6 @@
 import { formatUserDisplay, todayLocal } from "./helpers.js";
 import { renderReceivingSheet } from "./render.js";
-import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession } from "/session-shell.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
 export function initReceivingSheetPage() {
@@ -18,8 +18,9 @@ export function initReceivingSheetPage() {
   const printReceiver = document.querySelector("#printReceiver");
   const receivingList = document.querySelector("#receivingList");
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
   let currentSheet = { date: "", requests: [], suppliers: [], supplierNotes: [], displayRows: new Map() };
 
   function setMessage(text, isError = false) {

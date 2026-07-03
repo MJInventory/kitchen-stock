@@ -3,7 +3,8 @@ import { renderUsers } from "./render.js";
 import {
   applyAuthenticatedShell,
   applyLoggedOutShell,
-  persistKitchenSession
+  persistKitchenSession,
+  readKitchenSession
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
@@ -23,9 +24,10 @@ export function initUserAdminPage() {
   const statusFilter = document.querySelector("#statusFilter");
   const userCount = document.querySelector("#userCount");
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
+  let permissions = initialSession.permissions;
   let allUsers = [];
 
   function setMessage(text, isError = false) {
@@ -51,7 +53,7 @@ export function initUserAdminPage() {
   }
 
   function showApp() {
-    const role = localStorage.getItem("kitchenStockRole") || "user";
+    const role = readKitchenSession().role;
     applyAuthenticatedShell({
       loginScreen,
       currentUser,

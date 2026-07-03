@@ -1,6 +1,6 @@
 import { formatUserDisplay } from "./helpers.js";
 import { renderPickerBoard } from "./render.js";
-import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
 export function initPickerSheetPage() {
@@ -15,9 +15,10 @@ export function initPickerSheetPage() {
   const message = document.querySelector("#message");
   const pickerGroups = document.querySelector("#pickerGroups");
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
+  let sessionPermissions = initialSession.permissions;
   let internalOrders = [];
 
   function setMessage(text, isError = false) {
@@ -157,15 +158,13 @@ export function initPickerSheetPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not log in.");
-      sessionToken = data.token;
-      sessionUser = data.user.name;
-      sessionPermissions = data.user.permissions || {};
-      localStorage.setItem("kitchenStockToken", sessionToken);
-      localStorage.setItem("kitchenStockUser", sessionUser);
-      localStorage.setItem("kitchenStockRole", data.user.role || "user");
-      localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
-      localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-      window.applyKitchenTheme?.(data.user.theme || "dark");
+      const saved = persistKitchenSession(data, {
+        currentToken: sessionToken,
+        applyTheme: window.applyKitchenTheme
+      });
+      sessionToken = saved.token;
+      sessionUser = saved.user;
+      sessionPermissions = saved.permissions;
       if (!sessionPermissions.canPickInternalOrders) throw new Error("This user is not allowed to pick internal requests.");
       if (data.user.mustChangePassword) {
         window.location.href = "/change-password.html";

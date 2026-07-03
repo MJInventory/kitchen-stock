@@ -6,6 +6,17 @@ export function clearKitchenSession(storage = window.localStorage) {
   storage.removeItem("kitchenStockSettings");
 }
 
+export function readKitchenSession(storage = window.localStorage) {
+  return {
+    token: storage.getItem("kitchenStockToken") || "",
+    user: storage.getItem("kitchenStockUser") || "",
+    role: storage.getItem("kitchenStockRole") || "user",
+    permissions: JSON.parse(storage.getItem("kitchenStockPermissions") || "{}"),
+    settings: JSON.parse(storage.getItem("kitchenStockSettings") || "{}"),
+    theme: storage.getItem("kitchenStockTheme") || ""
+  };
+}
+
 export function applyLoggedOutShell({
   loginScreen,
   currentUser,

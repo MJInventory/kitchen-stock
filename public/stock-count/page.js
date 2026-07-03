@@ -7,7 +7,7 @@ import {
   syncLocationPicker,
   updateCountSummary as updateStockCountSummary
 } from "./render.js";
-import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
 export function initStockCountPage() {
@@ -31,8 +31,9 @@ export function initStockCountPage() {
   const locationMeta = document.querySelector("#locationMeta");
   const backToTopButton = document.querySelector("#backToTopButton");
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
   let items = [];
   let draftCounts = new Map();
   let draftNotes = new Map();
@@ -194,12 +195,12 @@ export function initStockCountPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not log in.");
-      sessionToken = data.token;
-      sessionUser = data.user.name;
-      localStorage.setItem("kitchenStockToken", sessionToken);
-      localStorage.setItem("kitchenStockUser", sessionUser);
-      localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-      window.applyKitchenTheme?.(data.user.theme || "dark");
+      const saved = persistKitchenSession(data, {
+        currentToken: sessionToken,
+        applyTheme: window.applyKitchenTheme
+      });
+      sessionToken = saved.token;
+      sessionUser = saved.user;
       passwordInput.value = "";
       showApp();
       await loadItems();

@@ -6,7 +6,7 @@ import {
   renderActivity,
   renderReport
 } from "./render.js";
-import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
 export function initOrderReportPage() {
@@ -34,9 +34,10 @@ export function initOrderReportPage() {
   const activitySummary = document.querySelector("#activitySummary");
   const activityReportList = document.querySelector("#activityReportList");
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
-  let sessionPermissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
+  let sessionPermissions = initialSession.permissions;
   let currentReportRows = [];
   let currentActivityEntries = [];
   let currentActivitySummary = {};
@@ -237,15 +238,13 @@ export function initOrderReportPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not log in.");
 
-      sessionToken = data.token;
-      sessionUser = data.user.name;
-      sessionPermissions = data.user.permissions || {};
-      localStorage.setItem("kitchenStockToken", sessionToken);
-      localStorage.setItem("kitchenStockUser", sessionUser);
-      localStorage.setItem("kitchenStockRole", data.user.role || "user");
-      localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
-      localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-      window.applyKitchenTheme?.(data.user.theme || "dark");
+      const saved = persistKitchenSession(data, {
+        currentToken: sessionToken,
+        applyTheme: window.applyKitchenTheme
+      });
+      sessionToken = saved.token;
+      sessionUser = saved.user;
+      sessionPermissions = saved.permissions;
       if (data.user.mustChangePassword) {
         window.location.href = "/change-password.html";
         return;

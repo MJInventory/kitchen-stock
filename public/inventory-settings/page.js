@@ -4,7 +4,7 @@ import {
   optionList
 } from "./helpers.js";
 import { fillFilter, renderItems, shelvesForLocation } from "./render.js";
-import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 
 export function initInventorySettingsPage() {
@@ -24,8 +24,9 @@ export function initInventorySettingsPage() {
   const saveAllButton = document.querySelector("#saveAllButton");
   const loadItemsButton = document.querySelector("#loadItemsButton");
 
-  let sessionToken = localStorage.getItem("kitchenStockToken") || "";
-  let sessionUser = localStorage.getItem("kitchenStockUser") || "";
+  const initialSession = readKitchenSession();
+  let sessionToken = initialSession.token;
+  let sessionUser = initialSession.user;
   let items = [];
   let hasLoadedItems = false;
   let appliedFilters = {
@@ -227,12 +228,12 @@ export function initInventorySettingsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not log in.");
 
-      sessionToken = data.token;
-      sessionUser = data.user.name;
-      localStorage.setItem("kitchenStockToken", sessionToken);
-      localStorage.setItem("kitchenStockUser", sessionUser);
-      localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-      window.applyKitchenTheme?.(data.user.theme || "dark");
+      const saved = persistKitchenSession(data, {
+        currentToken: sessionToken,
+        applyTheme: window.applyKitchenTheme
+      });
+      sessionToken = saved.token;
+      sessionUser = saved.user;
       passwordInput.value = "";
       setLoginMessage("");
       showApp();

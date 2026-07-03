@@ -1,4 +1,5 @@
 import { createJsonApiClient } from "/api-client.js";
+import { persistKitchenSession, readKitchenSession } from "/session-shell.js";
 
 const form = document.querySelector("#passwordForm");
 const currentPassword = document.querySelector("#currentPassword");
@@ -6,7 +7,7 @@ const newPassword = document.querySelector("#newPassword");
 const repeatPassword = document.querySelector("#repeatPassword");
 const message = document.querySelector("#passwordMessage");
 
-let sessionToken = localStorage.getItem("kitchenStockToken") || "";
+let sessionToken = readKitchenSession().token;
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -14,13 +15,11 @@ function setMessage(text, isError = false) {
 }
 
 function saveSession(data) {
-  localStorage.setItem("kitchenStockToken", data.token);
-  localStorage.setItem("kitchenStockUser", data.user.name);
-  localStorage.setItem("kitchenStockRole", data.user.role || "user");
-  localStorage.setItem("kitchenStockPermissions", JSON.stringify(data.user.permissions || {}));
-  localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-  window.applyKitchenTheme?.(data.user.theme || "dark");
-  sessionToken = data.token;
+  const saved = persistKitchenSession(data, {
+    currentToken: sessionToken,
+    applyTheme: window.applyKitchenTheme
+  });
+  sessionToken = saved.token;
 }
 
 const api = createJsonApiClient({

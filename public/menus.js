@@ -8,6 +8,7 @@
   const menuConfig = window.MJ_STOCK_MENU_ITEMS || {};
   const gotoItems = menuConfig.gotoItems || [];
   const backofficeItems = menuConfig.backofficeItems || [];
+  const LOGOUT_VALUE = "__logout__";
 
   function sortMenuItems(items) {
     return [...items].sort((left, right) => {
@@ -15,6 +16,8 @@
       const rightHref = String(right?.href || "").trim();
       if (leftHref === "/" && rightHref !== "/") return -1;
       if (rightHref === "/" && leftHref !== "/") return 1;
+      if (leftHref === LOGOUT_VALUE && rightHref !== LOGOUT_VALUE) return 1;
+      if (rightHref === LOGOUT_VALUE && leftHref !== LOGOUT_VALUE) return -1;
       return String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" });
     });
   }
@@ -79,6 +82,20 @@
     `;
   }
 
+  function performLogout() {
+    const logoutButton = document.querySelector("#logoutButton");
+    if (logoutButton) {
+      logoutButton.click();
+      return;
+    }
+    localStorage.removeItem("kitchenStockToken");
+    localStorage.removeItem("kitchenStockUser");
+    localStorage.removeItem("kitchenStockRole");
+    localStorage.removeItem("kitchenStockPermissions");
+    localStorage.removeItem("kitchenStockSettings");
+    window.location.href = "/";
+  }
+
   function mountMenus() {
     syncSessionState();
     const orderTopbar = document.querySelector(".order-topbar");
@@ -101,6 +118,11 @@
     menus.querySelectorAll("select").forEach((select) => {
       select.addEventListener("change", (event) => {
         if (!event.target.value) return;
+        if (event.target.value === LOGOUT_VALUE) {
+          performLogout();
+          event.target.value = "";
+          return;
+        }
         if (typeof window.confirmNavigationAllowed === "function" && !window.confirmNavigationAllowed()) {
           event.target.value = "";
           return;

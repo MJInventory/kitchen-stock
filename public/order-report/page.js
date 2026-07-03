@@ -31,6 +31,7 @@ export function initOrderReportPage() {
   const printDate = document.querySelector("#printDate");
   const reportViewToggle = document.querySelector("#reportViewToggle");
   const activityScopeToggle = document.querySelector("#activityScopeToggle");
+  const activityScopeButton = document.querySelector("#activityScopeButton");
   const reportSummary = document.querySelector("#reportSummary");
   const reportList = document.querySelector("#reportList");
   const standingReportSummaryList = document.querySelector("#standingReportSummaryList");
@@ -100,11 +101,12 @@ export function initOrderReportPage() {
       button.setAttribute("aria-pressed", active ? "true" : "false");
     });
     if (activityScopeToggle) activityScopeToggle.hidden = activeReportView !== "changes";
-    activityScopeToggle?.querySelectorAll("[data-activity-scope]").forEach((button) => {
-      const active = button.dataset.activityScope === activeActivityScope;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-pressed", active ? "true" : "false");
-    });
+    if (activityScopeButton) {
+      const receivedOnly = activeActivityScope === "received";
+      activityScopeButton.classList.toggle("active", receivedOnly);
+      activityScopeButton.setAttribute("aria-pressed", receivedOnly ? "true" : "false");
+      activityScopeButton.textContent = receivedOnly ? "Showing: received items" : "Showing: all changes";
+    }
   }
 
   async function loadReport() {
@@ -206,7 +208,8 @@ export function initOrderReportPage() {
       summary: currentActivitySummary,
       activitySummary,
       activityReportList,
-      activeActivityFilter
+      activeActivityFilter,
+      activeActivityScope
     });
   }
 
@@ -247,10 +250,8 @@ export function initOrderReportPage() {
     activeReportView = button.dataset.reportView || "status";
     renderReportViewState();
   });
-  activityScopeToggle?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-activity-scope]");
-    if (!button) return;
-    updateActivityScope(button.dataset.activityScope || "all");
+  activityScopeButton?.addEventListener("click", () => {
+    updateActivityScope(activeActivityScope === "received" ? "all" : "received");
   });
   activityReportList?.addEventListener("click", async (event) => {
     const button = event.target.closest(".undo-delivery-button");

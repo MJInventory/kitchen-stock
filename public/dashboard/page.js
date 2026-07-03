@@ -40,6 +40,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
+import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
 
 export function initDashboardPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -290,11 +291,14 @@ export function initDashboardPage() {
     renderPushStatus(enablePushButton, event.detail || {});
   });
 
-  if (sessionToken && sessionUser) {
-    showApp();
-    renderPushStatus(enablePushButton, window.kitchenPushStatus || {});
-    refresh().catch((error) => setMessage(error.message, true));
-  } else {
-    showLogin();
-  }
+  bindAuthenticatedBootstrap({
+    hasSession: () => Boolean(sessionToken && sessionUser),
+    showApp: () => {
+      showApp();
+      renderPushStatus(enablePushButton, window.kitchenPushStatus || {});
+    },
+    showLogin,
+    load: refresh,
+    onError: (error) => setMessage(error.message, true)
+  });
 }

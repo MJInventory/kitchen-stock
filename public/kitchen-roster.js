@@ -6,6 +6,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
+import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
 
 (function initKitchenRosterPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -781,10 +782,11 @@ import { bindKitchenLogin } from "/login-flow.js";
   });
 
   weekDate.value = todayIso();
-  if (sessionToken && sessionUser) {
-    showApp();
-    bootstrap();
-  } else {
-    showLogin();
-  }
+  bindAuthenticatedBootstrap({
+    hasSession: () => Boolean(sessionToken && sessionUser),
+    showApp,
+    showLogin,
+    load: bootstrap,
+    onError: (error) => setMessage(error.message, true)
+  });
 }());

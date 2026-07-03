@@ -9,6 +9,7 @@ import {
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
+import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
 
 export function initOrderReportPage() {
   const reportDate = document.querySelector("#reportDate");
@@ -247,10 +248,11 @@ export function initOrderReportPage() {
     }
   });
 
-  if (sessionToken && sessionUser) {
-    showApp();
-    loadReport().catch((error) => setMessage(error.message, true));
-  } else {
-    showLogin();
-  }
+  bindAuthenticatedBootstrap({
+    hasSession: () => Boolean(sessionToken && sessionUser),
+    showApp,
+    showLogin,
+    load: loadReport,
+    onError: (error) => setMessage(error.message, true)
+  });
 }

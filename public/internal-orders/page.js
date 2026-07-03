@@ -15,6 +15,7 @@ import {
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
+import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
 
 export function initInternalOrdersPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -382,10 +383,11 @@ export function initInternalOrdersPage() {
     }
   });
 
-  if (sessionToken && sessionUser) {
-    showApp();
-    loadData().catch((error) => setMessage(error.message, true));
-  } else {
-    showLogin();
-  }
+  bindAuthenticatedBootstrap({
+    hasSession: () => Boolean(sessionToken && sessionUser),
+    showApp,
+    showLogin,
+    load: loadData,
+    onError: (error) => setMessage(error.message, true)
+  });
 }

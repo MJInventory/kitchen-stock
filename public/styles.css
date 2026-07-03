@@ -2697,7 +2697,7 @@ html.menus-loading .order-topbar > .top-actions {
 .product-row.selected .product-controls {
   grid-area: controls;
   display: grid;
-  grid-template-columns: minmax(118px, 132px) minmax(170px, 196px) minmax(90px, 106px) minmax(108px, 128px) minmax(92px, max-content) minmax(138px, max-content);
+  grid-template-columns: minmax(170px, 196px) minmax(90px, 106px) minmax(108px, 128px) minmax(92px, max-content) minmax(138px, max-content);
   align-items: end;
   gap: 8px 10px;
   width: 100%;
@@ -2856,10 +2856,6 @@ html.menus-loading .order-topbar > .top-actions {
   .order-app .product-row.selected .product-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding-left: 0;
-  }
-
-  .order-app .product-row.selected .stock-adjust {
-    grid-column: auto;
   }
 
   .order-app .product-row.selected .qty-adjust {
@@ -4157,14 +4153,6 @@ html.menus-loading .order-topbar > .top-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .order-app .product-row.selected .stock-adjust {
-    grid-column: 1 / -1;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "label label"
-      "input button";
-  }
-
   .order-app .product-row.selected .qty-adjust {
     grid-column: 1 / -1;
   }
@@ -4173,8 +4161,6 @@ html.menus-loading .order-topbar > .top-actions {
     grid-template-columns: 1fr 1fr 1fr;
   }
 
-  .order-app .product-row.selected .stock-adjust input,
-  .order-app .product-row.selected .stock-adjust button,
   .order-app .product-row.selected .unit-input,
   .order-app .product-row.selected .urgency-input,
   .order-app .product-row.selected .row-save-button,

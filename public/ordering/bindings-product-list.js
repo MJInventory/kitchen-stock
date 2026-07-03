@@ -3,7 +3,6 @@ import { itemUnit } from "./shared.js";
 export function bindOrderingProductList({
   productList,
   toggleProduct,
-  updateCurrentStock,
   allItemsRef,
   selectedRef,
   selectItem,
@@ -24,23 +23,6 @@ export function bindOrderingProductList({
         setMessage("Choose a valid item first.", true);
         return;
       }
-      return;
-    }
-
-    if (event.target.closest(".stock-save")) {
-      const itemId = row.dataset.itemId;
-      const input = row.querySelector(".stock-input");
-      const button = event.target.closest(".stock-save");
-      button.disabled = true;
-      updateCurrentStock(itemId, input.value)
-        .then(() => {
-          render();
-          setMessage("Current stock updated.");
-        })
-        .catch((error) => setMessage(error.message, true))
-        .finally(() => {
-          button.disabled = false;
-        });
       return;
     }
 

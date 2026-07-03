@@ -103,15 +103,9 @@ export function renderProductList({
               item.category,
               item.shelfCode
             ].filter(Boolean).join(" / ") || itemCategory(item))}</span>
-            <small>${escapeHtml(`Current ${item.quantity ?? 0} ${itemUnit(item)} / Min ${item.minimum ?? 0}`)}</small>
             ${renderStatusChips(chips)}
           </div>
           <div class="product-controls">
-            <label class="stock-adjust">
-              <span class="stock-adjust-label">Stock</span>
-              <input class="stock-input" type="number" min="0" step="0.01" value="${item.quantity ?? 0}">
-              <button class="stock-save" type="button">Set</button>
-            </label>
             <label class="qty-adjust">
               <span class="qty-adjust-label">Order</span>
               <div class="qty-adjust-controls">

@@ -8,6 +8,7 @@ import {
   updateCountSummary as updateStockCountSummary
 } from "./render.js";
 import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { createJsonApiClient } from "/api-client.js";
 
 export function initStockCountPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -56,19 +57,10 @@ export function initStockCountPage() {
     sessionUser = "";
   }
 
-  async function api(path, options = {}) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (response.status === 401) showLogin();
-    if (!response.ok) throw new Error(data.error || "Something went wrong.");
-    return data;
-  }
+  const api = createJsonApiClient({
+    getToken: () => sessionToken,
+    onUnauthorized: () => showLogin()
+  });
 
   async function queueApi(path, options = {}, meta = {}) {
     if (!window.kitchenOfflineQueue?.request) return api(path, options);

@@ -1,3 +1,5 @@
+import { createJsonApiClient } from "/api-client.js";
+
 export function createOrderingRuntime({
   loginScreen,
   currentUser,
@@ -65,22 +67,14 @@ export function createOrderingRuntime({
     });
   }
 
-  async function api(path, options) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(getSessionToken() ? { Authorization: `Bearer ${getSessionToken()}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (response.status === 401) showLogin();
-    if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") {
+  const api = createJsonApiClient({
+    getToken: () => getSessionToken(),
+    onUnauthorized: () => showLogin(),
+    onPasswordChangeRequired: () => {
       windowObject.location.href = "/change-password.html";
-    }
-    if (!response.ok) throw new Error(data.error || "Something went wrong.");
-    return data;
-  }
+    },
+    windowObject
+  });
 
   async function queueApi(path, options = {}, meta = {}) {
     if (!windowObject.kitchenOfflineQueue?.request) return api(path, options);

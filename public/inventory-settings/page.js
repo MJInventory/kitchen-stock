@@ -5,6 +5,7 @@ import {
 } from "./helpers.js";
 import { fillFilter, renderItems, shelvesForLocation } from "./render.js";
 import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { createJsonApiClient } from "/api-client.js";
 
 export function initInventorySettingsPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -68,19 +69,10 @@ export function initInventorySettingsPage() {
     sessionUser = "";
   }
 
-  async function api(path, options) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (response.status === 401) showLogin();
-    if (!response.ok) throw new Error(data.error || "Something went wrong.");
-    return data;
-  }
+  const api = createJsonApiClient({
+    getToken: () => sessionToken,
+    onUnauthorized: () => showLogin()
+  });
 
   function effectiveItem(item) {
     return { ...item, ...(draftValues.get(item.id) || {}) };

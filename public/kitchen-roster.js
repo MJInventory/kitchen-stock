@@ -3,6 +3,7 @@ import {
   applyLoggedOutShell,
   persistKitchenSession
 } from "/session-shell.js";
+import { createJsonApiClient } from "/api-client.js";
 
 (function initKitchenRosterPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -166,20 +167,13 @@ import {
     });
   }
 
-  async function api(path, options = {}) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (response.status === 401) showLogin();
-    if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") window.location.href = "/change-password.html";
-    if (!response.ok) throw new Error(data.error || "Something went wrong.");
-    return data;
-  }
+  const api = createJsonApiClient({
+    getToken: () => sessionToken,
+    onUnauthorized: () => showLogin(),
+    onPasswordChangeRequired: () => {
+      window.location.href = "/change-password.html";
+    }
+  });
 
   function shiftById(id) {
     return rosterData?.shiftTypes?.find((shift) => shift.id === id) || null;

@@ -1,3 +1,5 @@
+import { createJsonApiClient } from "/api-client.js";
+
 const form = document.querySelector("#passwordForm");
 const currentPassword = document.querySelector("#currentPassword");
 const newPassword = document.querySelector("#newPassword");
@@ -21,18 +23,9 @@ function saveSession(data) {
   sessionToken = data.token;
 }
 
-async function api(path, options = {}) {
-  const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-    },
-    ...options
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Something went wrong.");
-  return data;
-}
+const api = createJsonApiClient({
+  getToken: () => sessionToken
+});
 
 async function init() {
   if (!sessionToken) {

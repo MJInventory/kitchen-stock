@@ -1,6 +1,7 @@
 import { formatUserDisplay } from "./helpers.js";
 import { renderPickerBoard } from "./render.js";
 import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+import { createJsonApiClient } from "/api-client.js";
 
 export function initPickerSheetPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -45,22 +46,13 @@ export function initPickerSheetPage() {
     sessionPermissions = {};
   }
 
-  async function api(path, options = {}) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (response.status === 401) showLogin();
-    if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") {
+  const api = createJsonApiClient({
+    getToken: () => sessionToken,
+    onUnauthorized: () => showLogin(),
+    onPasswordChangeRequired: () => {
       window.location.href = "/change-password.html";
     }
-    if (!response.ok) throw new Error(data.error || "Something went wrong.");
-    return data;
-  }
+  });
 
   async function queueApi(path, options = {}, meta = {}) {
     if (!window.kitchenOfflineQueue?.request) return api(path, options);

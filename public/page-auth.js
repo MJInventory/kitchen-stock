@@ -3,6 +3,7 @@ import {
   applyLoggedOutShell,
   persistKitchenSession
 } from "/session-shell.js";
+import { createJsonApiClient } from "/api-client.js";
 
 export function authPage({ permission = "", messageSelector = "" } = {}) {
   const loginScreen = document.querySelector("#loginScreen");
@@ -68,20 +69,13 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
     sessionUser = "";
   }
 
-  async function api(path, options = {}) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (response.status === 401) showLogin();
-    if (response.status === 403 && data.code === "PASSWORD_CHANGE_REQUIRED") window.location.href = "/change-password.html";
-    if (!response.ok) throw new Error(data.error || "Something went wrong.");
-    return data;
-  }
+  const api = createJsonApiClient({
+    getToken: () => sessionToken,
+    onUnauthorized: () => showLogin(),
+    onPasswordChangeRequired: () => {
+      window.location.href = "/change-password.html";
+    }
+  });
 
   async function verifyPermission() {
     const data = await api("/api/me");

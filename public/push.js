@@ -9,16 +9,11 @@
   }
 
   async function api(path, options = {}) {
-    const response = await fetch(path, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token() ? { Authorization: `Bearer ${token()}` } : {})
-      },
-      ...options
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Push request failed.");
-    return data;
+    const { createJsonApiClient } = await import("/api-client.js");
+    return createJsonApiClient({
+      getToken: () => token(),
+      defaultErrorMessage: "Push request failed."
+    })(path, options);
   }
 
   function emitStatus() {

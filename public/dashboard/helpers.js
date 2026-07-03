@@ -41,6 +41,7 @@ export function buildOrderJumpHref(request, allItems) {
   const item = itemForRequest(request, allItems);
   const params = new URLSearchParams();
   if (request?.itemId) params.set("itemId", String(request.itemId));
+  if (request?.id) params.set("requestId", String(request.id));
   if (item?.category || requestCategory(request, allItems)) params.set("category", item?.category || requestCategory(request, allItems));
   return `/ordering.html?${params.toString()}`;
 }

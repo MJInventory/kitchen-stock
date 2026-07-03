@@ -46,6 +46,16 @@ function createOrderingHarness(overrides = {}) {
             }]
           };
         }
+        if (path === "/api/requests/existing-request-1") {
+          return {
+            request: {
+              id: "existing-request-1",
+              itemId: "item-existing",
+              requestedAt: "2026-07-03T11:00:00.000Z",
+              requestId: 101
+            }
+          };
+        }
         return { ok: true };
       },
       confirmDuplicateSave: overrides.confirmDuplicateSave || (() => true),
@@ -144,6 +154,40 @@ test("submitOrderingSelection cancels duplicate saves without calling the API", 
   assert.equal(result.selected, selected);
 });
 
+test("submitOrderingSelection updates existing orders instead of creating duplicates", async () => {
+  const selected = new Map([
+    ["item-existing", {
+      item: {
+        id: "item-existing",
+        name: "Kahlua",
+        unit: "box",
+        storageLocation: "Bar",
+        inventoryArea: "General",
+        shelfCode: "C1"
+      },
+      requestId: "existing-request-1",
+      quantity: 4,
+      urgency: "High",
+      unit: "box",
+      deleteRequested: false
+    }]
+  ]);
+  const recentRequests = [
+    { id: "existing-request-1", itemId: "item-existing", requestedAt: "2026-07-03T09:00:00.000Z", requestId: 101 }
+  ];
+  const harness = createOrderingHarness({ selected, recentRequests });
+
+  const result = await submitOrderingSelection(harness.args);
+
+  assert.equal(harness.queueCalls.length, 1);
+  assert.equal(harness.queueCalls[0].path, "/api/requests/existing-request-1");
+  assert.equal(harness.queueCalls[0].options.method, "PATCH");
+  assert.match(harness.queueCalls[0].options.body, /"quantityNeeded":4/);
+  assert.equal(harness.messages.at(-1)?.text, "1 item(s) updated.");
+  assert.equal(harness.refreshCalls.length, 1);
+  assert.equal(result.recentRequests[0].id, "existing-request-1");
+});
+
 function createMutationApiHarness(overrides = {}) {
   const calls = [];
   let sent = null;
@@ -165,6 +209,10 @@ function createMutationApiHarness(overrides = {}) {
     createOcrRule: noop,
     emailInvoicePicture: noop,
     ocrSpaceParseImage: noop,
+    updateRequest: async (...args) => {
+      calls.push(["updateRequest", ...args]);
+      return { ok: true };
+    },
     deliverRequest: async (...args) => {
       calls.push(["deliverRequest", ...args]);
       return { ok: true };
@@ -204,6 +252,23 @@ test("mutation api routes request undo-delivery through undoDeliveredRequest", a
   assert.deepEqual(calls, [[
     "undoDeliveredRequest",
     "44444444-4444-4444-4444-444444444444",
+    "Enno"
+  ]]);
+  assert.equal(getSent()?.status, 200);
+});
+
+test("mutation api routes request patch through updateRequest", async () => {
+  const payload = { quantityNeeded: 5, unitOverride: "box", urgencyLevel: "High" };
+  const { handler, calls, getSent } = createMutationApiHarness({ payload });
+  const handled = await handler(
+    { method: "PATCH", url: "/api/requests/55555555-5555-5555-5555-555555555555" },
+    {}
+  );
+  assert.equal(handled, true);
+  assert.deepEqual(calls, [[
+    "updateRequest",
+    "55555555-5555-5555-5555-555555555555",
+    payload,
     "Enno"
   ]]);
   assert.equal(getSent()?.status, 200);

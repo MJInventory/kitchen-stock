@@ -30,9 +30,11 @@ export async function submitOrderingSelection({
   try {
     const deleteEntries = scopedEntries.filter((entry) => entry.deleteRequested && entry.requestId);
     const saveEntries = scopedEntries.filter((entry) => !entry.deleteRequested);
+    const updateEntries = saveEntries.filter((entry) => entry.requestId);
+    const createEntries = saveEntries.filter((entry) => !entry.requestId);
     let queuedOffline = false;
 
-    if (saveEntries.length && !confirmDuplicateSave(saveEntries)) {
+    if (createEntries.length && !confirmDuplicateSave(createEntries)) {
       setMessage("Duplicate save cancelled.");
       return { recentRequests, selected };
     }
@@ -46,7 +48,7 @@ export async function submitOrderingSelection({
       queuedOffline = queuedOffline || deleteResults.some((result) => result?.offlineQueued);
     }
 
-    const requests = saveEntries
+    const createRequests = createEntries
       .map((entry) => ({
         itemId: String(entry.item.id || "").trim(),
         quantityNeeded: entry.quantity,
@@ -60,28 +62,54 @@ export async function submitOrderingSelection({
       }))
       .filter((entry) => entry.itemId);
 
-    if (!requests.length && !deleteEntries.length) {
+    if (!createRequests.length && !updateEntries.length && !deleteEntries.length) {
       throw new Error("No valid items were selected to save.");
     }
 
+    const updatedRequests = [];
+    if (updateEntries.length) {
+      const updateResults = await Promise.all(updateEntries.map((entry, index) => queueApi(`/api/requests/${entry.requestId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          quantityNeeded: entry.quantity,
+          unitOverride: entry.unit || itemUnit(entry.item),
+          urgencyLevel: entry.urgency,
+          notes: ""
+        })
+      }, {
+        label: `${entry.item?.name || "Order item"} update`,
+        fallbackData: {
+          request: optimisticRequestFromEntry(entry, index)
+        }
+      })));
+      queuedOffline = queuedOffline || updateResults.some((result) => result?.offlineQueued);
+      for (const result of updateResults) {
+        if (result?.request?.id) updatedRequests.push(result.request);
+      }
+    }
+
     let data = { requests: [] };
-    if (requests.length) {
+    if (createRequests.length) {
       data = await queueApi("/api/requests/batch", {
         method: "POST",
-        body: JSON.stringify({ requests })
+        body: JSON.stringify({ requests: createRequests })
       }, {
-        label: `${requests.length} order item(s)`,
+        label: `${createRequests.length} order item(s)`,
         fallbackData: {
-          requests: saveEntries.map((entry, index) => optimisticRequestFromEntry(entry, index))
+          requests: createEntries.map((entry, index) => optimisticRequestFromEntry(entry, index))
         }
       });
       queuedOffline = queuedOffline || Boolean(data?.offlineQueued);
     }
 
     const deletedIds = new Set(deleteEntries.map((entry) => entry.requestId).filter(Boolean));
-    const saved = requests.length;
+    const saved = createRequests.length;
+    const updated = updateEntries.length;
     const deleted = deleteEntries.length;
     const byId = new Map(recentRequests.filter((request) => !deletedIds.has(request.id)).map((request) => [request.id, request]));
+    for (const request of updatedRequests) {
+      if (request?.id) byId.set(request.id, request);
+    }
     for (const request of data.requests || []) {
       if (request?.id) byId.set(request.id, request);
     }
@@ -99,6 +127,7 @@ export async function submitOrderingSelection({
 
     const actions = [];
     if (saved) actions.push(`${saved} item(s) saved`);
+    if (updated) actions.push(`${updated} item(s) updated`);
     if (deleted) actions.push(`${deleted} item(s) deleted`);
     setMessage(queuedOffline ? `${actions.join(" and ")} offline. They will sync automatically.` : `${actions.join(" and ")}.`);
     if (!queuedOffline) {

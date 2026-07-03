@@ -59,7 +59,8 @@ export function createOrderingBootstrapContext({
     orderingSummaryFilter: "all",
     bootstrapCacheKey: "kitchenStockOrderingBootstrap",
     pendingJumpItemId: String(pageParams.get("itemId") || "").trim(),
-    pendingJumpCategory: String(pageParams.get("category") || "").trim()
+    pendingJumpCategory: String(pageParams.get("category") || "").trim(),
+    pendingJumpRequestId: String(pageParams.get("requestId") || "").trim()
   };
 
   return {

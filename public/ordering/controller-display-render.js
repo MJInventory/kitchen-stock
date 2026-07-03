@@ -33,6 +33,8 @@ export function createOrderingDisplayRender(options) {
     setPendingJumpItemId,
     getPendingJumpCategory,
     setPendingJumpCategory,
+    getPendingJumpRequestId,
+    setPendingJumpRequestId,
     todayLocal,
     renderOrderingSummaryBlock,
     renderOrderingSummaryView,
@@ -98,11 +100,34 @@ export function createOrderingDisplayRender(options) {
     });
   }
 
-  function jumpToItem(itemId, category = "") {
+  function jumpToItem(itemId, category = "", requestId = "") {
     const item = getAllItems().find((candidate) => String(candidate.id) === String(itemId));
     if (!item) return;
     setPendingJumpItemId(String(item.id));
     setPendingJumpCategory(category || itemCategory(item));
+    setPendingJumpRequestId(String(requestId || "").trim());
+    const selected = getSelected();
+    const targetRequest = (String(requestId || "").trim()
+      ? getRecentRequests().find((request) => String(request?.id || "").trim() === String(requestId || "").trim())
+      : null);
+    if (targetRequest) {
+      selected.set(String(item.id), {
+        item,
+        requestId: targetRequest.id,
+        quantity: Math.max(1, Number(targetRequest.quantity || targetRequest.quantityNeeded || 1)),
+        urgency: targetRequest.urgency || targetRequest.urgencyLevel || "Medium",
+        unit: targetRequest.unit || targetRequest.orderUnit || itemUnit(item),
+        deleteRequested: false
+      });
+    } else if (!selected.has(String(item.id))) {
+      selected.set(String(item.id), {
+        item,
+        quantity: defaultQuantity(item),
+        urgency: "Medium",
+        unit: itemUnit(item),
+        deleteRequested: false
+      });
+    }
     searchInput.value = "";
     setActiveCategory(getPendingJumpCategory() || itemCategory(item));
     categoryView.hidden = true;
@@ -117,9 +142,10 @@ export function createOrderingDisplayRender(options) {
 
   function applyPendingJump() {
     if (!getPendingJumpItemId()) return;
-    jumpToItem(getPendingJumpItemId(), getPendingJumpCategory());
+    jumpToItem(getPendingJumpItemId(), getPendingJumpCategory(), getPendingJumpRequestId());
     setPendingJumpItemId("");
     setPendingJumpCategory("");
+    setPendingJumpRequestId("");
     if (windowObject.history?.replaceState) {
       windowObject.history.replaceState({}, "", "/ordering.html");
     }

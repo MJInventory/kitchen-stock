@@ -8,7 +8,7 @@ export function bindOrderingDailyOrder({
   dailyOrderList.addEventListener("click", (event) => {
     const jumpButton = event.target.closest(".order-sheet-item-link");
     if (jumpButton) {
-      jumpToItem(jumpButton.dataset.jumpItemId, jumpButton.dataset.jumpCategory);
+      jumpToItem(jumpButton.dataset.jumpItemId, jumpButton.dataset.jumpCategory, jumpButton.dataset.jumpRequestId);
       return;
     }
 

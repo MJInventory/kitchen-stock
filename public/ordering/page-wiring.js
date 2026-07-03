@@ -143,7 +143,8 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     orderingSummaryFilter,
     bootstrapCacheKey,
     pendingJumpItemId,
-    pendingJumpCategory
+    pendingJumpCategory,
+    pendingJumpRequestId
   } = state;
   let unitRecords = [];
 
@@ -258,6 +259,10 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     getPendingJumpCategory: () => pendingJumpCategory,
     setPendingJumpCategory: (value) => {
       pendingJumpCategory = value;
+    },
+    getPendingJumpRequestId: () => pendingJumpRequestId,
+    setPendingJumpRequestId: (value) => {
+      pendingJumpRequestId = value;
     },
     todayLocal,
     hasSearchTermValue,

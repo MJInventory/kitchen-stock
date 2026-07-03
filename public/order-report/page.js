@@ -8,6 +8,7 @@ import {
 } from "./render.js";
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
+import { bindKitchenLogin } from "/login-flow.js";
 
 export function initOrderReportPage() {
   const reportDate = document.querySelector("#reportDate");
@@ -222,22 +223,12 @@ export function initOrderReportPage() {
   });
   logoutButton.addEventListener("click", showLogin);
 
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    setLoginMessage("Logging in...");
-
-    try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: usernameInput.value,
-          password: passwordInput.value
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not log in.");
-
+  bindKitchenLogin({
+    loginForm,
+    usernameInput,
+    passwordInput,
+    setLoginMessage,
+    onSuccess: async (data) => {
       const saved = persistKitchenSession(data, {
         currentToken: sessionToken,
         applyTheme: window.applyKitchenTheme
@@ -253,8 +244,6 @@ export function initOrderReportPage() {
       setLoginMessage("");
       showApp();
       await loadReport();
-    } catch (error) {
-      setLoginMessage(error.message, true);
     }
   });
 

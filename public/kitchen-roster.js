@@ -5,6 +5,7 @@ import {
   readKitchenSession
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
+import { bindKitchenLogin } from "/login-flow.js";
 
 (function initKitchenRosterPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -727,17 +728,12 @@ import { createJsonApiClient } from "/api-client.js";
     }
   }
 
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    setLoginMessage("Logging in...");
-    try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not log in.");
+  bindKitchenLogin({
+    loginForm,
+    usernameInput,
+    passwordInput,
+    setLoginMessage,
+    onSuccess: async (data) => {
       saveSession(data);
       if (data.user.mustChangePassword) {
         window.location.href = "/change-password.html";
@@ -746,8 +742,6 @@ import { createJsonApiClient } from "/api-client.js";
       passwordInput.value = "";
       showApp();
       await bootstrap();
-    } catch (error) {
-      setLoginMessage(error.message, true);
     }
   });
 

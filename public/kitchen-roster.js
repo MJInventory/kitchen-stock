@@ -6,7 +6,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 (function initKitchenRosterPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -746,6 +746,7 @@ import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
     }
   });
 
+  bindLogoutButton(document.querySelector("#logoutButton"), showLogin);
   loadButton.addEventListener("click", () => loadRoster().catch((error) => setMessage(error.message, true)));
   saveButton.addEventListener("click", () => saveRoster().catch((error) => {
     saveButton.disabled = false;

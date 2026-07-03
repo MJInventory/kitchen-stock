@@ -1,4 +1,5 @@
 import { bindKitchenLogin } from "/login-flow.js";
+import { bindLogoutButton } from "/session-bootstrap.js";
 
 export function bindOrderingLogin({
   loginForm,
@@ -28,7 +29,7 @@ export function bindOrderingLogin({
     }
   });
 
-  document.querySelector("#logoutButton")?.addEventListener("click", showLogin);
+  bindLogoutButton(document.querySelector("#logoutButton"), showLogin);
 }
 
 export function bindOrderingBootstrap({

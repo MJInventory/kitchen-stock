@@ -12,3 +12,9 @@ export function bindAuthenticatedBootstrap({
   showApp();
   Promise.resolve(load()).catch((error) => onError(error));
 }
+
+export function bindLogoutButton(logoutButton, showLogin) {
+  logoutButton?.addEventListener("click", () => {
+    showLogin();
+  });
+}

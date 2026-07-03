@@ -10,7 +10,7 @@ import { createDriverSheetActions } from "./actions.js";
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initDriverSheetPage() {
   const sheetDate = document.querySelector("#sheetDate");
@@ -320,9 +320,7 @@ export function initDriverSheetPage() {
     }
   });
 
-  logoutButton.addEventListener("click", () => {
-    showLogin();
-  });
+  bindLogoutButton(logoutButton, showLogin);
 
   bindAuthenticatedBootstrap({
     hasSession: () => Boolean(sessionToken && sessionUser),

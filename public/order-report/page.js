@@ -9,7 +9,7 @@ import {
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initOrderReportPage() {
   const reportDate = document.querySelector("#reportDate");
@@ -222,7 +222,7 @@ export function initOrderReportPage() {
       button.disabled = false;
     }
   });
-  logoutButton.addEventListener("click", showLogin);
+  bindLogoutButton(logoutButton, showLogin);
 
   bindKitchenLogin({
     loginForm,

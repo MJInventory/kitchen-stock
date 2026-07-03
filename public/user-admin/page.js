@@ -8,7 +8,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initUserAdminPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -274,7 +274,7 @@ export function initUserAdminPage() {
     control?.addEventListener("change", renderUserList);
   });
 
-  logoutButton.addEventListener("click", showLogin);
+  bindLogoutButton(logoutButton, showLogin);
 
   bindAuthenticatedBootstrap({
     hasSession: () => Boolean(sessionToken && sessionUser),

@@ -3,7 +3,7 @@ import { renderReceivingSheet } from "./render.js";
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initReceivingSheetPage() {
   const sheetDate = document.querySelector("#sheetDate");
@@ -164,7 +164,7 @@ export function initReceivingSheetPage() {
 
   sheetDate.value = todayLocal();
   loadSheetButton.addEventListener("click", () => loadSheet().catch((error) => setMessage(error.message, true)));
-  logoutButton.addEventListener("click", showLogin);
+  bindLogoutButton(logoutButton, showLogin);
 
   receivingList.addEventListener("click", (event) => {
     const button = event.target.closest(".driver-check-button");

@@ -40,7 +40,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initDashboardPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -242,7 +242,7 @@ export function initDashboardPage() {
     }
   });
 
-  logoutButton?.addEventListener("click", showLogin);
+  bindLogoutButton(logoutButton, showLogin);
   refreshButton?.addEventListener("click", () => refresh().catch((error) => setMessage(error.message, true)));
   dailyScopeFilter?.addEventListener("change", () => {
     if (dailyScopeFilter.value === "__mine__") dailyUserFilter.value = "__mine__";

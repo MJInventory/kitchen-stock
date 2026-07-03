@@ -10,7 +10,7 @@ import {
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initStockCountPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -204,7 +204,7 @@ export function initStockCountPage() {
     }
   });
 
-  logoutButton.addEventListener("click", showLogin);
+  bindLogoutButton(logoutButton, showLogin);
   refreshButton?.addEventListener("click", () => loadItems().catch((error) => message(countMessage, error.message, true)));
   saveAllButton.addEventListener("click", saveAllCounts);
   window.addEventListener("kitchen-offline-queue-synced", () => {

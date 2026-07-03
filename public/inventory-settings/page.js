@@ -7,7 +7,7 @@ import { fillFilter, renderItems, shelvesForLocation } from "./render.js";
 import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession, readKitchenSession } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 export function initInventorySettingsPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -234,7 +234,7 @@ export function initInventorySettingsPage() {
     }
   });
 
-  logoutButton.addEventListener("click", () => {
+  bindLogoutButton(logoutButton, () => {
     if (dirtyIds.size && !window.confirm("You have unsaved inventory changes. Leave this screen anyway?")) return;
     showLogin();
   });

@@ -6,7 +6,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
-import { bindAuthenticatedBootstrap } from "/session-bootstrap.js";
+import { bindAuthenticatedBootstrap, bindLogoutButton } from "/session-bootstrap.js";
 
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
@@ -528,7 +528,7 @@ bindKitchenLogin({
   }
 });
 
-logoutButton.addEventListener("click", showLogin);
+bindLogoutButton(logoutButton, showLogin);
 invoicePhoto.addEventListener("change", () => {
   if (invoicePhoto.files.length) {
     const file = invoicePhoto.files[0];

@@ -6,6 +6,7 @@ import {
 } from "/session-shell.js";
 import { createJsonApiClient } from "/api-client.js";
 import { bindKitchenLogin } from "/login-flow.js";
+import { bindLogoutButton } from "/session-bootstrap.js";
 
 export function authPage({ permission = "", messageSelector = "" } = {}) {
   const loginScreen = document.querySelector("#loginScreen");
@@ -106,7 +107,7 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
     }
   });
 
-  logoutButton?.addEventListener("click", showLogin);
+  bindLogoutButton(logoutButton, showLogin);
 
   return {
     api,

@@ -4,8 +4,16 @@
   let subscribeAttempted = false;
   let pushStatus = { supported: false, permission: "default", subscribed: false, enabled: false };
 
+  function readSessionToken() {
+    try {
+      return window.kitchenSessionBridge?.readKitchenSession?.(localStorage)?.token || localStorage.getItem("kitchenStockToken") || "";
+    } catch {
+      return localStorage.getItem("kitchenStockToken") || "";
+    }
+  }
+
   function token() {
-    return localStorage.getItem("kitchenStockToken") || "";
+    return readSessionToken();
   }
 
   async function api(path, options = {}) {

@@ -10,6 +10,48 @@
   const backofficeItems = menuConfig.backofficeItems || [];
   const LOGOUT_VALUE = "__logout__";
 
+  function directSessionSnapshot() {
+    return {
+      token: localStorage.getItem("kitchenStockToken") || "",
+      user: localStorage.getItem("kitchenStockUser") || "",
+      role: String(localStorage.getItem("kitchenStockRole") || "user").trim().toLowerCase(),
+      permissions: JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}"),
+      settings: JSON.parse(localStorage.getItem("kitchenStockSettings") || "{}")
+    };
+  }
+
+  function readSessionSnapshot() {
+    const bridge = window.kitchenSessionBridge;
+    if (bridge?.readKitchenSession) {
+      const session = bridge.readKitchenSession(localStorage);
+      return {
+        ...session,
+        role: String(session.role || "user").trim().toLowerCase()
+      };
+    }
+    return directSessionSnapshot();
+  }
+
+  function writeSessionSnapshot(session) {
+    const bridge = window.kitchenSessionBridge;
+    if (bridge?.writeKitchenSession) {
+      return bridge.writeKitchenSession(session, localStorage);
+    }
+    const current = directSessionSnapshot();
+    const next = {
+      ...current,
+      ...session,
+      permissions: session.permissions ?? current.permissions,
+      settings: session.settings ?? current.settings
+    };
+    localStorage.setItem("kitchenStockToken", next.token || "");
+    localStorage.setItem("kitchenStockUser", next.user || "");
+    localStorage.setItem("kitchenStockRole", next.role || "user");
+    localStorage.setItem("kitchenStockPermissions", JSON.stringify(next.permissions || {}));
+    localStorage.setItem("kitchenStockSettings", JSON.stringify(next.settings || {}));
+    return next;
+  }
+
   function sortMenuItems(items) {
     return [...items].sort((left, right) => {
       const leftHref = String(left?.href || "").trim();
@@ -23,19 +65,21 @@
   }
 
   function syncSessionState() {
-    permissions = JSON.parse(localStorage.getItem("kitchenStockPermissions") || "{}");
-    storedRole = String(localStorage.getItem("kitchenStockRole") || "").trim().toLowerCase();
-    sessionToken = localStorage.getItem("kitchenStockToken") || "";
-    userSettings = JSON.parse(localStorage.getItem("kitchenStockSettings") || "{}");
+    const session = readSessionSnapshot();
+    permissions = session.permissions || {};
+    storedRole = String(session.role || "").trim().toLowerCase();
+    sessionToken = session.token || "";
+    userSettings = session.settings || {};
   }
 
   function sessionSnapshot() {
+    const session = readSessionSnapshot();
     return JSON.stringify({
-      permissions,
-      storedRole,
-      sessionToken,
-      userSettings,
-      userName: localStorage.getItem("kitchenStockUser") || ""
+      permissions: session.permissions || {},
+      storedRole: String(session.role || "").trim().toLowerCase(),
+      sessionToken: session.token || "",
+      userSettings: session.settings || {},
+      userName: session.user || ""
     });
   }
 
@@ -163,12 +207,17 @@
       const data = await response.json();
       if (!data?.user) return false;
       permissions = data.user.permissions || permissions;
-      localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
       storedRole = String(data.user.role || storedRole || "").trim().toLowerCase();
-      localStorage.setItem("kitchenStockRole", storedRole);
-      localStorage.setItem("kitchenStockUser", data.user.name || localStorage.getItem("kitchenStockUser") || "");
       userSettings = data.user.settings || userSettings || {};
-      localStorage.setItem("kitchenStockSettings", JSON.stringify(userSettings));
+      const current = readSessionSnapshot();
+      writeSessionSnapshot({
+        token: current.token,
+        user: data.user.name || current.user || "",
+        role: storedRole,
+        permissions,
+        settings: userSettings,
+        theme: data.user.theme || current.theme || ""
+      });
       syncSessionState();
       return before !== sessionSnapshot();
     } catch {

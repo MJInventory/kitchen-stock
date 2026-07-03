@@ -25,8 +25,16 @@
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   }
 
+  function readSessionToken() {
+    try {
+      return window.kitchenSessionBridge?.readKitchenSession?.(localStorage)?.token || localStorage.getItem("kitchenStockToken") || "";
+    } catch {
+      return localStorage.getItem("kitchenStockToken") || "";
+    }
+  }
+
   function currentToken() {
-    return localStorage.getItem("kitchenStockToken") || "";
+    return readSessionToken();
   }
 
   function normalizeHeaders(headers = {}, body = undefined) {

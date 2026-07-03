@@ -17,6 +17,25 @@ export function readKitchenSession(storage = window.localStorage) {
   };
 }
 
+export function writeKitchenSession(session = {}, storage = window.localStorage) {
+  const current = readKitchenSession(storage);
+  const next = {
+    ...current,
+    ...session,
+    permissions: session.permissions ?? current.permissions,
+    settings: session.settings ?? current.settings
+  };
+  storage.setItem("kitchenStockToken", next.token || "");
+  storage.setItem("kitchenStockUser", next.user || "");
+  storage.setItem("kitchenStockRole", next.role || "user");
+  storage.setItem("kitchenStockPermissions", JSON.stringify(next.permissions || {}));
+  storage.setItem("kitchenStockSettings", JSON.stringify(next.settings || {}));
+  if (next.theme) {
+    storage.setItem("kitchenStockTheme", next.theme);
+  }
+  return next;
+}
+
 export function applyLoggedOutShell({
   loginScreen,
   currentUser,
@@ -74,5 +93,16 @@ export function persistKitchenSession(data, {
     role: nextRole,
     permissions: nextPermissions,
     theme: nextTheme
+  };
+}
+
+if (typeof window !== "undefined") {
+  window.kitchenSessionBridge = {
+    clearKitchenSession,
+    readKitchenSession,
+    writeKitchenSession,
+    applyLoggedOutShell,
+    applyAuthenticatedShell,
+    persistKitchenSession
   };
 }

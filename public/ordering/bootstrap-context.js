@@ -60,7 +60,8 @@ export function createOrderingBootstrapContext({
     bootstrapCacheKey: "kitchenStockOrderingBootstrap",
     pendingJumpItemId: String(pageParams.get("itemId") || "").trim(),
     pendingJumpCategory: String(pageParams.get("category") || "").trim(),
-    pendingJumpRequestId: String(pageParams.get("requestId") || "").trim()
+    pendingJumpRequestId: String(pageParams.get("requestId") || "").trim(),
+    focusedRequestId: String(pageParams.get("requestId") || "").trim()
   };
 
   return {

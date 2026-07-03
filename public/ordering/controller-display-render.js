@@ -35,6 +35,8 @@ export function createOrderingDisplayRender(options) {
     setPendingJumpCategory,
     getPendingJumpRequestId,
     setPendingJumpRequestId,
+    getFocusedRequestId,
+    setFocusedRequestId,
     todayLocal,
     renderOrderingSummaryBlock,
     renderOrderingSummaryView,
@@ -106,6 +108,7 @@ export function createOrderingDisplayRender(options) {
     setPendingJumpItemId(String(item.id));
     setPendingJumpCategory(category || itemCategory(item));
     setPendingJumpRequestId(String(requestId || "").trim());
+    setFocusedRequestId(String(requestId || "").trim());
     const selected = getSelected();
     const targetRequest = (String(requestId || "").trim()
       ? getRecentRequests().find((request) => String(request?.id || "").trim() === String(requestId || "").trim())

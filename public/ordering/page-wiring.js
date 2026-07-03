@@ -144,9 +144,27 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     bootstrapCacheKey,
     pendingJumpItemId,
     pendingJumpCategory,
-    pendingJumpRequestId
+    pendingJumpRequestId,
+    focusedRequestId
   } = state;
   let unitRecords = [];
+
+  function ensureFocusedRequestSelected(requestsOverride = recentRequests) {
+    const requestId = String(focusedRequestId || "").trim();
+    if (!requestId) return;
+    const request = requestsOverride.find((entry) => String(entry?.id || "").trim() === requestId);
+    if (!request?.itemId) return;
+    const item = allItems.find((entry) => String(entry?.id || "").trim() === String(request.itemId || "").trim());
+    if (!item) return;
+    selected.set(String(item.id), {
+      item,
+      requestId: request.id,
+      quantity: Math.max(1, Number(request.quantity || request.quantityNeeded || 1)),
+      urgency: request.urgency || request.urgencyLevel || "Medium",
+      unit: request.unit || request.orderUnit || itemUnit(item),
+      deleteRequested: false
+    });
+  }
 
   const {
     setMessage,
@@ -264,6 +282,10 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
     setPendingJumpRequestId: (value) => {
       pendingJumpRequestId = value;
     },
+    getFocusedRequestId: () => focusedRequestId,
+    setFocusedRequestId: (value) => {
+      focusedRequestId = value;
+    },
     todayLocal,
     hasSearchTermValue,
     requestMatchesScopeValue,
@@ -325,6 +347,7 @@ export function wireOrderingPage({ window, document, localStorage, refs, state }
       summary = data.summary || null;
     });
     selected = buildSelectedFromRecentRequests();
+    ensureFocusedRequestSelected(recentRequests);
     render();
   }
 

@@ -29,6 +29,16 @@
     userSettings = JSON.parse(localStorage.getItem("kitchenStockSettings") || "{}");
   }
 
+  function sessionSnapshot() {
+    return JSON.stringify({
+      permissions,
+      storedRole,
+      sessionToken,
+      userSettings,
+      userName: localStorage.getItem("kitchenStockUser") || ""
+    });
+  }
+
   function effectivePermissionSet() {
     if (storedRole === "god" || storedRole === "admin") {
       return {
@@ -138,14 +148,15 @@
 
   async function refreshPermissions() {
     syncSessionState();
-    if (!sessionToken) return;
+    if (!sessionToken) return false;
+    const before = sessionSnapshot();
     try {
       const response = await fetch("/api/me", {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
-      if (!response.ok) return;
+      if (!response.ok) return false;
       const data = await response.json();
-      if (!data?.user) return;
+      if (!data?.user) return false;
       permissions = data.user.permissions || permissions;
       localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
       storedRole = String(data.user.role || storedRole || "").trim().toLowerCase();
@@ -154,14 +165,18 @@
       userSettings = data.user.settings || userSettings || {};
       localStorage.setItem("kitchenStockSettings", JSON.stringify(userSettings));
       syncSessionState();
+      return before !== sessionSnapshot();
     } catch {
       // Keep cached permissions if the refresh check fails.
+      return false;
     }
   }
 
-  const boot = async () => {
-    await refreshPermissions();
+  const boot = async ({ refresh = true } = {}) => {
     mountMenus();
+    if (!refresh) return;
+    const changed = await refreshPermissions();
+    if (changed) mountMenus();
   };
 
   if (document.readyState === "loading") {
@@ -179,7 +194,7 @@
   }
 
   window.refreshKitchenMenus = () => {
-    boot().catch(() => {
+    boot({ refresh: true }).catch(() => {
       mountMenus();
       document.documentElement.classList.remove("menus-loading");
     });

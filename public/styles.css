@@ -2106,6 +2106,16 @@ html.menus-loading .order-topbar > .top-actions {
   margin-top: 18px;
 }
 
+.ordering-page .daily-order-panel {
+  width: 100%;
+  margin: 10px 0 18px;
+  padding: 0;
+}
+
+.ordering-page .dashboard-cards {
+  gap: 14px;
+}
+
 .section-helper {
   margin: 6px 0 14px;
   color: var(--order-muted);
@@ -2320,22 +2330,26 @@ html.menus-loading .order-topbar > .top-actions {
   background: #171717;
 }
 
-.order-search-band {
+.ordering-page .order-search-band {
   max-width: 1120px;
-  margin: 28px auto 20px;
-  padding: 0 18px;
+  margin: 18px auto 18px;
+  padding: 18px;
   display: grid;
   gap: 14px;
-  justify-items: center;
+  justify-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
-.search-box {
-  width: min(640px, 100%);
+.ordering-page .search-box {
+  width: 100%;
   position: relative;
   display: block;
 }
 
-.search-box span {
+.ordering-page .search-box span {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2343,165 +2357,164 @@ html.menus-loading .order-topbar > .top-actions {
   clip: rect(0, 0, 0, 0);
 }
 
-.search-box input {
-  height: 58px;
-  padding: 0 24px 0 54px;
-  border: 1px solid #111;
-  border-radius: 999px;
-  background: #080808;
-  color: var(--order-ink);
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.54);
+.ordering-page .search-box input {
+  height: 52px;
+  padding: 0 18px 0 46px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.search-box::before {
+.ordering-page .search-box::before {
   content: "";
   position: absolute;
-  left: 25px;
+  left: 18px;
   top: 50%;
   width: 12px;
   height: 12px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--muted);
   border-radius: 50%;
   transform: translateY(-55%);
 }
 
-.search-box::after {
+.ordering-page .search-box::after {
   content: "";
   position: absolute;
-  left: 36px;
-  top: 33px;
+  left: 29px;
+  top: 30px;
   width: 7px;
   height: 1px;
-  background: #4a4a4a;
+  background: var(--muted);
   transform: rotate(45deg);
 }
 
-.order-filters {
+.ordering-page .order-filters {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
-.order-filters select {
-  width: auto;
-  min-width: 150px;
-  background: #101010;
-  color: var(--order-muted);
-  border: 1px solid var(--order-line);
-  border-radius: 999px;
+.ordering-page .order-filters select {
+  flex: 1 1 200px;
+  min-width: 180px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 14px;
   padding: 10px 34px 10px 14px;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
+  font-size: 14px;
 }
 
-.selected-chips {
-  width: min(980px, 100%);
+.ordering-page .selected-chips {
+  width: 100%;
   min-height: 42px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
-.selected-chip {
+.ordering-page .selected-chip {
   width: auto;
   min-width: 0;
   display: inline-flex;
   gap: 8px;
   align-items: center;
-  border: 1px solid rgba(212, 173, 67, 0.74);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(212, 173, 67, 0.12);
-  color: var(--order-ink);
+  background: #f8fafc;
+  color: var(--text);
   padding: 8px 12px;
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.selected-chip small {
-  color: var(--order-gold-strong);
+.ordering-page .selected-chip small {
+  color: var(--muted);
   font-size: 10px;
   text-transform: uppercase;
 }
 
-.order-message {
+.ordering-page .order-message {
   min-height: 20px;
   margin: 0;
-  color: var(--order-muted);
+  color: var(--muted);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
-  text-align: center;
+  text-align: left;
 }
 
-.order-message.error {
+.ordering-page .order-message.error {
   color: var(--order-danger);
 }
 
-.category-view,
-.product-view {
+.ordering-page .category-view,
+.ordering-page .product-view {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 18px 28px;
+  padding: 0 0 20px;
 }
 
-.order-divider {
+.ordering-page .order-divider {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 12px 0 30px;
-  color: var(--order-muted);
+  margin: 8px 0 18px;
+  color: var(--muted);
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 9px;
-  letter-spacing: 1.8px;
+  font-size: 11px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
 }
 
-.order-divider::before,
-.order-divider::after {
+.ordering-page .order-divider::before,
+.ordering-page .order-divider::after {
   content: "";
   height: 1px;
   flex: 1;
-  background: var(--order-line-soft);
+  background: var(--line);
 }
 
-.category-grid {
+.ordering-page .category-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
-.category-card {
+.ordering-page .category-card {
   position: relative;
-  min-height: 128px;
+  min-height: 114px;
   display: grid;
   place-items: center;
   gap: 5px;
-  border: 1px solid var(--order-line);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
-    #070707;
-  color: var(--order-ink);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  padding: 20px 18px;
 }
 
-.category-card:hover {
-  border-color: rgba(212, 173, 67, 0.7);
-  background: #0e0e0e;
+.ordering-page .category-card:hover {
+  border-color: #94a3b8;
+  background: #ffffff;
 }
 
-.category-card strong {
-  font-size: 17px;
+.ordering-page .category-card strong {
+  font-family: inherit;
+  font-size: 18px;
   text-align: center;
 }
 
-.category-card small {
-  color: var(--order-muted);
+.ordering-page .category-card small {
+  color: var(--muted);
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.9px;
+  font-size: 11px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
 }
 

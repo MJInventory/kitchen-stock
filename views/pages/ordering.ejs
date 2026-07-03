@@ -1,78 +1,80 @@
-<%- include("../partials/notifications-panel", {
-  panelClass: "daily-order-panel notification-panel",
-  listClass: "notification-list",
-  showPushButton: false
-}) %>
+<div class="ordering-page">
+  <%- include("../partials/notifications-panel", {
+    panelClass: "daily-order-panel notification-panel",
+    listClass: "notification-list",
+    showPushButton: false
+  }) %>
 
-<%- include("../partials/summary-panel", {
-  panelClass: "daily-order-panel ordering-summary-panel",
-  title: "Ordering Snapshot",
-  modeId: "orderingMode",
-  modeText: "Team view",
-  helperText: "What is saved, already open, or below minimum right now.",
-  cardsId: "orderingSummaryCards",
-  cardsClass: "dashboard-cards ordering-summary-cards"
-}) %>
+  <%- include("../partials/summary-panel", {
+    panelClass: "daily-order-panel ordering-summary-panel",
+    title: "Ordering Snapshot",
+    modeId: "orderingMode",
+    modeText: "Team view",
+    helperText: "What is saved, already open, or below minimum right now.",
+    cardsId: "orderingSummaryCards",
+    cardsClass: "dashboard-cards ordering-summary-cards"
+  }) %>
 
-<section class="order-search-band">
-  <label class="search-box">
-    <span>Search</span>
-    <input id="searchInput" type="search" placeholder="Quick search products..." autocomplete="off">
-  </label>
-  <div class="order-filters">
-    <select id="requestScopeFilter" aria-label="Filter order list by scope">
-      <option value="">All work</option>
-      <option value="__mine__">My stuff</option>
-      <option value="__team__">Team stuff</option>
-    </select>
-    <select id="areaFilter" aria-label="Inventory area">
-      <option value="">All Areas</option>
-      <option>Bar</option>
-      <option>Kitchen</option>
-      <option>FOH</option>
-    </select>
-    <select id="locationFilter" aria-label="Storage location">
-      <option value="">All Locations</option>
-      <option>Dry Storage</option>
-      <option>Cooler</option>
-      <option>Freezer</option>
-      <option>Liquor Storage</option>
-      <option>General Storage</option>
-    </select>
-  </div>
-  <div id="selectedChips" class="selected-chips"></div>
-  <p id="message" class="order-message" role="status"></p>
-</section>
-
-<section id="categoryView" class="category-view">
-  <div class="order-divider"><span>All Categories</span></div>
-  <div id="categoryGrid" class="category-grid"></div>
-</section>
-
-<section id="productView" class="product-view" hidden>
-  <div class="product-heading">
-    <button id="backButton" class="back-button" type="button">Back Home</button>
-    <div>
-      <h2 id="categoryTitle">Products</h2>
-      <p id="categoryMeta"></p>
+  <section class="order-search-band">
+    <label class="search-box">
+      <span>Search</span>
+      <input id="searchInput" type="search" placeholder="Quick search products..." autocomplete="off">
+    </label>
+    <div class="order-filters">
+      <select id="requestScopeFilter" aria-label="Filter order list by scope">
+        <option value="">All work</option>
+        <option value="__mine__">My stuff</option>
+        <option value="__team__">Team stuff</option>
+      </select>
+      <select id="areaFilter" aria-label="Inventory area">
+        <option value="">All Areas</option>
+        <option>Bar</option>
+        <option>Kitchen</option>
+        <option>FOH</option>
+      </select>
+      <select id="locationFilter" aria-label="Storage location">
+        <option value="">All Locations</option>
+        <option>Dry Storage</option>
+        <option>Cooler</option>
+        <option>Freezer</option>
+        <option>Liquor Storage</option>
+        <option>General Storage</option>
+      </select>
     </div>
-  </div>
-  <div id="productList" class="product-list"></div>
-</section>
+    <div id="selectedChips" class="selected-chips"></div>
+    <p id="message" class="order-message" role="status"></p>
+  </section>
 
-<section class="daily-order-panel">
-  <div class="daily-order-heading">
-    <h2>Today's Order</h2>
-    <span id="dailyOrderCount"></span>
-  </div>
-  <p class="section-helper">Open order lines grouped by category so the team can see what is already in motion.</p>
-  <div id="dailyOrderList" class="daily-order-list"></div>
-</section>
+  <section id="categoryView" class="category-view">
+    <div class="order-divider"><span>All Categories</span></div>
+    <div id="categoryGrid" class="category-grid"></div>
+  </section>
 
-<section class="daily-order-panel">
-  <div class="daily-order-heading">
-    <h2>Standing Orders</h2>
-    <span id="standingOrderCount"></span>
-  </div>
-  <div id="standingOrderList" class="daily-order-list"></div>
-</section>
+  <section id="productView" class="product-view" hidden>
+    <div class="product-heading">
+      <button id="backButton" class="back-button" type="button">Back Home</button>
+      <div>
+        <h2 id="categoryTitle">Products</h2>
+        <p id="categoryMeta"></p>
+      </div>
+    </div>
+    <div id="productList" class="product-list"></div>
+  </section>
+
+  <section class="daily-order-panel">
+    <div class="daily-order-heading">
+      <h2>Today's Order</h2>
+      <span id="dailyOrderCount"></span>
+    </div>
+    <p class="section-helper">Open order lines grouped by category so the team can see what is already in motion.</p>
+    <div id="dailyOrderList" class="daily-order-list"></div>
+  </section>
+
+  <section class="daily-order-panel">
+    <div class="daily-order-heading">
+      <h2>Standing Orders</h2>
+      <span id="standingOrderCount"></span>
+    </div>
+    <div id="standingOrderList" class="daily-order-list"></div>
+  </section>
+</div>

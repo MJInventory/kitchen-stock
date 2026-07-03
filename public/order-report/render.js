@@ -60,6 +60,18 @@ function canUndoDeliveryEntry(entry) {
     && (reason === "delivery-complete" || reason === "delivery-partial");
 }
 
+function canRestoreRemovedOrderEntry(entry) {
+  const reason = String(entry?.reasonCode || "").trim();
+  const actionType = String(entry?.actionType || "").trim();
+  const entityType = String(entry?.entityType || "").trim();
+  const auditId = Number(entry?.id || 0);
+  return actionType === "delete"
+    && entityType === "order-request"
+    && reason === "order-delete"
+    && Number.isFinite(auditId)
+    && auditId > 0;
+}
+
 export function renderSummary({ reportSummary, summary, activeReportFilter }) {
   const cards = [
     ["Guests", summary.guests ?? "-", ""],
@@ -181,7 +193,7 @@ export function renderActivity({ entries, summary, activitySummary, activityRepo
   `).join("");
 
   const scoped = activeActivityScope === "received"
-    ? list.filter((entry) => canUndoDeliveryEntry(entry))
+    ? list.filter((entry) => canUndoDeliveryEntry(entry) || canRestoreRemovedOrderEntry(entry))
     : list;
 
   const visible = activeActivityFilter === "all"
@@ -210,6 +222,11 @@ export function renderActivity({ entries, summary, activitySummary, activityRepo
         ${canUndoDeliveryEntry(entry) ? `
           <button class="small-button danger-soft undo-delivery-button no-print" type="button" data-request-id="${escapeHtml(activityEntityId(entry))}">
             Undo received
+          </button>
+        ` : ""}
+        ${canRestoreRemovedOrderEntry(entry) ? `
+          <button class="small-button danger-soft undo-removed-button no-print" type="button" data-audit-id="${escapeHtml(entry.id)}">
+            Undo removed
           </button>
         ` : ""}
       </article>

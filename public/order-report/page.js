@@ -213,6 +213,20 @@ export function initOrderReportPage() {
     });
   }
 
+  function hideRemovedOrderEntries(auditId) {
+    const targetId = Number(auditId || 0);
+    if (!Number.isFinite(targetId) || targetId <= 0) return;
+    currentActivityEntries = currentActivityEntries.filter((entry) => Number(entry?.id || 0) !== targetId);
+    renderActivity({
+      entries: currentActivityEntries,
+      summary: currentActivitySummary,
+      activitySummary,
+      activityReportList,
+      activeActivityFilter,
+      activeActivityScope
+    });
+  }
+
 
   async function saveGuests() {
     setMessage("Saving guests...");
@@ -255,21 +269,40 @@ export function initOrderReportPage() {
   });
   activityReportList?.addEventListener("click", async (event) => {
     const button = event.target.closest(".undo-delivery-button");
-    if (!button) return;
-    const requestId = button.dataset.requestId || "";
-    if (!requestId) return;
-    if (!window.confirm("Undo this received item? This will subtract the received quantity from stock and reopen the order.")) return;
-    button.disabled = true;
+    if (button) {
+      const requestId = button.dataset.requestId || "";
+      if (!requestId) return;
+      if (!window.confirm("Undo this received item? This will subtract the received quantity from stock and reopen the order.")) return;
+      button.disabled = true;
+      try {
+        setMessage("Undoing received item...");
+        await api(`/api/requests/${encodeURIComponent(requestId)}/undo-delivery`, { method: "POST" });
+        await loadReport();
+        hideUndoDeliveryEntries(requestId);
+        setMessage("Received item was undone and the order was reopened.");
+      } catch (error) {
+        setMessage(error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+      return;
+    }
+    const restoreButton = event.target.closest(".undo-removed-button");
+    if (!restoreButton) return;
+    const auditId = restoreButton.dataset.auditId || "";
+    if (!auditId) return;
+    if (!window.confirm("Undo this removed item? This will restore the deleted order line.")) return;
+    restoreButton.disabled = true;
     try {
-      setMessage("Undoing received item...");
-      await api(`/api/requests/${encodeURIComponent(requestId)}/undo-delivery`, { method: "POST" });
+      setMessage("Restoring removed item...");
+      await api(`/api/requests/restore-from-audit/${encodeURIComponent(auditId)}`, { method: "POST" });
       await loadReport();
-      hideUndoDeliveryEntries(requestId);
-      setMessage("Received item was undone and the order was reopened.");
+      hideRemovedOrderEntries(auditId);
+      setMessage("Removed item was restored.");
     } catch (error) {
       setMessage(error.message, true);
     } finally {
-      button.disabled = false;
+      restoreButton.disabled = false;
     }
   });
   bindLogoutButton(logoutButton, showLogin);

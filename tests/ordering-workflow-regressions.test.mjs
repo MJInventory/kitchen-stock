@@ -233,6 +233,10 @@ function createMutationApiHarness(overrides = {}) {
       calls.push(["undoDeliveredRequest", ...args]);
       return { ok: true };
     },
+    restoreDeletedRequestFromAudit: async (...args) => {
+      calls.push(["restoreDeletedRequestFromAudit", ...args]);
+      return { ok: true };
+    },
     updateDriverLine: noop,
     deliverDriverLine: noop,
     canDeleteRequest: async () => true,
@@ -269,6 +273,21 @@ test("mutation api routes request patch through updateRequest", async () => {
     "updateRequest",
     "55555555-5555-5555-5555-555555555555",
     payload,
+    "Enno"
+  ]]);
+  assert.equal(getSent()?.status, 200);
+});
+
+test("mutation api routes restore-deleted order through restoreDeletedRequestFromAudit", async () => {
+  const { handler, calls, getSent } = createMutationApiHarness();
+  const handled = await handler(
+    { method: "POST", url: "/api/requests/restore-from-audit/42" },
+    {}
+  );
+  assert.equal(handled, true);
+  assert.deepEqual(calls, [[
+    "restoreDeletedRequestFromAudit",
+    "42",
     "Enno"
   ]]);
   assert.equal(getSent()?.status, 200);

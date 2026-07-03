@@ -64,12 +64,11 @@ function canRestoreRemovedOrderEntry(entry) {
   const reason = String(entry?.reasonCode || "").trim();
   const actionType = String(entry?.actionType || "").trim();
   const entityType = String(entry?.entityType || "").trim();
-  const auditId = Number(entry?.id || 0);
+  const auditId = String(entry?.id || "").trim();
   return actionType === "delete"
     && entityType === "order-request"
     && reason === "order-delete"
-    && Number.isFinite(auditId)
-    && auditId > 0;
+    && Boolean(auditId);
 }
 
 export function renderSummary({ reportSummary, summary, activeReportFilter }) {

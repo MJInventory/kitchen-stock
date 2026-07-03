@@ -214,9 +214,9 @@ export function initOrderReportPage() {
   }
 
   function hideRemovedOrderEntries(auditId) {
-    const targetId = Number(auditId || 0);
-    if (!Number.isFinite(targetId) || targetId <= 0) return;
-    currentActivityEntries = currentActivityEntries.filter((entry) => Number(entry?.id || 0) !== targetId);
+    const targetId = String(auditId || "").trim();
+    if (!targetId) return;
+    currentActivityEntries = currentActivityEntries.filter((entry) => String(entry?.id || "").trim() !== targetId);
     renderActivity({
       entries: currentActivityEntries,
       summary: currentActivitySummary,

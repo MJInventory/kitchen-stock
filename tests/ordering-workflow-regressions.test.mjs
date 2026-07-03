@@ -281,13 +281,13 @@ test("mutation api routes request patch through updateRequest", async () => {
 test("mutation api routes restore-deleted order through restoreDeletedRequestFromAudit", async () => {
   const { handler, calls, getSent } = createMutationApiHarness();
   const handled = await handler(
-    { method: "POST", url: "/api/requests/restore-from-audit/42" },
+    { method: "POST", url: "/api/requests/restore-from-audit/c369ffd9-c8ec-4837-bf41-1a7d364da08d" },
     {}
   );
   assert.equal(handled, true);
   assert.deepEqual(calls, [[
     "restoreDeletedRequestFromAudit",
-    "42",
+    "c369ffd9-c8ec-4837-bf41-1a7d364da08d",
     "Enno"
   ]]);
   assert.equal(getSent()?.status, 200);

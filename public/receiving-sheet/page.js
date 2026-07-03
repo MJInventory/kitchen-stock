@@ -1,5 +1,6 @@
 import { formatUserDisplay, todayLocal } from "./helpers.js";
 import { renderReceivingSheet } from "./render.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession } from "/session-shell.js";
 
 export function initReceivingSheetPage() {
   const sheetDate = document.querySelector("#sheetDate");
@@ -31,21 +32,19 @@ export function initReceivingSheetPage() {
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    currentUser.textContent = formatUserDisplay(sessionUser);
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay
+    });
     printReceiver.textContent = `Receiver: ${formatUserDisplay(sessionUser) || "________________"}`;
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
-    currentUser.textContent = "";
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
   }
 
   async function api(path, options = {}) {
@@ -215,14 +214,13 @@ export function initReceivingSheetPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not log in.");
 
-      sessionToken = data.token;
-      sessionUser = data.user.name;
-      localStorage.setItem("kitchenStockToken", sessionToken);
-      localStorage.setItem("kitchenStockUser", sessionUser);
-      localStorage.setItem("kitchenStockRole", data.user.role || "user");
-      localStorage.setItem("kitchenStockPermissions", JSON.stringify(data.user.permissions || {}));
-      localStorage.setItem("kitchenStockTheme", "light");
-      window.applyKitchenTheme?.("light");
+      const saved = persistKitchenSession(data, {
+        currentToken: sessionToken,
+        applyTheme: window.applyKitchenTheme,
+        forcedTheme: "light"
+      });
+      sessionToken = saved.token;
+      sessionUser = saved.user;
       if (data.user.mustChangePassword) {
         window.location.href = "/change-password.html";
         return;

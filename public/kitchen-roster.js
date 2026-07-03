@@ -1,3 +1,9 @@
+import {
+  applyAuthenticatedShell,
+  applyLoggedOutShell,
+  persistKitchenSession
+} from "/session-shell.js";
+
 (function initKitchenRosterPage() {
   const loginScreen = document.querySelector("#loginScreen");
   const loginForm = document.querySelector("#loginForm");
@@ -133,32 +139,31 @@
   }
 
   function saveSession(data) {
-    sessionToken = data.token;
-    sessionUser = data.user.name;
-    permissions = data.user.permissions || {};
-    localStorage.setItem("kitchenStockToken", sessionToken);
-    localStorage.setItem("kitchenStockUser", sessionUser);
-    localStorage.setItem("kitchenStockRole", data.user.role || "user");
-    localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
-    localStorage.setItem("kitchenStockTheme", "light");
-    window.applyKitchenTheme?.("light");
-    window.refreshKitchenMenus?.();
+    const saved = persistKitchenSession(data, {
+      currentToken: sessionToken,
+      applyTheme: window.applyKitchenTheme,
+      setupPush: window.setupKitchenPush,
+      forcedTheme: "light"
+    });
+    sessionToken = saved.token;
+    sessionUser = saved.user;
+    permissions = saved.permissions;
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
+    permissions = {};
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    currentUser.textContent = sessionUser ? formatDisplayName(sessionUser) : "";
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay: formatDisplayName
+    });
   }
 
   async function api(path, options = {}) {

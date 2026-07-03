@@ -7,6 +7,7 @@ import {
 } from "./helpers.js";
 import { renderSheet } from "./render.js";
 import { createDriverSheetActions } from "./actions.js";
+import { applyAuthenticatedShell, applyLoggedOutShell, persistKitchenSession } from "/session-shell.js";
 
 export function initDriverSheetPage() {
   const sheetDate = document.querySelector("#sheetDate");
@@ -41,9 +42,12 @@ export function initDriverSheetPage() {
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    currentUser.textContent = formatUserDisplay(sessionUser);
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay
+    });
     const canAssignDriver = Boolean(sessionPermissions.canAdminUsers);
     driverName.disabled = !canAssignDriver;
     saveDriverButton.hidden = !canAssignDriver;
@@ -54,14 +58,10 @@ export function initDriverSheetPage() {
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
-    currentUser.textContent = "";
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
+    sessionPermissions = {};
   }
 
   async function api(path, options = {}) {
@@ -316,16 +316,14 @@ export function initDriverSheetPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not log in.");
 
-      sessionToken = data.token;
-      sessionUser = data.user.name;
-      sessionPermissions = data.user.permissions || {};
-      localStorage.setItem("kitchenStockToken", sessionToken);
-      localStorage.setItem("kitchenStockUser", sessionUser);
-      localStorage.setItem("kitchenStockPermissions", JSON.stringify(sessionPermissions));
-      localStorage.setItem("kitchenStockRole", data.user.role || "user");
-      localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-      window.applyKitchenTheme?.(data.user.theme || "dark");
-      window.setupKitchenPush?.();
+      const saved = persistKitchenSession(data, {
+        currentToken: sessionToken,
+        applyTheme: window.applyKitchenTheme,
+        setupPush: window.setupKitchenPush
+      });
+      sessionToken = saved.token;
+      sessionUser = saved.user;
+      sessionPermissions = saved.permissions;
       if (data.user.mustChangePassword) {
         window.location.href = "/change-password.html";
         return;

@@ -1,5 +1,6 @@
 import { formatUserDisplay } from "./helpers.js";
 import { renderPickerBoard } from "./render.js";
+import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
 
 export function initPickerSheetPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -29,22 +30,19 @@ export function initPickerSheetPage() {
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    if (currentUser) {
-      currentUser.textContent = formatUserDisplay(sessionUser);
-      currentUser.hidden = false;
-    }
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay
+    });
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
+    sessionPermissions = {};
   }
 
   async function api(path, options = {}) {

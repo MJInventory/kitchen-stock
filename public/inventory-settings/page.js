@@ -4,6 +4,7 @@ import {
   optionList
 } from "./helpers.js";
 import { fillFilter, renderItems, shelvesForLocation } from "./render.js";
+import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
 
 export function initInventorySettingsPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -53,18 +54,18 @@ export function initInventorySettingsPage() {
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    currentUser.textContent = formatUserDisplay(sessionUser);
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay
+    });
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
-    currentUser.textContent = "";
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
   }
 
   async function api(path, options) {

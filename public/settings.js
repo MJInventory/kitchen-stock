@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { clearKitchenSession } from "/session-shell.js";
 
 const openOrderDaysInput = document.querySelector("#openOrderDays");
 const gotoMenuOptions = document.querySelector("#gotoMenuOptions");
@@ -100,11 +101,7 @@ settingsLogoutButton?.addEventListener("click", () => {
     logoutButton.click();
     return;
   }
-  localStorage.removeItem("kitchenStockToken");
-  localStorage.removeItem("kitchenStockUser");
-  localStorage.removeItem("kitchenStockRole");
-  localStorage.removeItem("kitchenStockPermissions");
-  localStorage.removeItem("kitchenStockSettings");
+  clearKitchenSession();
   window.location.href = "/";
 });
 

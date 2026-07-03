@@ -1,3 +1,5 @@
+import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
+
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
 const usernameInput = document.querySelector("#usernameInput");
@@ -53,18 +55,18 @@ function message(target, text, isError = false) {
 }
 
 function showApp() {
-  loginScreen.hidden = true;
-  currentUser.textContent = formatUserDisplay(sessionUser);
-  window.refreshKitchenMenus?.();
+  applyAuthenticatedShell({
+    loginScreen,
+    currentUser,
+    sessionUser,
+    formatUserDisplay
+  });
 }
 
 function showLogin() {
-  loginScreen.hidden = false;
-  currentUser.textContent = "";
+  applyLoggedOutShell({ loginScreen, currentUser });
   sessionToken = "";
   sessionUser = "";
-  localStorage.removeItem("kitchenStockToken");
-  localStorage.removeItem("kitchenStockUser");
 }
 
 async function api(path, options) {

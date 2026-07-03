@@ -1,3 +1,9 @@
+import {
+  applyAuthenticatedShell,
+  applyLoggedOutShell,
+  persistKitchenSession
+} from "/session-shell.js";
+
 export function authPage({ permission = "", messageSelector = "" } = {}) {
   const loginScreen = document.querySelector("#loginScreen");
   const loginForm = document.querySelector("#loginForm");
@@ -38,39 +44,28 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
   }
 
   function saveSession(data) {
-    sessionToken = data.token;
-    sessionUser = data.user.name;
-    permissions = data.user.permissions || {};
-    localStorage.setItem("kitchenStockToken", sessionToken);
-    localStorage.setItem("kitchenStockUser", sessionUser);
-    localStorage.setItem("kitchenStockRole", data.user.role || "user");
-    localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
-    localStorage.setItem("kitchenStockSettings", JSON.stringify(data.user.settings || {}));
-    localStorage.setItem("kitchenStockTheme", data.user.theme || "dark");
-    window.applyKitchenTheme?.(data.user.theme || "dark");
+    const saved = persistKitchenSession(data, {
+      currentToken: sessionToken,
+      applyTheme: window.applyKitchenTheme
+    });
+    sessionToken = saved.token;
+    sessionUser = saved.user;
+    permissions = saved.permissions;
   }
 
   function showApp() {
-    if (loginScreen) loginScreen.hidden = true;
-    if (currentUser) {
-      currentUser.textContent = formatUserDisplay(sessionUser);
-      currentUser.hidden = false;
-    }
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay
+    });
   }
 
   function showLogin() {
-    if (loginScreen) loginScreen.hidden = false;
-    if (currentUser) {
-      currentUser.textContent = "";
-      currentUser.hidden = true;
-    }
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
   }
 
   async function api(path, options = {}) {

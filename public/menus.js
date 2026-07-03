@@ -92,17 +92,22 @@
     `;
   }
 
-  function performLogout() {
+  async function performLogout() {
     const logoutButton = document.querySelector("#logoutButton");
     if (logoutButton) {
       logoutButton.click();
       return;
     }
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
-    localStorage.removeItem("kitchenStockSettings");
+    try {
+      const { clearKitchenSession } = await import("/session-shell.js");
+      clearKitchenSession();
+    } catch {
+      localStorage.removeItem("kitchenStockToken");
+      localStorage.removeItem("kitchenStockUser");
+      localStorage.removeItem("kitchenStockRole");
+      localStorage.removeItem("kitchenStockPermissions");
+      localStorage.removeItem("kitchenStockSettings");
+    }
     window.location.href = "/";
   }
 
@@ -129,7 +134,7 @@
       select.addEventListener("change", (event) => {
         if (!event.target.value) return;
         if (event.target.value === LOGOUT_VALUE) {
-          performLogout();
+          void performLogout();
           event.target.value = "";
           return;
         }

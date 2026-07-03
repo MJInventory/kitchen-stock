@@ -1,5 +1,10 @@
 import { formatUserDisplay, roleLabel } from "./helpers.js";
 import { renderUsers } from "./render.js";
+import {
+  applyAuthenticatedShell,
+  applyLoggedOutShell,
+  persistKitchenSession
+} from "/session-shell.js";
 
 export function initUserAdminPage() {
   const loginScreen = document.querySelector("#loginScreen");
@@ -33,23 +38,26 @@ export function initUserAdminPage() {
   }
 
   function saveSession(data) {
-    sessionToken = data.token;
-    sessionUser = data.user.name;
-    permissions = data.user.permissions || {};
-    localStorage.setItem("kitchenStockToken", sessionToken);
-    localStorage.setItem("kitchenStockUser", sessionUser);
-    localStorage.setItem("kitchenStockRole", data.user.role || "user");
-    localStorage.setItem("kitchenStockPermissions", JSON.stringify(permissions));
-    localStorage.setItem("kitchenStockTheme", "light");
-    window.applyKitchenTheme?.("light");
-    window.setupKitchenPush?.();
+    const saved = persistKitchenSession(data, {
+      currentToken: sessionToken,
+      applyTheme: window.applyKitchenTheme,
+      setupPush: window.setupKitchenPush,
+      forcedTheme: "light"
+    });
+    sessionToken = saved.token;
+    sessionUser = saved.user;
+    permissions = saved.permissions;
   }
 
   function showApp() {
-    loginScreen.hidden = true;
     const role = localStorage.getItem("kitchenStockRole") || "user";
-    currentUser.textContent = sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel(role)}` : "";
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser: sessionUser ? `${formatUserDisplay(sessionUser)} / ${roleLabel(role)}` : "",
+      formatUserDisplay: (value) => value,
+      refreshMenus: true
+    });
     document.querySelectorAll("[data-god-only]").forEach((option) => {
       option.hidden = !permissions.canManageAdminRoles;
       option.disabled = !permissions.canManageAdminRoles;
@@ -57,13 +65,10 @@ export function initUserAdminPage() {
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
+    permissions = {};
   }
 
   async function api(path, options = {}) {

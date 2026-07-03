@@ -6,6 +6,7 @@ import {
   renderActivity,
   renderReport
 } from "./render.js";
+import { applyAuthenticatedShell, applyLoggedOutShell } from "/session-shell.js";
 
 export function initOrderReportPage() {
   const reportDate = document.querySelector("#reportDate");
@@ -54,9 +55,12 @@ export function initOrderReportPage() {
   }
 
   function showApp() {
-    loginScreen.hidden = true;
-    currentUser.textContent = formatUserDisplay(sessionUser);
-    window.refreshKitchenMenus?.();
+    applyAuthenticatedShell({
+      loginScreen,
+      currentUser,
+      sessionUser,
+      formatUserDisplay
+    });
     const canAdmin = Boolean(sessionPermissions.canAdminUsers);
     guestCountField.hidden = !canAdmin;
     guestNotesField.hidden = !canAdmin;
@@ -64,14 +68,10 @@ export function initOrderReportPage() {
   }
 
   function showLogin() {
-    loginScreen.hidden = false;
-    currentUser.textContent = "";
+    applyLoggedOutShell({ loginScreen, currentUser });
     sessionToken = "";
     sessionUser = "";
-    localStorage.removeItem("kitchenStockToken");
-    localStorage.removeItem("kitchenStockUser");
-    localStorage.removeItem("kitchenStockRole");
-    localStorage.removeItem("kitchenStockPermissions");
+    sessionPermissions = {};
   }
 
   async function api(path, options = {}) {

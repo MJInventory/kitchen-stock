@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { bindAutosaveRows, createStatusPresenter } from "/admin-crud-helpers.js";
 
 const page = authPage({
   permission: "canAddInventoryItems",
@@ -14,10 +15,7 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
-function setMessage(text, isError = false) {
-  message.textContent = text;
-  message.classList.toggle("error", isError);
-}
+const setMessage = createStatusPresenter(message);
 
 function renderLocations(locations) {
   locationRecords = locations || [];
@@ -91,24 +89,12 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-locationList.addEventListener("input", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isLocationDirty(row));
-});
-
-locationList.addEventListener("change", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isLocationDirty(row));
-});
-
-locationList.addEventListener("focusout", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  const next = event.relatedTarget;
-  if (next && row.contains(next)) return;
-  saveLocationRow(row).catch((error) => setMessage(error.message, true));
+bindAutosaveRows({
+  container: locationList,
+  rowSelector: ".setup-admin-row",
+  isDirty: isLocationDirty,
+  saveRow: saveLocationRow,
+  onError: (error) => setMessage(error.message, true)
 });
 
 page.ready(loadLocations);

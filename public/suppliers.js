@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { bindAutosaveRows, bindDeleteAction, createStatusPresenter } from "/admin-crud-helpers.js";
 
 const page = authPage({
   permission: "canAddInventoryItems",
@@ -14,10 +15,7 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
-function setSupplierMessage(text, isError = false) {
-  supplierMessage.textContent = text;
-  supplierMessage.classList.toggle("error", isError);
-}
+const setSupplierMessage = createStatusPresenter(supplierMessage);
 
 function renderSuppliers(suppliers) {
   supplierRecords = suppliers || [];
@@ -103,39 +101,27 @@ supplierForm.addEventListener("submit", async (event) => {
   }
 });
 
-supplierList.addEventListener("click", (event) => {
-  const deleteButton = event.target.closest(".delete-supplier");
-  if (!deleteButton) return;
-  const row = deleteButton.closest(".supplier-row");
+bindDeleteAction({
+  container: supplierList,
+  buttonSelector: ".delete-supplier",
+  rowSelector: ".supplier-row",
+  onDelete: async (row) => {
   const supplierName = row.querySelector(".supplier-name").value.trim() || "this supplier";
   if (!window.confirm(`Delete supplier ${supplierName}?`)) return;
   if (!window.confirm("Really delete this supplier? This cannot be undone.")) return;
-  deleteButton.disabled = true;
-  page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, { method: "DELETE" })
-    .then(loadSuppliers)
-    .then(() => setSupplierMessage("Supplier deleted."))
-    .catch((error) => setSupplierMessage(error.message, true))
-    .finally(() => { deleteButton.disabled = false; });
+  await page.api(`/api/setup/suppliers/${row.dataset.supplierId}`, { method: "DELETE" });
+  await loadSuppliers();
+  setSupplierMessage("Supplier deleted.");
+  },
+  onError: (error) => setSupplierMessage(error.message, true)
 });
 
-supplierList.addEventListener("input", (event) => {
-  const row = event.target.closest(".supplier-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isSupplierDirty(row));
-});
-
-supplierList.addEventListener("change", (event) => {
-  const row = event.target.closest(".supplier-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isSupplierDirty(row));
-});
-
-supplierList.addEventListener("focusout", (event) => {
-  const row = event.target.closest(".supplier-row");
-  if (!row) return;
-  const next = event.relatedTarget;
-  if (next && row.contains(next)) return;
-  saveSupplierRow(row).catch((error) => setSupplierMessage(error.message, true));
+bindAutosaveRows({
+  container: supplierList,
+  rowSelector: ".supplier-row",
+  isDirty: isSupplierDirty,
+  saveRow: saveSupplierRow,
+  onError: (error) => setSupplierMessage(error.message, true)
 });
 
 page.ready(loadSuppliers);

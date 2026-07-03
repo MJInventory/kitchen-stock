@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { bindAutosaveRows, bindDeleteAction, createStatusPresenter } from "/admin-crud-helpers.js";
 
 const page = authPage({
   permission: "canAdminUsers",
@@ -14,10 +15,7 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
-function setUnitMessage(text, isError = false) {
-  unitMessage.textContent = text;
-  unitMessage.classList.toggle("error", isError);
-}
+const setUnitMessage = createStatusPresenter(unitMessage);
 
 function renderUnits(units) {
   unitRecords = units || [];
@@ -97,40 +95,28 @@ unitForm.addEventListener("submit", async (event) => {
   }
 });
 
-unitList.addEventListener("click", (event) => {
-  const deleteButton = event.target.closest(".delete-unit");
-  if (!deleteButton) return;
-  const row = deleteButton.closest("[data-unit-id]");
+bindDeleteAction({
+  container: unitList,
+  buttonSelector: ".delete-unit",
+  rowSelector: "[data-unit-id]",
+  onDelete: async (row) => {
   const name = row.querySelector(".unit-name")?.value || "this unit";
   if (!window.confirm(`Delete ${name}?`)) return;
-  deleteButton.disabled = true;
-  page.api(`/api/setup/units-of-measure/${row.dataset.unitId}`, {
+  await page.api(`/api/setup/units-of-measure/${row.dataset.unitId}`, {
     method: "DELETE"
-  })
-    .then(loadUnits)
-    .then(() => setUnitMessage("Unit deleted."))
-    .catch((error) => setUnitMessage(error.message, true))
-    .finally(() => { deleteButton.disabled = false; });
+  });
+  await loadUnits();
+  setUnitMessage("Unit deleted.");
+  },
+  onError: (error) => setUnitMessage(error.message, true)
 });
 
-unitList.addEventListener("input", (event) => {
-  const row = event.target.closest("[data-unit-id]");
-  if (!row) return;
-  row.classList.toggle("dirty", isUnitDirty(row));
-});
-
-unitList.addEventListener("change", (event) => {
-  const row = event.target.closest("[data-unit-id]");
-  if (!row) return;
-  row.classList.toggle("dirty", isUnitDirty(row));
-});
-
-unitList.addEventListener("focusout", (event) => {
-  const row = event.target.closest("[data-unit-id]");
-  if (!row) return;
-  const next = event.relatedTarget;
-  if (next && row.contains(next)) return;
-  saveUnitRow(row).catch((error) => setUnitMessage(error.message, true));
+bindAutosaveRows({
+  container: unitList,
+  rowSelector: "[data-unit-id]",
+  isDirty: isUnitDirty,
+  saveRow: saveUnitRow,
+  onError: (error) => setUnitMessage(error.message, true)
 });
 
 page.ready(loadUnits);

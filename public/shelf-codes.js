@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { bindAutosaveRows, createStatusPresenter } from "/admin-crud-helpers.js";
 
 const page = authPage({
   permission: "canAddInventoryItems",
@@ -21,15 +22,9 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
-function setLocationMessage(text, isError = false) {
-  locationMessage.textContent = text;
-  locationMessage.classList.toggle("error", isError);
-}
+const setLocationMessage = createStatusPresenter(locationMessage);
 
-function setShelfMessage(text, isError = false) {
-  shelfMessage.textContent = text;
-  shelfMessage.classList.toggle("error", isError);
-}
+const setShelfMessage = createStatusPresenter(shelfMessage);
 
 function locationOptions(selected = "") {
   return storageLocations
@@ -178,24 +173,12 @@ locationForm.addEventListener("submit", async (event) => {
   }
 });
 
-locationList.addEventListener("input", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isLocationDirty(row));
-});
-
-locationList.addEventListener("change", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isLocationDirty(row));
-});
-
-locationList.addEventListener("focusout", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  const next = event.relatedTarget;
-  if (next && row.contains(next)) return;
-  saveLocationRow(row).catch((error) => setLocationMessage(error.message, true));
+bindAutosaveRows({
+  container: locationList,
+  rowSelector: ".setup-admin-row",
+  isDirty: isLocationDirty,
+  saveRow: saveLocationRow,
+  onError: (error) => setLocationMessage(error.message, true)
 });
 
 shelfForm.addEventListener("submit", async (event) => {
@@ -220,24 +203,12 @@ shelfForm.addEventListener("submit", async (event) => {
   }
 });
 
-shelfList.addEventListener("input", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isShelfDirty(row));
-});
-
-shelfList.addEventListener("change", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isShelfDirty(row));
-});
-
-shelfList.addEventListener("focusout", (event) => {
-  const row = event.target.closest(".setup-admin-row");
-  if (!row) return;
-  const next = event.relatedTarget;
-  if (next && row.contains(next)) return;
-  saveShelfRow(row).catch((error) => setShelfMessage(error.message, true));
+bindAutosaveRows({
+  container: shelfList,
+  rowSelector: ".setup-admin-row",
+  isDirty: isShelfDirty,
+  saveRow: saveShelfRow,
+  onError: (error) => setShelfMessage(error.message, true)
 });
 
 page.ready(loadEverything);

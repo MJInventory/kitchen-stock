@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { bindAutosaveRows, bindDeleteAction, createStatusPresenter } from "/admin-crud-helpers.js";
 
 const page = authPage({
   permission: "canAddInventoryItems",
@@ -14,10 +15,7 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
 }
 
-function setCategoryMessage(text, isError = false) {
-  categoryMessage.textContent = text;
-  categoryMessage.classList.toggle("error", isError);
-}
+const setCategoryMessage = createStatusPresenter(categoryMessage);
 
 function renderCategories(categories) {
   categoryRecords = categories || [];
@@ -90,34 +88,28 @@ categoryForm.addEventListener("submit", async (event) => {
   }
 });
 
-categoryList.addEventListener("click", (event) => {
-  const deleteButton = event.target.closest(".delete-category");
-  if (!deleteButton) return;
-  const row = deleteButton.closest(".category-row");
+bindDeleteAction({
+  container: categoryList,
+  buttonSelector: ".delete-category",
+  rowSelector: ".category-row",
+  onDelete: async (row) => {
   const name = row.querySelector(".category-name").value || "this category";
   if (!window.confirm(`Delete ${name}?`)) return;
-  deleteButton.disabled = true;
-  page.api(`/api/setup/categories/${row.dataset.categoryId}`, {
+  await page.api(`/api/setup/categories/${row.dataset.categoryId}`, {
     method: "DELETE"
-  })
-    .then(loadCategories)
-    .then(() => setCategoryMessage("Category deleted."))
-    .catch((error) => setCategoryMessage(error.message, true))
-    .finally(() => { deleteButton.disabled = false; });
+  });
+  await loadCategories();
+  setCategoryMessage("Category deleted.");
+  },
+  onError: (error) => setCategoryMessage(error.message, true)
 });
 
-categoryList.addEventListener("input", (event) => {
-  const row = event.target.closest(".category-row");
-  if (!row) return;
-  row.classList.toggle("dirty", isCategoryDirty(row));
-});
-
-categoryList.addEventListener("focusout", (event) => {
-  const row = event.target.closest(".category-row");
-  if (!row) return;
-  const next = event.relatedTarget;
-  if (next && row.contains(next)) return;
-  saveCategoryRow(row).catch((error) => setCategoryMessage(error.message, true));
+bindAutosaveRows({
+  container: categoryList,
+  rowSelector: ".category-row",
+  isDirty: isCategoryDirty,
+  saveRow: saveCategoryRow,
+  onError: (error) => setCategoryMessage(error.message, true)
 });
 
 page.ready(loadCategories);

@@ -62,6 +62,22 @@ test("session helpers read, merge-write, and clear kitchen session state", () =>
   assert.equal(storage.getItem("kitchenStockSettings"), null);
 });
 
+test("session helpers ignore broken saved json instead of crashing", () => {
+  const storage = createStorage({
+    kitchenStockPermissions: "{bad json",
+    kitchenStockSettings: "[broken"
+  });
+
+  assert.deepEqual(readKitchenSession(storage), {
+    token: "",
+    user: "",
+    role: "user",
+    permissions: {},
+    settings: {},
+    theme: ""
+  });
+});
+
 test("json api client triggers unauthorized and password-change hooks", async () => {
   const events = [];
   const api = createJsonApiClient({
@@ -79,6 +95,27 @@ test("json api client triggers unauthorized and password-change hooks", async ()
 
   await assert.rejects(() => api("/api/me"), /Change password/);
   assert.deepEqual(events, ["password-change"]);
+});
+
+test("json api client times out stalled requests", async () => {
+  const api = createJsonApiClient({
+    getToken: () => "token-2",
+    requestTimeoutMs: 10,
+    windowObject: {
+      location: { href: "" },
+      setTimeout,
+      clearTimeout
+    },
+    fetchImpl: async (_path, options) => new Promise((_resolve, reject) => {
+      options.signal?.addEventListener("abort", () => {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    })
+  });
+
+  await assert.rejects(() => api("/api/bootstrap"), /Request timed out after 10ms\./);
 });
 
 test("requestKitchenLogin returns parsed login payload", async () => {

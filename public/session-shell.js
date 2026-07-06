@@ -1,3 +1,12 @@
+function safeJsonParse(value, fallback) {
+  if (value == null || value === "") return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 export function clearKitchenSession(storage = window.localStorage) {
   storage.removeItem("kitchenStockToken");
   storage.removeItem("kitchenStockUser");
@@ -11,8 +20,8 @@ export function readKitchenSession(storage = window.localStorage) {
     token: storage.getItem("kitchenStockToken") || "",
     user: storage.getItem("kitchenStockUser") || "",
     role: storage.getItem("kitchenStockRole") || "user",
-    permissions: JSON.parse(storage.getItem("kitchenStockPermissions") || "{}"),
-    settings: JSON.parse(storage.getItem("kitchenStockSettings") || "{}"),
+    permissions: safeJsonParse(storage.getItem("kitchenStockPermissions"), {}),
+    settings: safeJsonParse(storage.getItem("kitchenStockSettings"), {}),
     theme: storage.getItem("kitchenStockTheme") || ""
   };
 }

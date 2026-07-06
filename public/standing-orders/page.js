@@ -106,6 +106,11 @@ export function initStandingOrdersPage() {
     document.querySelector("#expectedDate").value = todayLocal();
     renderSearchResults({ container: itemResults, query: "", items });
     renderSelectedItems({ selectedItems, standingItems, itemById });
+    await page.api("/api/standing-orders/sync", {
+      method: "POST",
+      body: JSON.stringify({ date: todayLocal() }),
+      timeoutMs: 10000
+    });
     await loadStandingOrders();
     await loadStandingOrderRuns();
     setMessage("");

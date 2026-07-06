@@ -1,5 +1,7 @@
 (function () {
-  const APP_VERSION = document.querySelector('meta[name="app-version"]')?.getAttribute("content") || "dev";
+  const APP_BUILD = document.querySelector('meta[name="app-build"]')?.getAttribute("content")
+    || document.querySelector('meta[name="app-version"]')?.getAttribute("content")
+    || "dev";
 
   function applyTheme() {
     const normalized = "light";
@@ -13,7 +15,7 @@
 
   function registerUpdater() {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`, { updateViaCache: "none" }).then((registration) => {
+    navigator.serviceWorker.register(`/sw.js?v=${APP_BUILD}`, { updateViaCache: "none" }).then((registration) => {
       registration.update().catch(() => {});
       if (registration.waiting) {
         registration.waiting.postMessage({ type: "SKIP_WAITING" });

@@ -79,6 +79,7 @@ export function initDashboardPage() {
   let sessionUser = initialSession.user;
   let sessionRole = initialSession.role;
   let sessionPermissions = initialSession.permissions;
+  let standingOrdersLoaded = false;
   function requestArea(request) {
     return resolveRequestArea(request, allItems);
   }
@@ -201,18 +202,32 @@ export function initDashboardPage() {
     });
   }
 
+  async function refreshStandingOrders() {
+    try {
+      const data = await api("/api/bootstrap-standing-orders", { timeoutMs: 8000 });
+      standingOrders = data.standingOrders || [];
+      standingOrdersLoaded = true;
+      renderAll();
+    } catch {
+      if (!standingOrdersLoaded) {
+        standingOrderCount.textContent = "loading";
+        standingOrderList.innerHTML = '<p class="empty-sheet">Standing orders are taking longer to load.</p>';
+      }
+    }
+  }
+
   async function refresh() {
     setMessage("Loading today's orders...");
-    const data = await api("/api/bootstrap");
+    const data = await api("/api/bootstrap?includeStandingOrders=false");
     allItems = data.items || [];
     recentRequests = data.requests || [];
-    standingOrders = data.standingOrders || [];
     notifications = data.notifications || [];
     summary = data.summary || null;
     populateDailyAreaFilter({ dailyAreaFilter, recentRequests, requestArea });
     populateDailyUserFilter({ dailyUserFilter, recentRequests, sessionUser, sessionPermissions });
     renderAll();
     setMessage("");
+    void refreshStandingOrders();
   }
 
   async function markNotificationsRead(ids = []) {

@@ -34,6 +34,7 @@ export function initDriverSheetPage() {
   let sessionUser = initialSession.user;
   let sessionPermissions = initialSession.permissions;
   let currentSheet = { date: "", requests: [], suppliers: [], units: [] };
+  let unitOptionsLoaded = false;
 
   function setMessage(text, isError = false) {
     sheetMessage.textContent = text;
@@ -187,14 +188,25 @@ export function initDriverSheetPage() {
     });
   }
 
+  async function refreshUnitOptions() {
+    if (unitOptionsLoaded) return;
+    try {
+      const formOptions = await api("/api/item-form-options", { timeoutMs: 5000 });
+      const units = Array.isArray(formOptions?.units) ? formOptions.units : [];
+      if (!units.length) return;
+      unitOptionsLoaded = true;
+      renderCurrentSheet({ ...currentSheet, units });
+    } catch {
+      // Keep the sheet usable with default unit fallbacks when setup options are slow.
+    }
+  }
+
   async function loadSheet() {
     setMessage("Loading...");
-    const [data, formOptions] = await Promise.all([
-      api(`/api/driver-sheet?date=${encodeURIComponent(sheetDate.value)}`),
-      api("/api/item-form-options")
-    ]);
-    renderCurrentSheet({ ...data, units: formOptions.units || [] });
+    const data = await api(`/api/driver-sheet?date=${encodeURIComponent(sheetDate.value)}`);
+    renderCurrentSheet({ ...data, units: currentSheet.units || [] });
     setMessage("");
+    void refreshUnitOptions();
   }
 
   const driverSheetActions = createDriverSheetActions({

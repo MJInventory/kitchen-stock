@@ -110,7 +110,7 @@ export function renderItems({
         </label>
         <label>
           Unit price
-          <input class="price-input" type="number" min="0" step="0.01" value="${item.unitPrice === null || item.unitPrice === undefined ? "" : escapeHtml(item.unitPrice)}" placeholder="Optional">
+          <input class="price-input compact-price-input" type="number" min="0" step="0.01" value="${item.unitPrice === null || item.unitPrice === undefined ? "" : escapeHtml(item.unitPrice)}">
         </label>
         <label>
           Unit

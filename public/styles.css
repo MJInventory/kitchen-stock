@@ -1470,6 +1470,11 @@ button:hover,
   line-height: 1.2;
 }
 
+.compact-price-input {
+  width: 88px;
+  min-width: 88px;
+}
+
 .sheet-group h2 {
   margin: 0 0 8px;
   font-size: 18px;

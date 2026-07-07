@@ -1473,6 +1473,7 @@ button:hover,
 .compact-price-input {
   width: 88px;
   min-width: 88px;
+  text-align: right;
 }
 
 .sheet-group h2 {

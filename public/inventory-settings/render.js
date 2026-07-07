@@ -46,10 +46,15 @@ export function renderItems({
     .sort(compareItems);
 
   const priceChipLabel = (value) => {
-    if (value === null || value === undefined || value === "") return "No price";
+    if (value === null || value === undefined || value === "") return "Price 0.00";
     const amount = Number(value);
-    if (!Number.isFinite(amount)) return "No price";
+    if (!Number.isFinite(amount)) return "Price 0.00";
     return `Price ${amount.toFixed(2)}`;
+  };
+
+  const priceInputValue = (value) => {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
   };
 
   itemSettingsList.innerHTML = filtered
@@ -110,7 +115,7 @@ export function renderItems({
         </label>
         <label>
           Unit price
-          <input class="price-input compact-price-input" type="number" min="0" step="0.01" value="${item.unitPrice === null || item.unitPrice === undefined ? "" : escapeHtml(item.unitPrice)}">
+          <input class="price-input compact-price-input" type="number" min="0" step="0.01" value="${escapeHtml(priceInputValue(item.unitPrice))}">
         </label>
         <label>
           Unit

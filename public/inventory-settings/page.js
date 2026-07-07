@@ -47,6 +47,11 @@ export function initInventorySettingsPage() {
     units: []
   };
 
+  function formatPriceValue(value) {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+  }
+
   function setLoginMessage(text, isError = false) {
     loginMessage.textContent = text;
     loginMessage.classList.toggle("error", isError);
@@ -113,7 +118,7 @@ export function initInventorySettingsPage() {
       shelfCode: item.shelfCode || "",
       supplierId: item.supplierId || "",
       minimumThreshold: String(item.minimum ?? 0),
-      unitPrice: item.unitPrice === null || item.unitPrice === undefined ? "" : String(item.unitPrice),
+      unitPrice: formatPriceValue(item.unitPrice),
       unit: item.unit || ""
     };
   }

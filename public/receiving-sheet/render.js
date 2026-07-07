@@ -31,6 +31,11 @@ function buildReceivingDisplayRows(requests = []) {
     }));
 }
 
+function priceInputValue(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+}
+
 export function renderReceivingSheet({
   data,
   sessionUser,
@@ -104,7 +109,7 @@ export function renderReceivingSheet({
                     <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" aria-label="Received quantity for ${escapeHtml(row.itemName)}">
                   </td>
                   <td>
-                    <input class="receive-price-input compact-price-input" type="number" min="0" step="0.01" value="${row.unitPrice === null || row.unitPrice === undefined ? "" : escapeHtml(row.unitPrice)}" aria-label="Received price for ${escapeHtml(row.itemName)}">
+                    <input class="receive-price-input compact-price-input" type="number" min="0" step="0.01" value="${escapeHtml(priceInputValue(row.unitPrice))}" aria-label="Received price for ${escapeHtml(row.itemName)}">
                   </td>
                   <td>${escapeHtml(row.unit || "")}</td>
                   <td>${escapeHtml(row.shelfCode || "")}</td>

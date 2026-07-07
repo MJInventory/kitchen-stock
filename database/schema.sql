@@ -185,7 +185,7 @@ create table if not exists inventory_items (
   unit_of_measure_id uuid references units_of_measure(id) on delete set null,
   current_quantity numeric(12,2) not null default 0,
   minimum_threshold numeric(12,2) not null default 0,
-  unit_price numeric(12,2),
+  unit_price numeric(12,2) not null default 0,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -114,7 +114,7 @@ export function renderItems({
           <input class="minimum-input" type="number" min="0" step="1" value="${item.minimum ?? 0}">
         </label>
         <label>
-          Unit price
+          Price per unit
           <input class="price-input compact-price-input" type="number" min="0" step="0.01" value="${escapeHtml(priceInputValue(item.unitPrice))}">
         </label>
         <label>

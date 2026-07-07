@@ -84,7 +84,7 @@ export function renderReceivingSheet({
               <th>Item</th>
               <th>Open</th>
               <th>Receive qty</th>
-              <th>Price</th>
+              <th>Price / unit</th>
               <th>Unit</th>
               <th>Shelf</th>
               <th>Area / Location</th>

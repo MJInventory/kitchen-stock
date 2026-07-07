@@ -11,6 +11,12 @@ import {
   reportRowsForFilter
 } from "./helpers.js";
 
+function formatCurrency(value) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return "0.00";
+  return amount.toFixed(2);
+}
+
 function standingStatusLabel(order) {
   const explicit = String(order?.statusLabel || "").trim();
   if (explicit) return explicit;
@@ -78,7 +84,8 @@ export function renderSummary({ reportSummary, summary, activeReportFilter }) {
     ["Picked / ordered", summary.orderedLines || 0, "picked"],
     ["2Deliver", summary.toDeliverLines || 0, "deliver"],
     ["Delivered", summary.deliveredLines || 0, "delivered"],
-    ["Waiting", summary.waitingLines || 0, "waiting"]
+    ["Waiting", summary.waitingLines || 0, "waiting"],
+    ["Received value", formatCurrency(summary.deliveredValue || 0), ""]
   ];
 
   reportSummary.innerHTML = cards

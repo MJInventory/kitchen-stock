@@ -22,6 +22,7 @@ function buildReceivingDisplayRows(requests = []) {
       openQuantity: Number(request.quantity || 0),
       receiveQuantity: Number(request.quantity || 0),
       unit: request.unit || "",
+      unitPrice: request.unitPrice,
       shelfCode: request.shelfCode || "",
       inventoryArea: request.inventoryArea || "",
       storageLocation: request.storageLocation || "",
@@ -78,6 +79,7 @@ export function renderReceivingSheet({
               <th>Item</th>
               <th>Open</th>
               <th>Receive qty</th>
+              <th>Price</th>
               <th>Unit</th>
               <th>Shelf</th>
               <th>Area / Location</th>
@@ -100,6 +102,9 @@ export function renderReceivingSheet({
                   <td>${escapeHtml(row.openQuantity)}</td>
                   <td>
                     <input class="receive-qty-input" type="number" min="0.01" step="0.01" value="${escapeHtml(row.receiveQuantity)}" aria-label="Received quantity for ${escapeHtml(row.itemName)}">
+                  </td>
+                  <td>
+                    <input class="receive-price-input" type="number" min="0" step="0.01" value="${row.unitPrice === null || row.unitPrice === undefined ? "" : escapeHtml(row.unitPrice)}" placeholder="Optional" aria-label="Received price for ${escapeHtml(row.itemName)}">
                   </td>
                   <td>${escapeHtml(row.unit || "")}</td>
                   <td>${escapeHtml(row.shelfCode || "")}</td>

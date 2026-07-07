@@ -45,6 +45,13 @@ export function renderItems({
     })
     .sort(compareItems);
 
+  const priceChipLabel = (value) => {
+    if (value === null || value === undefined || value === "") return "No price";
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return "No price";
+    return `Price ${amount.toFixed(2)}`;
+  };
+
   itemSettingsList.innerHTML = filtered
     .map((item) => `
       <article class="settings-item${dirtyIds.has(item.id) ? " dirty" : ""}" data-item-id="${item.id}">
@@ -59,6 +66,7 @@ export function renderItems({
             <span class="settings-item-meta-chip">${escapeHtml(item.category || "No category")}</span>
             <span class="settings-item-meta-chip">${escapeHtml(item.shelfCode ? `Shelf ${item.shelfCode}` : "No shelf")}</span>
             <span class="settings-item-meta-chip">Current ${escapeHtml(item.quantity ?? "")} ${escapeHtml(item.unit || "")}</span>
+            <span class="settings-item-meta-chip">${escapeHtml(priceChipLabel(item.unitPrice))}</span>
           </div>
         </div>
         <label>
@@ -99,6 +107,10 @@ export function renderItems({
         <label>
           Minimum stock
           <input class="minimum-input" type="number" min="0" step="1" value="${item.minimum ?? 0}">
+        </label>
+        <label>
+          Unit price
+          <input class="price-input" type="number" min="0" step="0.01" value="${item.unitPrice === null || item.unitPrice === undefined ? "" : escapeHtml(item.unitPrice)}" placeholder="Optional">
         </label>
         <label>
           Unit

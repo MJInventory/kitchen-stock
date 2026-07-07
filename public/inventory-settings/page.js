@@ -99,6 +99,7 @@ export function initInventorySettingsPage() {
       shelfCode: article.querySelector(".shelf-select")?.value || "",
       supplierId: article.querySelector(".supplier-select")?.value || "",
       minimumThreshold: String(article.querySelector(".minimum-input")?.value || "0"),
+      unitPrice: article.querySelector(".price-input")?.value ?? "",
       unit: article.querySelector(".unit-select")?.value || ""
     };
   }
@@ -112,6 +113,7 @@ export function initInventorySettingsPage() {
       shelfCode: item.shelfCode || "",
       supplierId: item.supplierId || "",
       minimumThreshold: String(item.minimum ?? 0),
+      unitPrice: item.unitPrice === null || item.unitPrice === undefined ? "" : String(item.unitPrice),
       unit: item.unit || ""
     };
   }
@@ -182,6 +184,7 @@ export function initInventorySettingsPage() {
       body: JSON.stringify({
         name: payload.name,
         minimumThreshold: payload.minimumThreshold,
+        unitPrice: payload.unitPrice,
         unit: payload.unit,
         inventoryArea: payload.inventoryArea,
         storageLocation: payload.storageLocation,

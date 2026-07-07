@@ -185,6 +185,7 @@ create table if not exists inventory_items (
   unit_of_measure_id uuid references units_of_measure(id) on delete set null,
   current_quantity numeric(12,2) not null default 0,
   minimum_threshold numeric(12,2) not null default 0,
+  unit_price numeric(12,2),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -557,6 +558,7 @@ select
   ia.name as inventory_area,
   sc.code as shelf_code,
   coalesce(nullif(r.order_unit, ''), u.name, 'item') as unit,
+  i.unit_price,
   sp.id as primary_supplier_id,
   sp.name as supplier_name,
   sp.contact_information as supplier_contact
@@ -667,7 +669,8 @@ select
   r.storage_location,
   r.inventory_area,
   r.shelf_code,
-  r.unit
+  r.unit,
+  r.unit_price
 from order_request_supply_vw r
 left join driver_sheet_lines d on d.order_request_id = r.id
 left join suppliers ds on ds.id = d.supplier_id;
@@ -692,7 +695,12 @@ select
   count(*) filter (
     where coalesce(is_standing_order, false) = false
       and coalesce(to_deliver, false) = true
-  )::integer as to_deliver_lines
+  )::integer as to_deliver_lines,
+  coalesce(sum(quantity * unit_price) filter (
+    where coalesce(is_standing_order, false) = false
+      and (coalesce(received, false) = true or coalesce(delivered, false) = true)
+      and unit_price is not null
+  ), 0)::numeric(12,2) as delivered_value
 from driver_sheet_request_vw
 where sheet_date is not null
 group by sheet_date;

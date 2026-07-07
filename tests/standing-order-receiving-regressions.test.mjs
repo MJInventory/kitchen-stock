@@ -145,6 +145,23 @@ test("mutation api routes standing-order run line undo-delivery to the dedicated
   assert.equal(getSent()?.status, 200);
 });
 
+test("mutation api forwards optional received price when delivering a request", async () => {
+  const payload = { quantityReceived: 3, unitPrice: 18.75 };
+  const { handler, calls, getSent } = createMutationApiHarness({ payload });
+  const handled = await handler(
+    { method: "POST", url: "/api/requests/44444444-4444-4444-4444-444444444444/deliver" },
+    {}
+  );
+  assert.equal(handled, true);
+  assert.deepEqual(calls, [[
+    "deliverRequest",
+    "44444444-4444-4444-4444-444444444444",
+    "Enno",
+    { quantityReceived: 3, unitPrice: 18.75 }
+  ]]);
+  assert.equal(getSent()?.status, 200);
+});
+
 test("mutation api routes standing-order run line quantity edits through updateStandingOrderRunLine", async () => {
   const payload = { quantity: 5 };
   const { handler, calls, getSent } = createMutationApiHarness({ payload });

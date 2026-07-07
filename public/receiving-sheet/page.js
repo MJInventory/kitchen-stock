@@ -87,9 +87,16 @@ export function initReceivingSheetPage() {
       return;
     }
     const quantityInput = row.querySelector(".receive-qty-input");
+    const priceInput = row.querySelector(".receive-price-input");
     const receiveQty = Number(quantityInput?.value || 0);
+    const receivedUnitPriceRaw = priceInput?.value ?? "";
+    const receivedUnitPrice = receivedUnitPriceRaw === "" ? null : Number(receivedUnitPriceRaw);
     if (!Number.isFinite(receiveQty) || receiveQty <= 0) {
       setMessage("Receive quantity must be greater than zero.", true);
+      return;
+    }
+    if (receivedUnitPrice !== null && (!Number.isFinite(receivedUnitPrice) || receivedUnitPrice < 0)) {
+      setMessage("Received price must be zero or greater.", true);
       return;
     }
     button.disabled = true;
@@ -102,7 +109,8 @@ export function initReceivingSheetPage() {
         body: JSON.stringify({
           quantityReceived: receiveQty,
           receivedQuantity: receiveQty,
-          receiveQuantity: receiveQty
+          receiveQuantity: receiveQty,
+          unitPrice: receivedUnitPrice
         })
       });
       await loadSheet();

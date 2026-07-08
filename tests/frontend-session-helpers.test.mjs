@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   clearKitchenSession,
+  isMobileOrTabletBrowser,
   readKitchenSession,
+  startKitchenInactivityMonitor,
+  stopKitchenInactivityMonitor,
   writeKitchenSession
 } from "../public/session-shell.js";
 import { createJsonApiClient } from "../public/api-client.js";
@@ -76,6 +79,85 @@ test("session helpers ignore broken saved json instead of crashing", () => {
     settings: {},
     theme: ""
   });
+});
+
+test("desktop inactivity monitor logs out after 15 minutes of no activity", () => {
+  const storage = createStorage({
+    kitchenStockToken: "token-1",
+    kitchenStockUser: "Enno"
+  });
+  const listeners = new Map();
+  let now = 1000;
+  let timerId = 0;
+  const timers = new Map();
+  let reloads = 0;
+  const windowObject = {
+    navigator: { userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", maxTouchPoints: 0 },
+    location: { reload() { reloads += 1; } },
+    matchMedia: () => ({ matches: false }),
+    addEventListener(type, callback) {
+      listeners.set(type, callback);
+    },
+    removeEventListener(type) {
+      listeners.delete(type);
+    },
+    setTimeout(callback, delay) {
+      timerId += 1;
+      timers.set(timerId, { callback, delay });
+      return timerId;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    }
+  };
+  const realNow = Date.now;
+  Date.now = () => now;
+
+  try {
+    startKitchenInactivityMonitor({
+      windowObject,
+      navigatorObject: windowObject.navigator,
+      storage
+    });
+    assert.equal(storage.getItem("kitchenStockLastActivityAt"), "1000");
+    assert.equal(timers.size, 1);
+
+    now += 15 * 60 * 1000 + 1;
+    const timeout = [...timers.values()][0];
+    timeout.callback();
+
+    assert.equal(reloads, 1);
+    assert.equal(storage.getItem("kitchenStockToken"), null);
+    assert.equal(storage.getItem("kitchenStockLastActivityAt"), null);
+  } finally {
+    Date.now = realNow;
+    stopKitchenInactivityMonitor({ windowObject, storage });
+  }
+});
+
+test("desktop inactivity monitor stays off on phones and tablets", () => {
+  const storage = createStorage({});
+  let added = 0;
+  const windowObject = {
+    navigator: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", maxTouchPoints: 5 },
+    matchMedia: () => ({ matches: true }),
+    addEventListener() {
+      added += 1;
+    },
+    removeEventListener() {},
+    setTimeout,
+    clearTimeout,
+    location: { reload() {} }
+  };
+
+  assert.equal(isMobileOrTabletBrowser({ windowObject, navigatorObject: windowObject.navigator }), true);
+  const monitor = startKitchenInactivityMonitor({
+    windowObject,
+    navigatorObject: windowObject.navigator,
+    storage
+  });
+  assert.equal(monitor.enabled, false);
+  assert.equal(added, 0);
 });
 
 test("json api client triggers unauthorized and password-change hooks", async () => {

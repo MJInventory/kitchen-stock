@@ -7,12 +7,105 @@ function safeJsonParse(value, fallback) {
   }
 }
 
+const LAST_ACTIVITY_KEY = "kitchenStockLastActivityAt";
+const DESKTOP_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const DESKTOP_IDLE_EVENTS = ["mousedown", "mousemove", "keydown", "scroll", "focus"];
+
+export function isMobileOrTabletBrowser({
+  windowObject = window,
+  navigatorObject = window.navigator
+} = {}) {
+  const userAgent = String(
+    navigatorObject?.userAgent ||
+    navigatorObject?.vendor ||
+    windowObject?.opera ||
+    ""
+  ).toLowerCase();
+  if (navigatorObject?.userAgentData?.mobile) return true;
+  if (/(android|iphone|ipad|ipod|mobile|tablet|silk|kindle)/i.test(userAgent)) return true;
+  if ((navigatorObject?.maxTouchPoints || 0) > 1 && windowObject?.matchMedia?.("(pointer: coarse)")?.matches) return true;
+  return false;
+}
+
+function inactivityState(windowObject = window) {
+  if (!windowObject.__kitchenInactivityState) {
+    windowObject.__kitchenInactivityState = {
+      timer: null,
+      stop: null
+    };
+  }
+  return windowObject.__kitchenInactivityState;
+}
+
+export function stopKitchenInactivityMonitor({
+  windowObject = window,
+  storage = window.localStorage
+} = {}) {
+  const state = inactivityState(windowObject);
+  state.stop?.();
+  state.stop = null;
+  if (state.timer) {
+    windowObject.clearTimeout?.(state.timer);
+    state.timer = null;
+  }
+  storage.removeItem(LAST_ACTIVITY_KEY);
+}
+
+export function startKitchenInactivityMonitor({
+  timeoutMs = DESKTOP_IDLE_TIMEOUT_MS,
+  windowObject = window,
+  navigatorObject = window.navigator,
+  storage = window.localStorage,
+  onTimeout = () => {
+    clearKitchenSession(storage);
+    windowObject.location?.reload?.();
+  }
+} = {}) {
+  stopKitchenInactivityMonitor({ windowObject, storage });
+  if (isMobileOrTabletBrowser({ windowObject, navigatorObject })) {
+    return { enabled: false, stop: () => {} };
+  }
+
+  const state = inactivityState(windowObject);
+  const markActivity = () => {
+    storage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+    if (state.timer) {
+      windowObject.clearTimeout?.(state.timer);
+    }
+    state.timer = windowObject.setTimeout?.(() => {
+      const lastActivity = Number(storage.getItem(LAST_ACTIVITY_KEY) || 0);
+      if (lastActivity && Date.now() - lastActivity >= timeoutMs) {
+        onTimeout();
+      } else {
+        markActivity();
+      }
+    }, timeoutMs);
+  };
+
+  for (const eventName of DESKTOP_IDLE_EVENTS) {
+    windowObject.addEventListener?.(eventName, markActivity, { passive: true });
+  }
+
+  state.stop = () => {
+    for (const eventName of DESKTOP_IDLE_EVENTS) {
+      windowObject.removeEventListener?.(eventName, markActivity, { passive: true });
+    }
+  };
+
+  markActivity();
+  return {
+    enabled: true,
+    stop: () => stopKitchenInactivityMonitor({ windowObject, storage })
+  };
+}
+
 export function clearKitchenSession(storage = window.localStorage) {
   storage.removeItem("kitchenStockToken");
   storage.removeItem("kitchenStockUser");
   storage.removeItem("kitchenStockRole");
   storage.removeItem("kitchenStockPermissions");
   storage.removeItem("kitchenStockSettings");
+  storage.removeItem(LAST_ACTIVITY_KEY);
 }
 
 export function readKitchenSession(storage = window.localStorage) {
@@ -48,13 +141,15 @@ export function writeKitchenSession(session = {}, storage = window.localStorage)
 export function applyLoggedOutShell({
   loginScreen,
   currentUser,
-  storage = window.localStorage
+  storage = window.localStorage,
+  windowObject = window
 }) {
   if (loginScreen) loginScreen.hidden = false;
   if (currentUser) {
     currentUser.textContent = "";
     currentUser.hidden = true;
   }
+  stopKitchenInactivityMonitor({ windowObject, storage });
   clearKitchenSession(storage);
 }
 
@@ -64,7 +159,8 @@ export function applyAuthenticatedShell({
   sessionUser,
   formatUserDisplay,
   refreshMenus = true,
-  windowObject = window
+  windowObject = window,
+  storage = window.localStorage
 }) {
   if (loginScreen) loginScreen.hidden = true;
   if (currentUser) {
@@ -74,6 +170,7 @@ export function applyAuthenticatedShell({
   if (refreshMenus) {
     windowObject.refreshKitchenMenus?.();
   }
+  startKitchenInactivityMonitor({ windowObject, storage });
 }
 
 export function persistKitchenSession(data, {
@@ -112,6 +209,9 @@ if (typeof window !== "undefined") {
     writeKitchenSession,
     applyLoggedOutShell,
     applyAuthenticatedShell,
-    persistKitchenSession
+    persistKitchenSession,
+    isMobileOrTabletBrowser,
+    startKitchenInactivityMonitor,
+    stopKitchenInactivityMonitor
   };
 }

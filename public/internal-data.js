@@ -1,5 +1,6 @@
 import { authPage } from "/page-auth.js";
 import { bindAutosaveRows, bindDeleteAction, createStatusPresenter } from "/admin-crud-helpers.js";
+import { readKitchenSession } from "/session-shell.js";
 
 const page = authPage({
   permission: "canViewInternalData",
@@ -9,7 +10,10 @@ const page = authPage({
 const internalDataForm = document.querySelector("#internalDataForm");
 const internalDataList = document.querySelector("#internalDataList");
 const internalDataMessage = document.querySelector("#internalDataMessage");
+const setMessage = createStatusPresenter(internalDataMessage);
+
 let serviceRecords = [];
+const unlockedServices = new Map();
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -21,40 +25,73 @@ function normalizeUrl(value) {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
-const setMessage = createStatusPresenter(internalDataMessage);
+function serviceSummary(service) {
+  return {
+    id: service.id,
+    serviceName: String(service.serviceName || ""),
+    serviceUrl: normalizeUrl(service.serviceUrl || "")
+  };
+}
+
+function currentUserName() {
+  return String(readKitchenSession().user || "").trim();
+}
+
+function renderDetailSection(serviceId) {
+  const detail = unlockedServices.get(serviceId);
+  if (!detail) return "";
+  return `
+    <section class="internal-data-detail-panel">
+      <label>Name of service
+        <input class="service-name" type="text" value="${esc(detail.serviceName)}">
+      </label>
+      <label>URL of website
+        <input class="service-url" type="url" value="${esc(detail.serviceUrl)}">
+      </label>
+      <label>Username
+        <input class="service-username" type="text" value="${esc(detail.username || "")}">
+      </label>
+      <label>Password
+        <div class="password-toggle-row">
+          <input class="service-password" type="password" value="${esc(detail.password || "")}">
+          <button class="small-button toggle-password-visibility" type="button">Show</button>
+        </div>
+      </label>
+      <label class="check-label"><input class="service-two-factor-enabled" type="checkbox" ${detail.twoFactorEnabled ? "checked" : ""}> 2 step authenticate</label>
+      <label>2 step details
+        <input class="service-two-factor-details" type="text" value="${esc(detail.twoFactorDetails || "")}" ${detail.twoFactorEnabled ? "" : "disabled"}>
+      </label>
+      <label class="wide-field">Memo
+        <textarea class="service-memo" rows="3">${esc(detail.memo || "")}</textarea>
+      </label>
+      <div class="internal-data-actions">
+        <button class="danger-button delete-service" type="button">Delete</button>
+      </div>
+    </section>
+  `;
+}
 
 function renderServices(services) {
-  serviceRecords = services || [];
-  internalDataList.innerHTML = (services || [])
+  serviceRecords = (services || []).map(serviceSummary);
+  internalDataList.innerHTML = serviceRecords
     .sort((a, b) => String(a.serviceName || "").localeCompare(String(b.serviceName || ""), undefined, { numeric: true }))
     .map((service) => `
       <article class="setting-row internal-data-row" data-service-id="${esc(service.id)}">
-        <label>Name of service
-          <input class="service-name" type="text" value="${esc(service.serviceName)}">
-        </label>
-        <label>URL of website
-          <input class="service-url" type="url" value="${esc(service.serviceUrl)}">
-        </label>
-        <label>Username
-          <input class="service-username" type="text" value="${esc(service.username || "")}">
-        </label>
-        <label>Password
-          <div class="password-toggle-row">
-            <input class="service-password" type="password" value="${esc(service.password || "")}">
-            <button class="small-button toggle-password-visibility" type="button">Show</button>
+        <div class="internal-data-summary">
+          <div>
+            <div class="field-label">Name of service</div>
+            <div class="internal-data-summary-value">${esc(service.serviceName)}</div>
           </div>
-        </label>
-        <label class="check-label"><input class="service-two-factor-enabled" type="checkbox" ${service.twoFactorEnabled ? "checked" : ""}> 2 step authenticate</label>
-        <label>2 step details
-          <input class="service-two-factor-details" type="text" value="${esc(service.twoFactorDetails || "")}" ${service.twoFactorEnabled ? "" : "disabled"}>
-        </label>
-        <label class="wide-field">Memo
-          <textarea class="service-memo" rows="3">${esc(service.memo || "")}</textarea>
-        </label>
-        <div class="internal-data-actions">
-          <button class="secondary open-service-link" type="button">Open website</button>
-          <button class="danger-button delete-service" type="button">Delete</button>
+          <div>
+            <div class="field-label">URL of website</div>
+            <div class="internal-data-summary-value internal-data-url">${esc(service.serviceUrl)}</div>
+          </div>
+          <div class="internal-data-actions">
+            <button class="secondary open-service-link" type="button">Open website</button>
+            <button class="secondary service-detail-toggle" type="button">${unlockedServices.has(service.id) ? "Hide details" : "Details"}</button>
+          </div>
         </div>
+        ${renderDetailSection(service.id)}
       </article>
     `)
     .join("");
@@ -67,12 +104,17 @@ function renderServices(services) {
 async function loadServices() {
   setMessage("Loading internal data...");
   const data = await page.api("/api/internal-data-services");
+  for (const serviceId of [...unlockedServices.keys()]) {
+    if (!(data.services || []).some((entry) => entry.id === serviceId)) {
+      unlockedServices.delete(serviceId);
+    }
+  }
   renderServices(data.services || []);
   setMessage("");
 }
 
-function getServiceRecord(row) {
-  return serviceRecords.find((service) => service.id === row.dataset.serviceId);
+function getUnlockedService(row) {
+  return unlockedServices.get(row.dataset.serviceId);
 }
 
 function syncTwoFactorDetailsState(scope) {
@@ -83,7 +125,7 @@ function syncTwoFactorDetailsState(scope) {
 }
 
 function isServiceDirty(row) {
-  const record = getServiceRecord(row);
+  const record = getUnlockedService(row);
   if (!record) return false;
   return (row.querySelector(".service-name")?.value || "") !== String(record.serviceName || "")
     || normalizeUrl(row.querySelector(".service-url")?.value || "") !== String(record.serviceUrl || "")
@@ -95,12 +137,13 @@ function isServiceDirty(row) {
 }
 
 async function saveServiceRow(row) {
-  if (!row || row.dataset.saving === "true" || !isServiceDirty(row)) return;
+  const record = getUnlockedService(row);
+  if (!row || !record || row.dataset.saving === "true" || !isServiceDirty(row)) return;
   row.dataset.saving = "true";
   row.classList.add("dirty");
   setMessage("Saving internal data...");
   try {
-    await page.api(`/api/internal-data-services/${row.dataset.serviceId}`, {
+    const data = await page.api(`/api/internal-data-services/${row.dataset.serviceId}`, {
       method: "PATCH",
       body: JSON.stringify({
         serviceName: row.querySelector(".service-name").value,
@@ -112,11 +155,24 @@ async function saveServiceRow(row) {
         memo: row.querySelector(".service-memo").value
       })
     });
+    unlockedServices.set(row.dataset.serviceId, data.service || record);
     await loadServices();
     setMessage("Internal data saved.");
   } finally {
     row.dataset.saving = "false";
   }
+}
+
+async function unlockServiceDetails(row) {
+  const serviceId = row.dataset.serviceId;
+  const password = window.prompt(`Enter the password for ${currentUserName() || "your user"} to open these details.`);
+  if (password == null) return;
+  const data = await page.api(`/api/internal-data-services/${serviceId}/details`, {
+    method: "POST",
+    body: JSON.stringify({ password })
+  });
+  unlockedServices.set(serviceId, data.service);
+  renderServices(serviceRecords);
 }
 
 internalDataForm.addEventListener("submit", async (event) => {
@@ -136,6 +192,7 @@ internalDataForm.addEventListener("submit", async (event) => {
       })
     });
     internalDataForm.reset();
+    syncTwoFactorDetailsState(internalDataForm);
     await loadServices();
     setMessage("Service added.");
   } catch (error) {
@@ -152,10 +209,12 @@ bindDeleteAction({
   buttonSelector: ".delete-service",
   rowSelector: ".internal-data-row",
   onDelete: async (row) => {
-    const serviceName = row.querySelector(".service-name")?.value.trim() || "this service";
+    const record = getUnlockedService(row);
+    const serviceName = record?.serviceName || "this service";
     if (!window.confirm(`Delete service ${serviceName}?`)) return;
     if (!window.confirm("Really delete this internal data record? This cannot be undone.")) return;
     await page.api(`/api/internal-data-services/${row.dataset.serviceId}`, { method: "DELETE" });
+    unlockedServices.delete(row.dataset.serviceId);
     await loadServices();
     setMessage("Service deleted.");
   },
@@ -178,7 +237,7 @@ internalDataList.addEventListener("change", (event) => {
   }
 });
 
-internalDataList.addEventListener("click", (event) => {
+internalDataList.addEventListener("click", async (event) => {
   const toggleButton = event.target.closest(".toggle-password-visibility");
   if (toggleButton) {
     const row = toggleButton.closest(".internal-data-row");
@@ -193,9 +252,31 @@ internalDataList.addEventListener("click", (event) => {
   const openButton = event.target.closest(".open-service-link");
   if (openButton) {
     const row = openButton.closest(".internal-data-row");
-    const url = normalizeUrl(row?.querySelector(".service-url")?.value || "");
+    const summary = serviceRecords.find((entry) => entry.id === row?.dataset.serviceId);
+    const url = normalizeUrl(summary?.serviceUrl || "");
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  const detailButton = event.target.closest(".service-detail-toggle");
+  if (detailButton) {
+    const row = detailButton.closest(".internal-data-row");
+    if (!row) return;
+    const serviceId = row.dataset.serviceId;
+    if (unlockedServices.has(serviceId)) {
+      unlockedServices.delete(serviceId);
+      renderServices(serviceRecords);
+      setMessage("");
+      return;
+    }
+    try {
+      setMessage("Checking login details...");
+      await unlockServiceDetails(row);
+      setMessage("Details unlocked.");
+    } catch (error) {
+      setMessage(error.message, true);
+    }
   }
 });
 

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createUserHelpers } from "../lib/user-helpers.js";
 import { createInternalDataDomain } from "../lib/internal-data-domain.js";
 
-test("security-admin role gets internal-data permission without admin powers", () => {
+test("security-admin role gets admin rights plus internal-data access", () => {
   const helpers = createUserHelpers({
     userConfig: "",
     editableUserSources: new Set(["postgres"]),
@@ -20,12 +20,15 @@ test("security-admin role gets internal-data permission without admin powers", (
   const permissions = helpers.userPermissions(role, {});
   assert.equal(role, "security-admin");
   assert.equal(permissions.canViewInternalData, true);
-  assert.equal(permissions.canAdminUsers, false);
+  assert.equal(permissions.canAdminUsers, true);
+  assert.equal(permissions.canManageKitchenRoster, true);
+  assert.equal(permissions.canAddInventoryItems, true);
   assert.equal(permissions.canManageSecurityRole, false);
 });
 
-test("internal data domain stores encrypted password and returns decrypted password", async () => {
+test("internal data domain stores encrypted password, lists safe summaries, and audits changes", async () => {
   let storedRow = null;
+  const auditCalls = [];
   const db = () => ({
     async query(sql, params = []) {
       const text = String(sql);
@@ -57,7 +60,9 @@ test("internal data domain stores encrypted password and returns decrypted passw
     assertPostgresSchemaReady: () => {},
     db,
     isValidId: () => true,
-    authSecret: "top-secret"
+    authSecret: "top-secret",
+    auditChanged: (before, after) => JSON.stringify(before) !== JSON.stringify(after),
+    pgRecordAuditEntry: async (payload) => { auditCalls.push(payload); }
   });
 
   const saved = await domain.saveInternalDataService({
@@ -74,6 +79,11 @@ test("internal data domain stores encrypted password and returns decrypted passw
   assert.equal(saved.password, "super-secret");
 
   const listed = await domain.listInternalDataServices();
-  assert.equal(listed[0].password, "super-secret");
+  assert.equal(listed[0].password, undefined);
   assert.equal(listed[0].serviceUrl, "https://render.com");
+  assert.equal(auditCalls[0]?.reasonCode, "internal-data-create");
+  assert.equal(auditCalls[0]?.after?.password, "[hidden]");
+
+  const detail = await domain.getInternalDataServiceDetail(saved.id);
+  assert.equal(detail.password, "super-secret");
 });

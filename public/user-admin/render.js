@@ -34,7 +34,9 @@ export function renderUsers({
   users,
   filters,
   userList,
-  userCount
+  userCount,
+  canManageSecurityRole = false,
+  canManageAdminRoles = false
 }) {
   const filteredUsers = filterUsers(users, filters);
   updateUserCount(filteredUsers.length, users.length, userCount);
@@ -65,8 +67,9 @@ export function renderUsers({
                   <option value="user"${user.role === "user" ? " selected" : ""}>User</option>
                   <option value="staff"${user.role === "staff" ? " selected" : ""}>Staff</option>
                   <option value="power-user"${user.role === "power-user" ? " selected" : ""}>Power User</option>
-                  <option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>
-                  <option value="god"${user.role === "god" ? " selected" : ""}>God</option>
+                  ${canManageSecurityRole ? `<option value="security-admin"${user.role === "security-admin" ? " selected" : ""}>Security Admin</option>` : ""}
+                  ${canManageAdminRoles ? `<option value="admin"${user.role === "admin" ? " selected" : ""}>Admin</option>` : ""}
+                  ${canManageAdminRoles ? `<option value="god"${user.role === "god" ? " selected" : ""}>God</option>` : ""}
                 </select>
               </label>
               <input class="user-theme" type="hidden" value="light">

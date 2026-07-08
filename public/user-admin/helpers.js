@@ -31,6 +31,7 @@ export function escapeHtml(value) {
 export function roleLabel(role) {
   return role === "god" ? "God"
     : role === "admin" ? "Admin"
+    : role === "security-admin" ? "Security Admin"
     : role === "power-user" ? "Power User"
     : role === "staff" ? "Staff"
     : "User";

@@ -17,6 +17,7 @@
       { label: "Management Report", href: "/management-report.html", permission: "canAddInventoryItems" },
       { label: "Standing Orders", href: "/standing-orders.html", permission: "canAddInventoryItems" },
       { label: "Item Admin", href: "/inventory-settings.html", permission: "canAddInventoryItems" },
+      { label: "Internal Data", href: "/internal-data.html", permission: "canViewInternalData" },
       { label: "User Admin", href: "/user-admin.html", permission: "canAdminUsers" },
       { label: "Log Off", href: "__logout__" }
     ]

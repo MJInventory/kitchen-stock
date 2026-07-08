@@ -104,7 +104,9 @@ export function initUserAdminPage() {
         wantedStatus: statusFilter?.value || "all"
       },
       userList,
-      userCount
+      userCount,
+      canManageSecurityRole: Boolean(permissions.canManageSecurityRole),
+      canManageAdminRoles: Boolean(permissions.canManageAdminRoles)
     });
   }
 

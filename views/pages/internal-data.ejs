@@ -1,0 +1,16 @@
+<section class="panel">
+  <h2>Add Service</h2>
+  <form id="internalDataForm" class="admin-form-grid">
+    <label>Name of service <input id="serviceName" type="text" required></label>
+    <label>URL of website <input id="serviceUrl" type="url" required></label>
+    <label>Username <input id="serviceUsername" type="text"></label>
+    <label>Password <input id="servicePassword" type="password"></label>
+    <label class="check-label"><input id="serviceTwoFactorEnabled" type="checkbox"> 2 step authenticate enabled</label>
+    <label>2 step details <input id="serviceTwoFactorDetails" type="text" placeholder="App, phone, device, key"></label>
+    <label class="wide-field">Memo <textarea id="serviceMemo" rows="3"></textarea></label>
+    <button type="submit">Add Service</button>
+    <p id="internalDataMessage" role="status"></p>
+  </form>
+</section>
+
+<section id="internalDataList" class="settings-list"></section>

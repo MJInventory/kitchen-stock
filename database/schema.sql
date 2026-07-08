@@ -5,7 +5,7 @@ create table if not exists app_users (
   username text not null unique,
   display_name text not null,
   password_hash text not null,
-  role text not null check (role in ('god', 'admin', 'power-user', 'staff', 'user')),
+  role text not null check (role in ('god', 'admin', 'security-admin', 'power-user', 'staff', 'user')),
   theme text not null default 'dark' check (theme in ('dark', 'light')),
   active boolean not null default true,
   must_change_password boolean not null default false,
@@ -36,6 +36,21 @@ create table if not exists kitchen_shift_types (
   shift_group text not null default 'kitchen' check (shift_group in ('kitchen', 'foh', 'bar', 'other')),
   sort_order integer not null default 0,
   active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists internal_data_services (
+  id uuid primary key default gen_random_uuid(),
+  service_name text not null,
+  service_url text not null default '',
+  username text not null default '',
+  password_encrypted text not null default '',
+  two_factor_enabled boolean not null default false,
+  two_factor_details text not null default '',
+  memo text not null default '',
+  created_by_username text not null default '',
+  updated_by_username text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

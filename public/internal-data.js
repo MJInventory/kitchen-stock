@@ -10,6 +10,7 @@ const page = authPage({
 const internalDataForm = document.querySelector("#internalDataForm");
 const internalDataList = document.querySelector("#internalDataList");
 const internalDataMessage = document.querySelector("#internalDataMessage");
+const exportInternalDataButton = document.querySelector("#exportInternalDataButton");
 const setMessage = createStatusPresenter(internalDataMessage);
 
 let serviceRecords = [];
@@ -35,6 +36,57 @@ function serviceSummary(service) {
 
 function currentUserName() {
   return String(readKitchenSession().user || "").trim();
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
+function exportFileName() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `internal-data-${today}.csv`;
+}
+
+function downloadCsvFile(rows) {
+  const headers = [
+    "Name of service",
+    "URL of website",
+    "Username",
+    "Password",
+    "2 step authenticate",
+    "2 step details",
+    "Memo",
+    "Created by",
+    "Updated by",
+    "Created at",
+    "Updated at"
+  ];
+  const lines = [
+    headers.map(csvCell).join(","),
+    ...rows.map((service) => [
+      service.serviceName,
+      service.serviceUrl,
+      service.username,
+      service.password,
+      service.twoFactorEnabled ? "Yes" : "No",
+      service.twoFactorDetails,
+      service.memo,
+      service.createdBy,
+      service.updatedBy,
+      service.createdAt,
+      service.updatedAt
+    ].map(csvCell).join(","))
+  ];
+  const blob = new Blob([`\uFEFF${lines.join("\r\n")}`], { type: "text/csv;charset=utf-8;" });
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = exportFileName();
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(href);
 }
 
 function renderDetailSection(serviceId) {
@@ -175,6 +227,18 @@ async function unlockServiceDetails(row) {
   renderServices(serviceRecords);
 }
 
+async function exportInternalData() {
+  const password = window.prompt(`Enter the password for ${currentUserName() || "your user"} to export the full list.`);
+  if (password == null) return;
+  setMessage("Preparing Excel export...");
+  const data = await page.api("/api/internal-data-services/export", {
+    method: "POST",
+    body: JSON.stringify({ password })
+  });
+  downloadCsvFile(data.services || []);
+  setMessage("Export downloaded.");
+}
+
 internalDataForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setMessage("Adding service...");
@@ -202,6 +266,14 @@ internalDataForm.addEventListener("submit", async (event) => {
 
 document.querySelector("#serviceTwoFactorEnabled")?.addEventListener("change", () => {
   syncTwoFactorDetailsState(internalDataForm);
+});
+
+exportInternalDataButton?.addEventListener("click", async () => {
+  try {
+    await exportInternalData();
+  } catch (error) {
+    setMessage(error.message, true);
+  }
 });
 
 bindDeleteAction({

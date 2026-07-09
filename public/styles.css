@@ -724,6 +724,14 @@ button:hover,
   color: var(--ink-soft);
 }
 
+.panel-heading-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .internal-data-url {
   word-break: break-word;
   font-weight: 500;

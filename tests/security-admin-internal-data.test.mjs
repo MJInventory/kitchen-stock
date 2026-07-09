@@ -86,4 +86,8 @@ test("internal data domain stores encrypted password, lists safe summaries, and 
 
   const detail = await domain.getInternalDataServiceDetail(saved.id);
   assert.equal(detail.password, "super-secret");
+
+  const exportRows = await domain.listInternalDataServicesForExport();
+  assert.equal(exportRows[0].password, "super-secret");
+  assert.equal(exportRows[0].username, "enno");
 });

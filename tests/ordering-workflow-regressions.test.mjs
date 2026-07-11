@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { submitOrderingSelection } from "../public/ordering/controller-actions.js";
+import { applyOrderingBootstrapData, loadOrderingBootstrapCache } from "../public/ordering/bootstrap-cache.js";
 import { createMutationApi } from "../lib/mutation-api.js";
 import { createRequestDomain } from "../lib/request-domain.js";
 
@@ -186,6 +187,60 @@ test("submitOrderingSelection updates existing orders instead of creating duplic
   assert.equal(harness.messages.at(-1)?.text, "1 item(s) updated.");
   assert.equal(harness.refreshCalls.length, 1);
   assert.equal(result.recentRequests[0].id, "existing-request-1");
+});
+
+test("loadOrderingBootstrapCache rejects stale cache and invalid item rows", () => {
+  const values = new Map();
+  globalThis.localStorage = {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    }
+  };
+
+  values.set("ordering-cache", JSON.stringify({
+    items: [{ id: "", name: "Dessert Fork" }],
+    requests: [],
+    standingOrders: [],
+    notifications: [],
+    cachedAt: new Date().toISOString()
+  }));
+  assert.equal(loadOrderingBootstrapCache("ordering-cache"), null);
+  assert.equal(values.has("ordering-cache"), false);
+
+  values.set("ordering-cache", JSON.stringify({
+    items: [{ id: "item-1", name: "Dessert Fork" }],
+    requests: [],
+    standingOrders: [],
+    notifications: [],
+    cachedAt: "2020-01-01T00:00:00.000Z"
+  }));
+  assert.equal(loadOrderingBootstrapCache("ordering-cache"), null);
+  assert.equal(values.has("ordering-cache"), false);
+});
+
+test("applyOrderingBootstrapData filters invalid items before rendering", () => {
+  let applied = null;
+  applyOrderingBootstrapData({
+    items: [
+      { id: "item-1", name: "Dessert Fork" },
+      { id: "", name: "Dessert Knife" }
+    ],
+    requests: [
+      { id: "req-1", itemId: "item-1" },
+      { id: "", itemId: "item-2" }
+    ]
+  }, (next) => {
+    applied = next;
+  });
+
+  assert.deepEqual(applied.items, [{ id: "item-1", name: "Dessert Fork" }]);
+  assert.deepEqual(applied.requests, [{ id: "req-1", itemId: "item-1" }]);
 });
 
 function createMutationApiHarness(overrides = {}) {

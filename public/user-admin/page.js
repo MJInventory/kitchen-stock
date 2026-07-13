@@ -131,6 +131,7 @@ export function initUserAdminPage() {
           kitchen: row.querySelector(".user-notify-area-kitchen").checked,
           general: row.querySelector(".user-notify-area-general").checked
         },
+        desktopIdleTimeoutEnabled: row.querySelector(".user-desktop-idle-timeout")?.checked,
         active: row.querySelector(".user-active").checked,
         mustChangePassword: row.querySelector(".user-must-change").checked
       })
@@ -146,6 +147,7 @@ export function initUserAdminPage() {
   function isUserDirty(row) {
     const user = getUserRecord(row);
     if (!user) return false;
+    const desktopIdleTimeoutControl = row.querySelector(".user-desktop-idle-timeout");
     return (row.querySelector(".user-password")?.value || "") !== ""
       || (row.querySelector(".user-role")?.value || "") !== String(user.role || "")
       || Boolean(row.querySelector(".user-is-driver")?.checked) !== Boolean(user.isDriver)
@@ -158,6 +160,9 @@ export function initUserAdminPage() {
       || Boolean(row.querySelector(".user-notify-area-foh")?.checked) !== (user.notifyAreas?.foh !== false)
       || Boolean(row.querySelector(".user-notify-area-kitchen")?.checked) !== (user.notifyAreas?.kitchen !== false)
       || Boolean(row.querySelector(".user-notify-area-general")?.checked) !== (user.notifyAreas?.general !== false)
+      || (desktopIdleTimeoutControl
+        ? Boolean(desktopIdleTimeoutControl.checked) !== (user.settings?.desktopIdleTimeoutEnabled !== false)
+        : false)
       || Boolean(row.querySelector(".user-active")?.checked) !== Boolean(user.active)
       || Boolean(row.querySelector(".user-must-change")?.checked) !== Boolean(user.mustChangePassword);
   }
@@ -212,6 +217,7 @@ export function initUserAdminPage() {
             kitchen: document.querySelector("#newNotifyKitchen").checked,
             general: document.querySelector("#newNotifyGeneral").checked
           },
+          desktopIdleTimeoutEnabled: document.querySelector("#newDesktopIdleTimeoutEnabled")?.checked,
           active: true,
           mustChangePassword: document.querySelector("#newMustChange").checked
         })

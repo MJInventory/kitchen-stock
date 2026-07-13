@@ -80,6 +80,7 @@ export function renderUsers({
             <div class="user-admin-toggle-row">
               <label class="check-label"><input class="user-active" type="checkbox" ${user.active ? "checked" : ""} ${user.editable ? "" : "disabled"}> Active</label>
               <label class="check-label"><input class="user-must-change" type="checkbox" ${user.mustChangePassword ? "checked" : ""} ${user.editable ? "" : "disabled"}> Force password change</label>
+              ${canManageAdminRoles ? `<label class="check-label"><input class="user-desktop-idle-timeout" type="checkbox" ${user.settings?.desktopIdleTimeoutEnabled !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> Desktop inactivity timeout</label>` : ""}
             </div>
           </section>
 

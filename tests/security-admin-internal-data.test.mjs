@@ -26,6 +26,25 @@ test("security-admin role gets admin rights plus internal-data access", () => {
   assert.equal(permissions.canManageSecurityRole, false);
 });
 
+test("public user settings expose desktop inactivity timeout and default it to enabled", () => {
+  const helpers = createUserHelpers({
+    userConfig: "",
+    editableUserSources: new Set(["postgres"]),
+    gotoMenuOptions: [],
+    backofficeMenuOptions: [],
+    authSecret: "secret",
+    sessionMaxAgeMs: 1000,
+    clampOpenOrderDays: (value) => Number(value || 7),
+    normalizeHiddenMenuItems: () => []
+  });
+
+  const enabledByDefault = helpers.publicUser({ name: "Enno", role: "god" });
+  assert.equal(enabledByDefault.settings.desktopIdleTimeoutEnabled, true);
+
+  const disabled = helpers.publicUser({ name: "Freddy", role: "user", desktop_idle_timeout_enabled: false });
+  assert.equal(disabled.settings.desktopIdleTimeoutEnabled, false);
+});
+
 test("internal data domain stores encrypted password, lists safe summaries, and audits changes", async () => {
   let storedRow = null;
   const auditCalls = [];

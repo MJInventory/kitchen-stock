@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  applyAuthenticatedShell,
   clearKitchenSession,
   isMobileOrTabletBrowser,
   readKitchenSession,
@@ -158,6 +159,37 @@ test("desktop inactivity monitor stays off on phones and tablets", () => {
   });
   assert.equal(monitor.enabled, false);
   assert.equal(added, 0);
+});
+
+test("authenticated shell keeps desktop inactivity monitor off when the user setting disables it", () => {
+  const storage = createStorage({
+    kitchenStockSettings: JSON.stringify({ desktopIdleTimeoutEnabled: false })
+  });
+  let added = 0;
+  const windowObject = {
+    navigator: { userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", maxTouchPoints: 0 },
+    matchMedia: () => ({ matches: false }),
+    addEventListener() {
+      added += 1;
+    },
+    removeEventListener() {},
+    setTimeout,
+    clearTimeout,
+    location: { reload() {} }
+  };
+
+  applyAuthenticatedShell({
+    loginScreen: null,
+    currentUser: null,
+    sessionUser: "Enno",
+    formatUserDisplay: (value) => value,
+    refreshMenus: false,
+    windowObject,
+    storage
+  });
+
+  assert.equal(added, 0);
+  assert.equal(storage.getItem("kitchenStockLastActivityAt"), null);
 });
 
 test("json api client triggers unauthorized and password-change hooks", async () => {

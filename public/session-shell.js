@@ -170,6 +170,11 @@ export function applyAuthenticatedShell({
   if (refreshMenus) {
     windowObject.refreshKitchenMenus?.();
   }
+  const session = readKitchenSession(storage);
+  if (session.settings?.desktopIdleTimeoutEnabled === false) {
+    stopKitchenInactivityMonitor({ windowObject, storage });
+    return;
+  }
   startKitchenInactivityMonitor({ windowObject, storage });
 }
 

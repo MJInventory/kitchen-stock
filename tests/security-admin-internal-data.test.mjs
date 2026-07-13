@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 
 import { createUserHelpers } from "../lib/user-helpers.js";
 import { createInternalDataDomain } from "../lib/internal-data-domain.js";
+import { normalizeHiddenMenuItems } from "../lib/server-core-utils.js";
 
 test("security-admin role gets admin rights plus internal-data access", () => {
   const helpers = createUserHelpers({
     userConfig: "",
     editableUserSources: new Set(["postgres"]),
-    gotoMenuOptions: [],
-    backofficeMenuOptions: [],
+    gotoMenuOptions: ["/ordering.html"],
+    backofficeMenuOptions: ["/standing-orders.html"],
     authSecret: "secret",
     sessionMaxAgeMs: 1000,
     clampOpenOrderDays: (value) => Number(value || 7),
@@ -30,19 +31,29 @@ test("public user settings expose desktop inactivity timeout and default it to e
   const helpers = createUserHelpers({
     userConfig: "",
     editableUserSources: new Set(["postgres"]),
-    gotoMenuOptions: [],
-    backofficeMenuOptions: [],
+    gotoMenuOptions: ["/ordering.html"],
+    backofficeMenuOptions: ["/standing-orders.html"],
     authSecret: "secret",
     sessionMaxAgeMs: 1000,
     clampOpenOrderDays: (value) => Number(value || 7),
-    normalizeHiddenMenuItems: () => []
+    normalizeHiddenMenuItems
   });
 
   const enabledByDefault = helpers.publicUser({ name: "Enno", role: "god" });
   assert.equal(enabledByDefault.settings.desktopIdleTimeoutEnabled, true);
+  assert.deepEqual(enabledByDefault.settings.blockedGotoMenu, []);
+  assert.deepEqual(enabledByDefault.settings.blockedBackofficeMenu, []);
 
-  const disabled = helpers.publicUser({ name: "Freddy", role: "user", desktop_idle_timeout_enabled: false });
+  const disabled = helpers.publicUser({
+    name: "Freddy",
+    role: "user",
+    desktop_idle_timeout_enabled: false,
+    blocked_goto_menu: ["/ordering.html"],
+    blocked_backoffice_menu: ["/standing-orders.html"]
+  });
   assert.equal(disabled.settings.desktopIdleTimeoutEnabled, false);
+  assert.deepEqual(disabled.settings.blockedGotoMenu, ["/ordering.html"]);
+  assert.deepEqual(disabled.settings.blockedBackofficeMenu, ["/standing-orders.html"]);
 });
 
 test("internal data domain stores encrypted password, lists safe summaries, and audits changes", async () => {

@@ -25,12 +25,57 @@ export function initUserAdminPage() {
   const roleFilter = document.querySelector("#roleFilter");
   const statusFilter = document.querySelector("#statusFilter");
   const userCount = document.querySelector("#userCount");
+  const newGotoScreenAccess = document.querySelector("#newGotoScreenAccess");
+  const newBackofficeScreenAccess = document.querySelector("#newBackofficeScreenAccess");
 
   const initialSession = readKitchenSession();
   let sessionToken = initialSession.token;
   let sessionUser = initialSession.user;
   let permissions = initialSession.permissions;
   let allUsers = [];
+  const menuConfig = window.MJ_STOCK_MENU_ITEMS || {};
+  const gotoItems = menuConfig.gotoItems || [];
+  const backofficeItems = menuConfig.backofficeItems || [];
+
+  function checkedValues(selector, row) {
+    return [...row.querySelectorAll(selector)]
+      .filter((input) => input.checked && !input.disabled)
+      .map((input) => input.value);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+  }
+
+  function sortMenuItems(items) {
+    return [...items].sort((left, right) => String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" }));
+  }
+
+  function renderNewScreenAccessOptions(host, items, inputClass) {
+    if (!host) return;
+    host.innerHTML = sortMenuItems(items)
+      .filter((item) => item.href && item.href !== "__logout__")
+      .map((item) => `
+        <label class="check-label">
+          <input class="${inputClass}" type="checkbox" value="${escapeHtml(item.href)}" checked ${item.fixed ? "disabled" : ""}>
+          ${escapeHtml(item.label)}
+        </label>
+      `)
+      .join("");
+  }
+
+  function hiddenValues(items, visibleValues) {
+    const visible = new Set(visibleValues);
+    return items
+      .filter((item) => item.href && item.href !== "__logout__")
+      .filter((item) => !item.fixed)
+      .filter((item) => !visible.has(item.href))
+      .map((item) => item.href);
+  }
+
+  function sameList(left = [], right = []) {
+    return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+  }
 
   function setMessage(text, isError = false) {
     adminMessage.textContent = text;
@@ -106,7 +151,9 @@ export function initUserAdminPage() {
       userList,
       userCount,
       canManageSecurityRole: Boolean(permissions.canManageSecurityRole),
-      canManageAdminRoles: Boolean(permissions.canManageAdminRoles)
+      canManageAdminRoles: Boolean(permissions.canManageAdminRoles),
+      gotoItems,
+      backofficeItems
     });
   }
 
@@ -132,6 +179,8 @@ export function initUserAdminPage() {
           general: row.querySelector(".user-notify-area-general").checked
         },
         desktopIdleTimeoutEnabled: row.querySelector(".user-desktop-idle-timeout")?.checked,
+        blockedGotoMenu: hiddenValues(gotoItems, checkedValues(".user-screen-access-goto", row)),
+        blockedBackofficeMenu: hiddenValues(backofficeItems, checkedValues(".user-screen-access-backoffice", row)),
         active: row.querySelector(".user-active").checked,
         mustChangePassword: row.querySelector(".user-must-change").checked
       })
@@ -148,6 +197,10 @@ export function initUserAdminPage() {
     const user = getUserRecord(row);
     if (!user) return false;
     const desktopIdleTimeoutControl = row.querySelector(".user-desktop-idle-timeout");
+    const currentBlockedGotoMenu = user.settings?.blockedGotoMenu || [];
+    const currentBlockedBackofficeMenu = user.settings?.blockedBackofficeMenu || [];
+    const nextBlockedGotoMenu = hiddenValues(gotoItems, checkedValues(".user-screen-access-goto", row));
+    const nextBlockedBackofficeMenu = hiddenValues(backofficeItems, checkedValues(".user-screen-access-backoffice", row));
     return (row.querySelector(".user-password")?.value || "") !== ""
       || (row.querySelector(".user-role")?.value || "") !== String(user.role || "")
       || Boolean(row.querySelector(".user-is-driver")?.checked) !== Boolean(user.isDriver)
@@ -163,6 +216,8 @@ export function initUserAdminPage() {
       || (desktopIdleTimeoutControl
         ? Boolean(desktopIdleTimeoutControl.checked) !== (user.settings?.desktopIdleTimeoutEnabled !== false)
         : false)
+      || !sameList(nextBlockedGotoMenu, currentBlockedGotoMenu)
+      || !sameList(nextBlockedBackofficeMenu, currentBlockedBackofficeMenu)
       || Boolean(row.querySelector(".user-active")?.checked) !== Boolean(user.active)
       || Boolean(row.querySelector(".user-must-change")?.checked) !== Boolean(user.mustChangePassword);
   }
@@ -194,6 +249,9 @@ export function initUserAdminPage() {
     }
   });
 
+  renderNewScreenAccessOptions(newGotoScreenAccess, gotoItems, "new-screen-access-goto");
+  renderNewScreenAccessOptions(newBackofficeScreenAccess, backofficeItems, "new-screen-access-backoffice");
+
   newUserForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     setMessage("Adding user...");
@@ -218,6 +276,8 @@ export function initUserAdminPage() {
             general: document.querySelector("#newNotifyGeneral").checked
           },
           desktopIdleTimeoutEnabled: document.querySelector("#newDesktopIdleTimeoutEnabled")?.checked,
+          blockedGotoMenu: hiddenValues(gotoItems, checkedValues("#newUserForm .new-screen-access-goto", newUserForm)),
+          blockedBackofficeMenu: hiddenValues(backofficeItems, checkedValues("#newUserForm .new-screen-access-backoffice", newUserForm)),
           active: true,
           mustChangePassword: document.querySelector("#newMustChange").checked
         })

@@ -14,6 +14,7 @@ const backofficeItems = menuConfig.backofficeItems || [];
 
 let auth = null;
 let currentPermissions = {};
+let currentSettings = {};
 
 function setMessage(text, isError = false) {
   settingsMessage.textContent = text;
@@ -29,7 +30,12 @@ function sortMenuItems(items) {
 }
 
 function isAllowed(item) {
-  return !item.permission || Boolean(currentPermissions[item.permission]);
+  if (item.permission && !currentPermissions[item.permission]) return false;
+  const blockedGoto = Array.isArray(currentSettings.blockedGotoMenu) ? currentSettings.blockedGotoMenu : [];
+  const blockedBackoffice = Array.isArray(currentSettings.blockedBackofficeMenu) ? currentSettings.blockedBackofficeMenu : [];
+  if (gotoItems.includes(item)) return !blockedGoto.includes(item.href);
+  if (backofficeItems.includes(item)) return !blockedBackoffice.includes(item.href);
+  return true;
 }
 
 function renderMenuToggles(host, items, selectedValues = []) {
@@ -64,6 +70,7 @@ async function loadSettings() {
   currentPermissions = me.user.permissions || {};
   const data = await auth.api("/api/user-settings");
   const settings = data.settings || {};
+  currentSettings = settings;
   openOrderDaysInput.value = Number(settings.openOrderDays || 7);
   renderMenuToggles(gotoMenuOptions, gotoItems, gotoItems.filter((item) => !((settings.hiddenGotoMenu || []).includes(item.href))).map((item) => item.href));
   renderMenuToggles(backofficeMenuOptions, backofficeItems, backofficeItems.filter((item) => !((settings.hiddenBackofficeMenu || []).includes(item.href))).map((item) => item.href));

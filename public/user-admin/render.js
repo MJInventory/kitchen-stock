@@ -30,13 +30,32 @@ export function updateUserCount(filtered, total, userCount) {
     : `${filtered} of ${total} user${total === 1 ? "" : "s"} shown.`;
 }
 
+function sortMenuItems(items) {
+  return [...items].sort((left, right) => String(left?.label || "").localeCompare(String(right?.label || ""), undefined, { sensitivity: "base" }));
+}
+
+function renderScreenAccessOptions(items, blockedItems = [], inputClass, canEdit) {
+  const blocked = new Set(Array.isArray(blockedItems) ? blockedItems : []);
+  return sortMenuItems(items)
+    .filter((item) => item.href && item.href !== "__logout__")
+    .map((item) => `
+      <label class="check-label">
+        <input class="${inputClass}" type="checkbox" value="${escapeHtml(item.href)}" ${blocked.has(item.href) ? "" : "checked"} ${canEdit && !item.fixed ? "" : "disabled"} ${item.fixed ? "checked" : ""}>
+        ${escapeHtml(item.label)}
+      </label>
+    `)
+    .join("");
+}
+
 export function renderUsers({
   users,
   filters,
   userList,
   userCount,
   canManageSecurityRole = false,
-  canManageAdminRoles = false
+  canManageAdminRoles = false,
+  gotoItems = [],
+  backofficeItems = []
 }) {
   const filteredUsers = filterUsers(users, filters);
   updateUserCount(filteredUsers.length, users.length, userCount);
@@ -116,6 +135,26 @@ export function renderUsers({
               <label class="check-label"><input class="user-notify-area-general" type="checkbox" ${user.notifyAreas?.general !== false ? "checked" : ""} ${user.editable ? "" : "disabled"}> General</label>
             </div>
           </section>
+
+          ${canManageAdminRoles ? `
+            <section class="user-admin-section user-admin-section-wide">
+              <h3>Screen Access</h3>
+              <div class="user-admin-fields">
+                <fieldset class="inline-fieldset wide-field">
+                  <legend>Go to screens</legend>
+                  <div class="notify-area-grid compact">
+                    ${renderScreenAccessOptions(gotoItems, user.settings?.blockedGotoMenu, "user-screen-access-goto", user.editable)}
+                  </div>
+                </fieldset>
+                <fieldset class="inline-fieldset wide-field">
+                  <legend>Backoffice screens</legend>
+                  <div class="notify-area-grid compact">
+                    ${renderScreenAccessOptions(backofficeItems, user.settings?.blockedBackofficeMenu, "user-screen-access-backoffice", user.editable)}
+                  </div>
+                </fieldset>
+              </div>
+            </section>
+          ` : ""}
         </div>
         <div class="user-admin-actions">
           ${user.canDelete ? '<button class="danger-button delete-user" type="button">Delete User</button>' : ""}

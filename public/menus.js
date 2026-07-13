@@ -103,10 +103,34 @@
     if (item.permission && !currentPermissions[item.permission]) return false;
     const hiddenGoto = Array.isArray(userSettings.hiddenGotoMenu) ? userSettings.hiddenGotoMenu : [];
     const hiddenBackoffice = Array.isArray(userSettings.hiddenBackofficeMenu) ? userSettings.hiddenBackofficeMenu : [];
-    if (item.href === "/settings.html") return true;
-    if (gotoItems.includes(item)) return !hiddenGoto.includes(item.href);
-    if (backofficeItems.includes(item)) return !hiddenBackoffice.includes(item.href);
+    const blockedGoto = Array.isArray(userSettings.blockedGotoMenu) ? userSettings.blockedGotoMenu : [];
+    const blockedBackoffice = Array.isArray(userSettings.blockedBackofficeMenu) ? userSettings.blockedBackofficeMenu : [];
+    if (gotoItems.includes(item)) return !hiddenGoto.includes(item.href) && !blockedGoto.includes(item.href);
+    if (backofficeItems.includes(item)) return !hiddenBackoffice.includes(item.href) && !blockedBackoffice.includes(item.href);
     return true;
+  }
+
+  function currentPageMenuItem() {
+    return [...gotoItems, ...backofficeItems].find((item) => item.href === currentPath) || null;
+  }
+
+  function resolveFallbackPath() {
+    const firstGoto = sortMenuItems(gotoItems.filter(allowed)).find((item) => item.href && item.href !== LOGOUT_VALUE);
+    if (firstGoto?.href) return firstGoto.href;
+    const firstBackoffice = sortMenuItems(backofficeItems.filter(allowed)).find((item) => item.href && item.href !== LOGOUT_VALUE);
+    if (firstBackoffice?.href) return firstBackoffice.href;
+    return "/";
+  }
+
+  function redirectIfCurrentPathBlocked() {
+    const currentItem = currentPageMenuItem();
+    if (!currentItem || allowed(currentItem)) return false;
+    const fallbackPath = resolveFallbackPath();
+    if (fallbackPath && fallbackPath !== currentPath) {
+      window.location.replace(fallbackPath);
+      return true;
+    }
+    return false;
   }
 
   function renderSelect(label, selectId, items) {
@@ -157,6 +181,7 @@
 
   function mountMenus() {
     syncSessionState();
+    if (redirectIfCurrentPathBlocked()) return;
     const orderTopbar = document.querySelector(".order-topbar");
     const genericTopbar = document.querySelector(".topbar");
     const topbar = orderTopbar || genericTopbar;

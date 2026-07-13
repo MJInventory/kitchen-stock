@@ -21,6 +21,8 @@ create table if not exists app_users (
   notify_area_kitchen boolean not null default true,
   notify_area_general boolean not null default true,
   desktop_idle_timeout_enabled boolean not null default true,
+  blocked_goto_menu jsonb not null default '[]'::jsonb,
+  blocked_backoffice_menu jsonb not null default '[]'::jsonb,
   hidden_goto_menu jsonb not null default '[]'::jsonb,
   hidden_backoffice_menu jsonb not null default '[]'::jsonb,
   source text not null default 'postgres',

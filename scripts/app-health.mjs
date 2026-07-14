@@ -76,6 +76,9 @@ function checkRenderedPageContract(route, html) {
   assert(/\/theme\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared theme behavior.`);
   const duplicateIds = duplicateHtmlIds(page);
   assert(!duplicateIds.length, `Rendered page ${route.path} contains duplicate element ids: ${duplicateIds.join(", ")}`);
+  if (route.path === "/ordering.html") {
+    assert(/<body[^>]*class=["'][^"']*\bordering-modern-app\b/i.test(page), "Ordering page is missing its shared modern visual mode.");
+  }
 }
 
 async function checkCriticalExports() {

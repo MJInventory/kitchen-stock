@@ -4807,6 +4807,134 @@ html.menus-loading .order-topbar > .top-actions {
   overflow: hidden;
 }
 
+/* Ordering keeps its workflow-specific controls but uses the shared application design. */
+@media screen {
+  body.order-app.ordering-modern-app {
+    --text: var(--ink);
+    --order-bg: var(--wash);
+    --order-panel: var(--surface);
+    --order-panel-soft: color-mix(in srgb, var(--surface) 92%, var(--ink) 8%);
+    --order-topbar-bg: color-mix(in srgb, var(--surface) 94%, transparent);
+    --order-line: var(--line);
+    --order-line-soft: var(--line);
+    --order-ink: var(--ink);
+    --order-muted: var(--muted);
+    --order-gold: var(--accent);
+    --order-gold-strong: var(--accent-strong);
+    --order-danger: var(--danger);
+    background: var(--wash);
+    color: var(--ink);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .ordering-modern-app .order-topbar {
+    background: var(--order-topbar-bg);
+    border-color: var(--line);
+  }
+
+  .ordering-modern-app .feature-select select,
+  .ordering-modern-app .user-chip,
+  .ordering-modern-app .icon-button,
+  .ordering-modern-app .order-filters select,
+  .ordering-modern-app .search-box input,
+  .ordering-modern-app .product-controls input,
+  .ordering-modern-app .product-controls select,
+  .ordering-modern-app .product-delete-toggle,
+  .ordering-modern-app .selected-chip {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+    box-shadow: none;
+  }
+
+  .ordering-modern-app .ordering-summary-panel,
+  .ordering-modern-app .daily-order-panel,
+  .ordering-modern-app .section-helper,
+  .ordering-modern-app .order-message {
+    color: var(--muted);
+  }
+
+  .ordering-modern-app .dashboard-card,
+  .ordering-modern-app .category-card,
+  .ordering-modern-app .product-row,
+  .ordering-modern-app .daily-order-row {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .ordering-modern-app .dashboard-card {
+    min-height: 128px;
+    border-radius: 12px;
+  }
+
+  .ordering-modern-app .dashboard-filter-card.active,
+  .ordering-modern-app .product-row.selected {
+    background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%);
+    border-color: color-mix(in srgb, var(--line) 55%, var(--accent) 45%);
+  }
+
+  .ordering-modern-app .dashboard-card strong,
+  .ordering-modern-app .category-card strong,
+  .ordering-modern-app .product-main strong,
+  .ordering-modern-app .daily-order-row strong,
+  .ordering-modern-app .daily-order-heading h2,
+  .ordering-modern-app .product-heading h2 {
+    color: var(--ink);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .ordering-modern-app .dashboard-card span,
+  .ordering-modern-app .daily-order-heading span,
+  .ordering-modern-app .product-main em,
+  .ordering-modern-app .product-heading p {
+    color: var(--accent);
+  }
+
+  .ordering-modern-app .category-card:hover,
+  .ordering-modern-app .dashboard-filter-card:hover,
+  .ordering-modern-app .dashboard-filter-card:focus-visible {
+    background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+    border-color: var(--accent);
+  }
+
+  .ordering-modern-app .category-open,
+  .ordering-modern-app .product-row.selected .product-check,
+  .ordering-modern-app .product-controls button,
+  .ordering-modern-app .row-save-button,
+  .ordering-modern-app .save-pill {
+    background: var(--accent) !important;
+    color: #ffffff !important;
+    border-color: var(--accent) !important;
+  }
+
+  .ordering-modern-app .category-open::before {
+    color: #ffffff;
+  }
+
+  .ordering-modern-app .product-check {
+    background: var(--surface);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+
+  .ordering-modern-app .save-pill::after {
+    content: "";
+  }
+
+  .ordering-modern-app .order-search-band {
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .ordering-modern-app .category-card,
+  .ordering-modern-app .product-row,
+  .ordering-modern-app .daily-order-row {
+    border-radius: 8px;
+  }
+}
+
 .roster-shift-admin-panel {
   margin-top: 12px;
 }

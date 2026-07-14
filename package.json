@@ -15,6 +15,10 @@
     "db:setup": "node scripts/setup-postgres.mjs",
     "db:import:airtable": "node scripts/import-airtable-to-postgres.mjs",
     "test:regressions": "node --test tests/*.test.mjs",
+    "inspect:codebase": "node scripts/inspect-codebase.mjs",
+    "inspect:changes": "node scripts/inspect-codebase.mjs --changed",
+    "check:fast": "node scripts/inspect-codebase.mjs && node scripts/check-startup.mjs && node --test tests/*.test.mjs",
+    "check:release": "npm run check:fast && node scripts/app-health.mjs",
     "check:startup": "node scripts/check-startup.mjs",
     "check:health": "node scripts/app-health.mjs"
   },

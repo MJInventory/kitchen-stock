@@ -105,6 +105,35 @@ async function checkRoutesAndMenus() {
   }
 }
 
+async function checkFrontendApiCoverage(frontendFiles) {
+  const apiHandlerFiles = (await walk(path.join(repoRoot, "lib"), new Set([".js"])))
+    .filter((file) => /(?:^|[\\/])(?:app-user|operations|mutation|setup-admin|workflow)-api\.js$/.test(file));
+  const backendPaths = [];
+  for (const file of apiHandlerFiles) {
+    const source = await fs.readFile(file, "utf8");
+    backendPaths.push(...[...source.matchAll(/["'](\/api\/[^"']+)["']/g)].map((match) => match[1]));
+  }
+
+  const uncovered = new Set();
+  for (const file of frontendFiles) {
+    const source = await fs.readFile(file, "utf8");
+    const clientPaths = [...source.matchAll(/["'`](\/api\/[^"'`\s]*)/g)].map((match) => match[1]);
+    for (const rawPath of clientPaths) {
+      const clientPath = rawPath.split("?")[0].split("${")[0];
+      if (!clientPath || clientPath === "/api/") continue;
+      const covered = backendPaths.some((backendPath) =>
+        clientPath === backendPath ||
+        clientPath.startsWith(backendPath) ||
+        backendPath.startsWith(clientPath)
+      );
+      if (!covered) uncovered.add(`${normalize(path.relative(repoRoot, file))}: ${rawPath}`);
+    }
+  }
+  if (uncovered.size) {
+    for (const endpoint of uncovered) fail(`Frontend API endpoint has no backend route family: ${endpoint}`);
+  }
+}
+
 function gitChangedFiles() {
   const result = spawnSync("git", ["status", "--porcelain"], { cwd: repoRoot, encoding: "utf8" });
   if (result.status !== 0) return [];
@@ -140,6 +169,7 @@ async function main() {
     await checkFrontendBoundary([...frontend, ...templates]);
     checkMigrations();
     await checkRoutesAndMenus();
+    await checkFrontendApiCoverage(frontend);
   }
   reportChangedImpact(gitChangedFiles());
 

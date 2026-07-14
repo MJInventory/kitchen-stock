@@ -26,7 +26,7 @@ Use this map before opening broad parts of the repository. Start with the row ma
 ## Lean commands
 
 - `npm run inspect:changes`: show which fragile flows and tests are affected by uncommitted files.
-- `npm run inspect:codebase`: static syntax, import, migration, menu-route, and frontend/database-boundary checks.
+- `npm run inspect:codebase`: static syntax, import, migration, menu-route, frontend/API-route, and frontend/database-boundary checks.
 - `npm run check:fast`: inspector, startup imports, and focused regression suite. Use during implementation.
 - `npm run check:release`: fast checks plus the application health check. Use before commit and deploy.
 

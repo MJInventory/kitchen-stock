@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createUserHelpers } from "../lib/user-helpers.js";
+import { createAppUserApi } from "../lib/app-user-api.js";
 import { createInternalDataDomain } from "../lib/internal-data-domain.js";
 import { normalizeHiddenMenuItems } from "../lib/server-core-utils.js";
 
@@ -54,6 +55,78 @@ test("public user settings expose desktop inactivity timeout and default it to e
   assert.equal(disabled.settings.desktopIdleTimeoutEnabled, false);
   assert.deepEqual(disabled.settings.blockedGotoMenu, ["/ordering.html"]);
   assert.deepEqual(disabled.settings.blockedBackofficeMenu, ["/standing-orders.html"]);
+});
+
+function createManagedUserApiHarness(actor) {
+  let updatedPayload = null;
+  let response = null;
+  const handler = createAppUserApi({
+    bcrypt: { compare: async () => false },
+    hasPostgres: () => true,
+    pushEnabled: false,
+    vapidPublicKey: "",
+    readJson: async () => ({
+      role: "user",
+      blockedGotoMenu: ["/ordering.html"],
+      blockedBackofficeMenu: ["/standing-orders.html"],
+      desktopIdleTimeoutEnabled: false
+    }),
+    send: (_res, status, body) => { response = { status, body }; },
+    requireUser: () => actor,
+    requireRole: () => true,
+    storeSession: (user) => user,
+    publicUser: (user) => user,
+    publicUserForAdmin: (user) => user,
+    canChangeAppUserRole: () => true,
+    canDeleteAppUserRecord: () => true,
+    findAppUserByName: async () => null,
+    changeOwnPassword: async () => ({}),
+    refreshUserFromDirectory: async (user) => user,
+    pgRecordSuccessfulLogin: async () => "",
+    pgGetOwnSettings: async () => ({}),
+    pgUpdateOwnSettings: async () => ({}),
+    pgSavePushSubscription: async () => ({}),
+    pgRemovePushSubscription: async () => ({}),
+    getAppUsers: async () => [],
+    createAppUser: async () => ({}),
+    findAppUserById: async () => ({ id: "user-1", role: "user" }),
+    updateAppUser: async (_id, payload) => {
+      updatedPayload = payload;
+      return payload;
+    },
+    deleteAppUser: async () => ({})
+  });
+  return {
+    async patch() {
+      await handler({ method: "PATCH", url: "/api/app-users/user-1" }, {});
+      return { updatedPayload, response };
+    }
+  };
+}
+
+test("ordinary admins cannot change God-only screen access or inactivity controls", async () => {
+  const harness = createManagedUserApiHarness({
+    name: "Admin",
+    permissions: { canAdminUsers: true, canManageAdminRoles: false }
+  });
+  const { updatedPayload, response } = await harness.patch();
+  assert.equal(response.status, 200);
+  assert.equal(updatedPayload.role, "user");
+  assert.equal("blockedGotoMenu" in updatedPayload, false);
+  assert.equal("blockedBackofficeMenu" in updatedPayload, false);
+  assert.equal("desktopIdleTimeoutEnabled" in updatedPayload, false);
+});
+
+test("God can change per-user screen access and inactivity controls", async () => {
+  const harness = createManagedUserApiHarness({
+    name: "Enno",
+    permissions: { canAdminUsers: true, canManageAdminRoles: true }
+  });
+  const { updatedPayload, response } = await harness.patch();
+  assert.equal(response.status, 200);
+  assert.deepEqual(updatedPayload.blockedGotoMenu, ["/ordering.html"]);
+  assert.deepEqual(updatedPayload.blockedBackofficeMenu, ["/standing-orders.html"]);
+  assert.equal(updatedPayload.desktopIdleTimeoutEnabled, false);
 });
 
 test("internal data domain stores encrypted password, lists safe summaries, and audits changes", async () => {

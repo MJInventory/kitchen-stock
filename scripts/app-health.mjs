@@ -57,6 +57,26 @@ function normalizeAssetPath(src = "") {
   return String(raw || "").split("?")[0].trim();
 }
 
+function duplicateHtmlIds(html = "") {
+  const counts = new Map();
+  for (const match of String(html).matchAll(/\bid=["']([^"']+)["']/gi)) {
+    counts.set(match[1], (counts.get(match[1]) || 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
+}
+
+function checkRenderedPageContract(route, html) {
+  const page = String(html || "");
+  assert(/^<!doctype html>/i.test(page), `Rendered page ${route.path} is missing the shared HTML document shell.`);
+  assert(/<meta\s+name=["']viewport["']/i.test(page), `Rendered page ${route.path} is missing mobile viewport metadata.`);
+  assert(/\/styles\.css(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing the shared stylesheet.`);
+  assert(/\/menu-config\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared menu configuration.`);
+  assert(/\/menus\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared menu behavior.`);
+  assert(/\/theme\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared theme behavior.`);
+  const duplicateIds = duplicateHtmlIds(page);
+  assert(!duplicateIds.length, `Rendered page ${route.path} contains duplicate element ids: ${duplicateIds.join(", ")}`);
+}
+
 async function checkCriticalExports() {
   assert(typeof createViewHelpers === "function", "createViewHelpers export is missing.");
   assert(typeof buildPageRouteDefinitions === "function", "buildPageRouteDefinitions export is missing.");
@@ -133,6 +153,9 @@ async function checkRouteDefinitionsAndAssets() {
       const beforeCount = renderedPages.length;
       await renderer.renderView({}, route.view, route.options || {}, 200);
       assert(renderedPages.length === beforeCount + 1, `Renderer did not emit HTML for ${route.path}`);
+      if (renderedPages.length === beforeCount + 1) {
+        checkRenderedPageContract(route, renderedPages.at(-1));
+      }
     } catch (error) {
       fail(`Render failed for ${route.path}: ${error.message}`);
     }

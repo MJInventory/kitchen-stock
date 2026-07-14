@@ -4809,7 +4809,8 @@ html.menus-loading .order-topbar > .top-actions {
 
 /* Ordering keeps its workflow-specific controls but uses the shared application design. */
 @media screen {
-  body.order-app.ordering-modern-app {
+  :root[data-theme="light"] body.order-app.ordering-modern-app,
+  :root[data-theme="dark"] body.order-app.ordering-modern-app {
     --text: var(--ink);
     --order-bg: var(--wash);
     --order-panel: var(--surface);

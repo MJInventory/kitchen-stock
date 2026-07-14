@@ -97,6 +97,7 @@ async function checkResponsiveStyles() {
   assert(/font-size:\s*16px/i.test(styles), "Shared phone form controls are missing the anti-zoom font size.");
   assert(/\.roster-grid-wrap\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Kitchen roster is missing its mobile-safe horizontal scroll container.");
   assert(/\.standing-sheet-shell\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Standing-order tables are missing their mobile-safe horizontal scroll container.");
+  assert(/:root\[data-theme=["']light["']\]\s+body\.order-app\.ordering-modern-app/is.test(styles), "Ordering modern theme is not specific enough to override the legacy light theme.");
 }
 
 async function checkRouteDefinitionsAndAssets() {

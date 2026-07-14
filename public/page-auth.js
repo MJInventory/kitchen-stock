@@ -86,6 +86,13 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
     if (data.token) saveSession(data);
     permissions = data.user.permissions || permissions;
     if (permission && !permissions[permission]) throw new Error("You do not have permission to use this screen.");
+    const screenAccess = window.MJScreenAccess;
+    const menuConfig = window.MJ_STOCK_MENU_ITEMS || {};
+    if (screenAccess && !screenAccess.isPathAllowed(window.location.pathname, menuConfig, permissions, data.user.settings || {})) {
+      window.location.replace(screenAccess.firstAllowedPath(menuConfig, permissions, data.user.settings || {}));
+      return false;
+    }
+    return true;
   }
 
   bindKitchenLogin({
@@ -102,8 +109,7 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
       passwordInput.value = "";
       setLoginMessage("");
       showApp();
-      await verifyPermission();
-      document.dispatchEvent(new CustomEvent("auth-ready"));
+      if (await verifyPermission()) document.dispatchEvent(new CustomEvent("auth-ready"));
     }
   });
 
@@ -116,7 +122,7 @@ export function authPage({ permission = "", messageSelector = "" } = {}) {
       if (sessionToken && sessionUser) {
         showApp();
         verifyPermission()
-          .then(callback)
+          .then((allowed) => allowed && callback())
           .catch((error) => setPageMessage(error.message, true));
       } else {
         showLogin();

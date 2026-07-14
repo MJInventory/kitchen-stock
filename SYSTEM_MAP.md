@@ -30,6 +30,6 @@ Use this map before opening broad parts of the repository. Start with the row ma
 - `npm run check:fast`: inspector, startup imports, and focused regression suite. Use during implementation.
 - `npm run check:release`: fast checks plus the application health check. Use before commit and deploy.
 
-The health check renders every routed page and verifies the shared shell, mobile viewport, stylesheet, menus, theme script, and unique element IDs.
+The health check renders every routed page and verifies the shared shell, mobile viewport, stylesheet, menus, theme script, unique element IDs, phone touch targets, and scroll-safe wide tables.
 
 Do not run browser checks unless a visual or interaction problem specifically requires one.

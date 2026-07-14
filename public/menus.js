@@ -6,6 +6,7 @@
   let userSettings = {};
 
   const menuConfig = window.MJ_STOCK_MENU_ITEMS || {};
+  const screenAccess = window.MJScreenAccess;
   const gotoItems = menuConfig.gotoItems || [];
   const backofficeItems = menuConfig.backofficeItems || [];
   const LOGOUT_VALUE = "__logout__";
@@ -100,26 +101,16 @@
 
   function allowed(item) {
     const currentPermissions = effectivePermissionSet();
-    if (item.permission && !currentPermissions[item.permission]) return false;
-    const hiddenGoto = Array.isArray(userSettings.hiddenGotoMenu) ? userSettings.hiddenGotoMenu : [];
-    const hiddenBackoffice = Array.isArray(userSettings.hiddenBackofficeMenu) ? userSettings.hiddenBackofficeMenu : [];
-    const blockedGoto = Array.isArray(userSettings.blockedGotoMenu) ? userSettings.blockedGotoMenu : [];
-    const blockedBackoffice = Array.isArray(userSettings.blockedBackofficeMenu) ? userSettings.blockedBackofficeMenu : [];
-    if (gotoItems.includes(item)) return !hiddenGoto.includes(item.href) && !blockedGoto.includes(item.href);
-    if (backofficeItems.includes(item)) return !hiddenBackoffice.includes(item.href) && !blockedBackoffice.includes(item.href);
-    return true;
+    const section = gotoItems.includes(item) ? "goto" : "backoffice";
+    return screenAccess?.isItemAllowed(item, section, currentPermissions, userSettings) ?? true;
   }
 
   function currentPageMenuItem() {
-    return [...gotoItems, ...backofficeItems].find((item) => item.href === currentPath) || null;
+    return screenAccess?.findItemForPath(currentPath, menuConfig)?.item || null;
   }
 
   function resolveFallbackPath() {
-    const firstGoto = sortMenuItems(gotoItems.filter(allowed)).find((item) => item.href && item.href !== LOGOUT_VALUE);
-    if (firstGoto?.href) return firstGoto.href;
-    const firstBackoffice = sortMenuItems(backofficeItems.filter(allowed)).find((item) => item.href && item.href !== LOGOUT_VALUE);
-    if (firstBackoffice?.href) return firstBackoffice.href;
-    return "/";
+    return screenAccess?.firstAllowedPath(menuConfig, effectivePermissionSet(), userSettings) || "/";
   }
 
   function redirectIfCurrentPathBlocked() {

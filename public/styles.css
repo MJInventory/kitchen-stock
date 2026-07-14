@@ -3894,6 +3894,20 @@ html.menus-loading .order-topbar > .top-actions {
 
 
 @media (max-width: 560px) {
+  input,
+  select,
+  textarea,
+  button,
+  .button {
+    min-height: 44px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
   .shell {
     padding: 14px;
   }
@@ -4915,7 +4929,7 @@ html.menus-loading .order-topbar > .top-actions {
 }
 
 .roster-grid-wrap {
-  overflow-x: visible;
+  overflow-x: auto;
   padding-bottom: 8px;
 }
 

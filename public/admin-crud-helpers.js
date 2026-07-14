@@ -11,30 +11,74 @@ export function bindAutosaveRows({
   rowSelector,
   isDirty,
   saveRow,
-  onError
+  onError,
+  windowObject = window
 }) {
-  if (!container) return;
+  if (!container) return { dispose() {}, flushRow: async () => {} };
+  const dirtyRows = new Set();
+  const pendingRows = new WeakMap();
 
   function syncRowState(row) {
     if (!row) return;
-    row.classList.toggle("dirty", Boolean(isDirty(row)));
+    const dirty = Boolean(isDirty(row));
+    row.classList.toggle("dirty", dirty);
+    if (dirty) dirtyRows.add(row);
+    else dirtyRows.delete(row);
   }
 
-  container.addEventListener("input", (event) => {
-    syncRowState(event.target.closest(rowSelector));
-  });
+  function flushRow(row) {
+    if (!row) return Promise.resolve();
+    const previous = pendingRows.get(row) || Promise.resolve();
+    const pending = previous
+      .catch(() => {})
+      .then(() => isDirty(row) ? saveRow(row) : undefined)
+      .then(() => syncRowState(row));
+    pendingRows.set(row, pending);
+    pending
+      .catch((error) => onError?.(error))
+      .finally(() => {
+        if (pendingRows.get(row) === pending) pendingRows.delete(row);
+      });
+    return pending;
+  }
 
-  container.addEventListener("change", (event) => {
+  const handleInput = (event) => {
     syncRowState(event.target.closest(rowSelector));
-  });
+  };
 
-  container.addEventListener("focusout", (event) => {
+  const handleChange = (event) => {
+    syncRowState(event.target.closest(rowSelector));
+  };
+
+  const handleFocusOut = (event) => {
     const row = event.target.closest(rowSelector);
     if (!row) return;
     const next = event.relatedTarget;
     if (next && row.contains(next)) return;
-    Promise.resolve(saveRow(row)).catch(onError);
-  });
+    void flushRow(row);
+  };
+
+  const handleBeforeUnload = (event) => {
+    if (!dirtyRows.size) return;
+    event.preventDefault();
+    event.returnValue = "";
+  };
+
+  container.addEventListener("input", handleInput);
+  container.addEventListener("change", handleChange);
+  container.addEventListener("focusout", handleFocusOut);
+  windowObject?.addEventListener?.("beforeunload", handleBeforeUnload);
+
+  return {
+    flushRow,
+    dispose() {
+      container.removeEventListener?.("input", handleInput);
+      container.removeEventListener?.("change", handleChange);
+      container.removeEventListener?.("focusout", handleFocusOut);
+      windowObject?.removeEventListener?.("beforeunload", handleBeforeUnload);
+      dirtyRows.clear();
+    }
+  };
 }
 
 export function bindDeleteAction({

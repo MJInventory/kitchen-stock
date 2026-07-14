@@ -71,6 +71,7 @@ function checkRenderedPageContract(route, html) {
   assert(/<meta\s+name=["']viewport["']/i.test(page), `Rendered page ${route.path} is missing mobile viewport metadata.`);
   assert(/\/styles\.css(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing the shared stylesheet.`);
   assert(/\/menu-config\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared menu configuration.`);
+  assert(/\/screen-access\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared screen-access behavior.`);
   assert(/\/menus\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared menu behavior.`);
   assert(/\/theme\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared theme behavior.`);
   const duplicateIds = duplicateHtmlIds(page);
@@ -84,6 +85,15 @@ async function checkCriticalExports() {
   assert(typeof createRenderer === "function", "createRenderer export is missing.");
   assert(typeof createServerComposition === "function", "createServerComposition export is missing.");
   assert(typeof createServerApiHandlers === "function", "createServerApiHandlers export is missing.");
+}
+
+async function checkResponsiveStyles() {
+  const styles = await fs.readFile(path.join(publicDir, "styles.css"), "utf8");
+  assert(/@media\s*\(max-width:\s*560px\)/i.test(styles), "Shared stylesheet is missing the phone layout breakpoint.");
+  assert(/min-height:\s*44px/i.test(styles), "Shared phone controls are missing the minimum touch target height.");
+  assert(/font-size:\s*16px/i.test(styles), "Shared phone form controls are missing the anti-zoom font size.");
+  assert(/\.roster-grid-wrap\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Kitchen roster is missing its mobile-safe horizontal scroll container.");
+  assert(/\.standing-sheet-shell\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Standing-order tables are missing their mobile-safe horizontal scroll container.");
 }
 
 async function checkRouteDefinitionsAndAssets() {
@@ -190,6 +200,7 @@ async function checkPostgresViews() {
 async function main() {
   try {
     await checkCriticalExports();
+    await checkResponsiveStyles();
     await checkRouteDefinitionsAndAssets();
     await checkPostgresViews();
   } finally {

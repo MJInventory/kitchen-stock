@@ -2,8 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 
 import { POSTGRES_MIGRATIONS } from "../lib/postgres-migrations.js";
+import { backofficeMenuOptions, gotoMenuOptions } from "../lib/app-config.js";
 import { createViewHelpers } from "../lib/view-helpers.js";
 import { buildPageRouteDefinitions } from "../lib/page-route-definitions.js";
 
@@ -99,9 +101,29 @@ async function checkRoutesAndMenus() {
   const routeDefinitions = await buildPageRouteDefinitions(createViewHelpers(path.join(repoRoot, "views")));
   const routePaths = new Set(routeDefinitions.flatMap((route) => [route.path, ...(route.aliases || [])]));
   const menuSource = await fs.readFile(path.join(repoRoot, "public", "menu-config.js"), "utf8");
-  const menuPaths = [...menuSource.matchAll(/href:\s*["']([^"']+)["']/g)].map((match) => match[1]);
-  for (const menuPath of menuPaths) {
-    if (menuPath !== "__logout__" && !routePaths.has(menuPath)) fail(`Menu points to an undefined page route: ${menuPath}`);
+  const context = { window: {} };
+  vm.runInNewContext(menuSource, context, { filename: "public/menu-config.js" });
+  const config = context.window.MJ_STOCK_MENU_ITEMS || {};
+  const sections = [
+    { name: "Go to", items: config.gotoItems || [], allowed: new Set(gotoMenuOptions) },
+    { name: "Backoffice", items: config.backofficeItems || [], allowed: new Set(backofficeMenuOptions) }
+  ];
+  const permissionSource = await fs.readFile(path.join(repoRoot, "lib", "user-helpers.js"), "utf8");
+  const knownPermissions = new Set([...permissionSource.matchAll(/\b(can[A-Z][A-Za-z]+)\s*:/g)].map((match) => match[1]));
+
+  for (const section of sections) {
+    const hrefs = section.items.map((item) => item.href);
+    if (new Set(hrefs).size !== hrefs.length) fail(`${section.name} menu contains duplicate paths.`);
+    if (section.items.at(-1)?.href !== "__logout__") fail(`${section.name} menu must keep Log Off as its final option.`);
+    if (section.name === "Go to" && section.items[0]?.href !== "/") fail("Go to menu must keep Home as its first option.");
+    for (const item of section.items) {
+      if (item.permission && !knownPermissions.has(item.permission)) fail(`${section.name} menu uses unknown permission: ${item.permission}`);
+      if (item.href !== "__logout__" && !routePaths.has(item.href)) fail(`Menu points to an undefined page route: ${item.href}`);
+      if (item.href !== "__logout__" && !section.allowed.has(item.href)) fail(`${section.name} menu path is missing from server screen-access options: ${item.href}`);
+      for (const coveredPath of item.paths || []) {
+        if (!routePaths.has(coveredPath)) fail(`${item.label} covers an undefined child page route: ${coveredPath}`);
+      }
+    }
   }
 }
 

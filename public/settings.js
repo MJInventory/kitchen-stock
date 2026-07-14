@@ -30,12 +30,13 @@ function sortMenuItems(items) {
 }
 
 function isAllowed(item) {
-  if (item.permission && !currentPermissions[item.permission]) return false;
-  const blockedGoto = Array.isArray(currentSettings.blockedGotoMenu) ? currentSettings.blockedGotoMenu : [];
-  const blockedBackoffice = Array.isArray(currentSettings.blockedBackofficeMenu) ? currentSettings.blockedBackofficeMenu : [];
-  if (gotoItems.includes(item)) return !blockedGoto.includes(item.href);
-  if (backofficeItems.includes(item)) return !blockedBackoffice.includes(item.href);
-  return true;
+  const section = gotoItems.includes(item) ? "goto" : "backoffice";
+  const settingsWithoutSelfHidden = {
+    ...currentSettings,
+    hiddenGotoMenu: [],
+    hiddenBackofficeMenu: []
+  };
+  return window.MJScreenAccess?.isItemAllowed(item, section, currentPermissions, settingsWithoutSelfHidden) ?? true;
 }
 
 function renderMenuToggles(host, items, selectedValues = []) {

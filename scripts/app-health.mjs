@@ -77,6 +77,10 @@ function checkRenderedPageContract(route, html) {
   assert(/\/pwa-install\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared install behavior.`);
   assert(/\bdata-install-app\b/i.test(page), `Rendered page ${route.path} is missing the app install control.`);
   assert(/\bdata-ios-install-help\b/i.test(page), `Rendered page ${route.path} is missing iOS install guidance.`);
+  assert(/<footer[^>]*class=["'][^"']*\bapp-footer\b/i.test(page), `Rendered page ${route.path} is missing the shared application footer.`);
+  assert(/href=["']\/terms\.html["']/i.test(page), `Rendered page ${route.path} is missing the Terms of Service footer link.`);
+  assert(/href=["']\/privacy\.html["']/i.test(page), `Rendered page ${route.path} is missing the Privacy Policy footer link.`);
+  assert(/href=["']\/support\.html["']/i.test(page), `Rendered page ${route.path} is missing the Support footer link.`);
   const duplicateIds = duplicateHtmlIds(page);
   assert(!duplicateIds.length, `Rendered page ${route.path} contains duplicate element ids: ${duplicateIds.join(", ")}`);
   if (route.path === "/ordering.html") {

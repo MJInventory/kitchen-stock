@@ -46,10 +46,10 @@ export function renderItems({
     .sort(compareItems);
 
   const priceChipLabel = (value) => {
-    if (value === null || value === undefined || value === "") return "Price 0.00";
+    if (value === null || value === undefined || value === "") return "Supplier price 0.00";
     const amount = Number(value);
-    if (!Number.isFinite(amount)) return "Price 0.00";
-    return `Price ${amount.toFixed(2)}`;
+    if (!Number.isFinite(amount)) return "Supplier price 0.00";
+    return `Supplier price ${amount.toFixed(2)}`;
   };
 
   const priceInputValue = (value) => {
@@ -114,7 +114,7 @@ export function renderItems({
           <input class="minimum-input" type="number" min="0" step="1" value="${item.minimum ?? 0}">
         </label>
         <label>
-          Price per unit
+          Price per unit for selected supplier
           <input class="price-input compact-price-input" type="number" min="0" step="0.01" value="${escapeHtml(priceInputValue(item.unitPrice))}">
         </label>
         <label>

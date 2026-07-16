@@ -58,6 +58,11 @@ function formatLeadTimeLabel(value) {
   return `${wholeDays} day${wholeDays === 1 ? "" : "s"}, ${hours}:${minutes}`;
 }
 
+function formatPrice(value) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+}
+
 function toggleCustomRange() {
   customRange.hidden = modeSelect.value !== "custom";
 }
@@ -76,6 +81,7 @@ function buildQuery() {
 function renderSummary(summary = {}) {
   const cards = [
     { label: "Total quantity", value: Number(summary.totalQuantity || 0) },
+    { label: "Total value", value: formatPrice(summary.totalValue) },
     { label: "Total lines", value: Number(summary.totalLines || 0) },
     { label: "Distinct items", value: Number(summary.distinctItems || 0) },
     { label: "Distinct suppliers", value: Number(summary.distinctSuppliers || 0) }
@@ -103,6 +109,8 @@ function renderGroups(groups = []) {
             <th>Supplier</th>
             <th>Qty</th>
             <th>Unit</th>
+            <th>Avg price / unit</th>
+            <th>Total value</th>
             <th>Avg lead time</th>
           </tr>
         </thead>
@@ -113,6 +121,8 @@ function renderGroups(groups = []) {
               <td>${escapeHtml(row.supplierName)}</td>
               <td>${escapeHtml(row.totalQuantity)}</td>
               <td>${escapeHtml(row.unit)}</td>
+              <td>${escapeHtml(formatPrice(row.averageUnitPrice))}</td>
+              <td>${escapeHtml(formatPrice(row.totalValue))}</td>
               <td>${escapeHtml(formatLeadTimeLabel(row.avgLeadTimeDays))}</td>
             </tr>
           `).join("")}

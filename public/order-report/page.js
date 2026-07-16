@@ -147,7 +147,10 @@ export function initOrderReportPage() {
           orderedLines: currentReportRows.filter((row) => row.ordered).length,
           toDeliverLines: currentReportRows.filter((row) => row.toDeliver).length,
           deliveredLines: currentReportRows.filter((row) => row.delivered).length,
-          waitingLines: currentReportRows.filter((row) => row.waiting).length
+          waitingLines: currentReportRows.filter((row) => row.waiting).length,
+          deliveredValue: currentReportRows
+            .filter((row) => row.delivered)
+            .reduce((total, row) => total + Number(row.quantity || 0) * Number(row.unitPrice || 0), 0)
         },
         rows: currentReportRows,
         standingOrders: currentStandingOrders,

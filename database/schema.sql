@@ -217,12 +217,27 @@ create index if not exists idx_inventory_items_location on inventory_items (stor
 create index if not exists idx_inventory_items_unit on inventory_items (unit_of_measure_id);
 create index if not exists idx_inventory_items_shelf on inventory_items (shelf_code_id);
 
+create table if not exists inventory_item_supplier_prices (
+  inventory_item_id uuid not null references inventory_items(id) on delete cascade,
+  supplier_id uuid not null references suppliers(id) on delete cascade,
+  unit_price numeric(12,2) not null default 0,
+  updated_by_username text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (inventory_item_id, supplier_id),
+  check (unit_price >= 0)
+);
+
+create index if not exists idx_inventory_item_supplier_prices_supplier
+  on inventory_item_supplier_prices (supplier_id);
+
 create table if not exists order_requests (
   id uuid primary key default gen_random_uuid(),
   request_number bigint generated always as identity,
   inventory_item_id uuid not null references inventory_items(id) on delete restrict,
   quantity_needed numeric(12,2) not null,
   order_unit text not null default '',
+  unit_price numeric(12,2) constraint order_requests_unit_price_nonnegative check (unit_price is null or unit_price >= 0),
   urgency_level text not null default 'Medium',
   status text not null default 'Approved',
   requested_by_username text not null,
@@ -579,7 +594,7 @@ select
   sp.id as primary_supplier_id,
   sp.name as supplier_name,
   sp.contact_information as supplier_contact,
-  i.unit_price
+  coalesce(r.unit_price, isp.unit_price, i.unit_price, 0)::numeric(12,2) as unit_price
 from order_requests r
 join inventory_items i on i.id = r.inventory_item_id
 left join categories c on c.id = i.category_id
@@ -587,7 +602,10 @@ left join storage_locations sl on sl.id = i.storage_location_id
 left join inventory_areas ia on ia.id = i.inventory_area_id
 left join shelf_codes sc on sc.id = i.shelf_code_id
 left join units_of_measure u on u.id = i.unit_of_measure_id
-left join suppliers sp on sp.id = i.primary_supplier_id;
+left join suppliers sp on sp.id = i.primary_supplier_id
+left join inventory_item_supplier_prices isp
+  on isp.inventory_item_id = i.id
+ and isp.supplier_id = i.primary_supplier_id;
 
 create or replace view internal_order_details_vw as
 select
@@ -677,13 +695,25 @@ select
   coalesce(ss.id, sso.id, r.primary_supplier_id) as resolved_supplier_id,
   coalesce(nullif(trim(sorl.supplier_name), ''), sso.name, r.supplier_name) as resolved_supplier_name,
   coalesce(ss.contact_information, sso.contact_information, r.supplier_contact, '') as resolved_supplier_contact,
-  r.unit_price
+  coalesce(
+    req.unit_price,
+    resolved_price.unit_price,
+    case
+      when coalesce(ss.id, sso.id, r.primary_supplier_id) = r.primary_supplier_id then r.unit_price
+      else 0
+    end,
+    0
+  )::numeric(12,2) as unit_price
 from order_request_details_vw r
+left join order_requests req on req.id = r.id
 left join standing_order_run_lines sorl on sorl.id = r.standing_order_run_line_id
 left join standing_order_runs sor on sor.id = coalesce(r.standing_order_run_id, sorl.standing_order_run_id)
 left join standing_orders so on so.id = coalesce(sor.standing_order_id, sorl.standing_order_id)
 left join suppliers sso on sso.id = so.supplier_id
-left join suppliers ss on lower(ss.name) = lower(sorl.supplier_name);
+left join suppliers ss on lower(ss.name) = lower(sorl.supplier_name)
+left join inventory_item_supplier_prices resolved_price
+  on resolved_price.inventory_item_id = r.inventory_item_id
+ and resolved_price.supplier_id = coalesce(ss.id, sso.id, r.primary_supplier_id);
 
 create or replace view driver_sheet_request_vw as
 select
@@ -730,10 +760,22 @@ select
   r.inventory_area,
   r.shelf_code,
   r.unit,
-  r.unit_price
+  coalesce(
+    req.unit_price,
+    driver_price.unit_price,
+    case
+      when coalesce(d.supplier_id, r.resolved_supplier_id) = r.resolved_supplier_id then r.unit_price
+      else 0
+    end,
+    0
+  )::numeric(12,2) as unit_price
 from order_request_supply_vw r
+left join order_requests req on req.id = r.id
 left join driver_sheet_lines d on d.order_request_id = r.id
-left join suppliers ds on ds.id = d.supplier_id;
+left join suppliers ds on ds.id = d.supplier_id
+left join inventory_item_supplier_prices driver_price
+  on driver_price.inventory_item_id = r.inventory_item_id
+ and driver_price.supplier_id = coalesce(d.supplier_id, r.resolved_supplier_id);
 
 create or replace view order_report_summary_vw as
 select
@@ -872,17 +914,17 @@ select
   r.id as request_id,
   r.request_number,
   r.inventory_item_id,
-  coalesce(i.name, '') as item_name,
-  coalesce(c.name, 'Uncategorized') as category_name,
-  coalesce(s.name, 'Unassigned Supplier') as supplier_name,
-  coalesce(nullif(r.order_unit, ''), u.name, 'item') as unit_name,
-  coalesce(a.name, '') as area_name,
-  coalesce(sl.name, '') as storage_location_name,
+  coalesce(r.item_name, '') as item_name,
+  coalesce(r.category, 'Uncategorized') as category_name,
+  coalesce(r.resolved_supplier_name, 'Unassigned Supplier') as supplier_name,
+  coalesce(r.unit, 'item') as unit_name,
+  coalesce(r.inventory_area, '') as area_name,
+  coalesce(r.storage_location, '') as storage_location_name,
   coalesce(r.requested_by_username, '') as requested_by_username,
   r.requested_at,
   r.requested_at::date as request_date,
-  coalesce(r.quantity_needed, 0) as quantity_needed,
-  coalesce(r.urgency_level, '') as urgency_level,
+  coalesce(r.quantity, 0) as quantity_needed,
+  coalesce(r.urgency, '') as urgency_level,
   coalesce(r.status, '') as status,
   coalesce(r.ordered, false) as ordered,
   coalesce(r.delivered, false) as delivered,
@@ -890,19 +932,16 @@ select
   r.delivery_day,
   r.delivered_at,
   r.standing_order_run_id,
-  r.standing_order_run_line_id
-from order_requests r
-left join inventory_items i on i.id = r.inventory_item_id
-left join categories c on c.id = i.category_id
-left join suppliers s on s.id = i.primary_supplier_id
-left join units_of_measure u on u.id = i.unit_of_measure_id
-left join inventory_areas a on a.id = i.inventory_area_id
-left join storage_locations sl on sl.id = i.storage_location_id;
+  r.standing_order_run_line_id,
+  coalesce(r.unit_price, 0)::numeric(12,2) as unit_price,
+  (coalesce(r.quantity, 0) * coalesce(r.unit_price, 0))::numeric(14,2) as total_value
+from order_request_supply_vw r;
 
 create or replace view management_order_summary_vw as
 select
   request_date::text as request_date,
   coalesce(sum(quantity_needed), 0) as total_quantity,
+  coalesce(sum(total_value), 0)::numeric(14,2) as total_value,
   count(*)::integer as total_lines,
   count(distinct inventory_item_id)::integer as distinct_items,
   count(distinct supplier_name)::integer as distinct_suppliers
@@ -917,6 +956,8 @@ select
   supplier_name,
   unit_name,
   coalesce(sum(quantity_needed), 0) as total_quantity,
+  round(avg(unit_price), 2)::numeric(12,2) as average_unit_price,
+  coalesce(sum(total_value), 0)::numeric(14,2) as total_value,
   round(avg(
     case
       when delivered_at is not null and requested_at is not null

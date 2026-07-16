@@ -155,6 +155,8 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
                 <th>Standing order</th>
                 <th>Item</th>
                 <th>Qty</th>
+                <th>Price / unit</th>
+                <th>Total</th>
                 <th>Expected delivery</th>
                 <th>Schedule</th>
                 <th>Status</th>
@@ -168,7 +170,9 @@ export function renderStandingOrders({ orders, standingReportSummaryList, standi
                     <small>${escapeHtml(order.notes || "")}</small>
                   </td>
                   <td>${escapeHtml(line.itemName || order.itemName || "")}</td>
-                  <td>${escapeHtml(line.quantity ?? order.quantity ?? "")}</td>
+                  <td>${escapeHtml(line.quantity ?? order.quantity ?? "")} ${escapeHtml(line.unit || "")}</td>
+                  <td>${escapeHtml(formatCurrency(line.unitPrice))}</td>
+                  <td>${escapeHtml(formatCurrency(line.lineTotal ?? (Number(line.quantity || 0) * Number(line.unitPrice || 0))))}</td>
                   <td>${escapeHtml(order.expectedDate || "")}</td>
                   <td>${escapeHtml(order.schedule || "")}</td>
                   <td>${escapeHtml(standingStatusLabel(order))}</td>
@@ -292,6 +296,8 @@ export function renderReport({
             <tr>
               <th>Item</th>
               <th>Qty</th>
+              <th>Price / unit</th>
+              <th>Total</th>
               <th>Requested By</th>
               <th>Picked / Ordered</th>
               <th>2Deliver</th>
@@ -313,6 +319,8 @@ export function renderReport({
                     <small>${escapeHtml([row.inventoryArea, row.storageLocation, row.shelfCode].filter(Boolean).join(" / "))}</small>
                   </td>
                   <td>${escapeHtml(row.quantity ?? "")} ${escapeHtml(row.unit || "")}</td>
+                  <td>${escapeHtml(formatCurrency(row.unitPrice))}</td>
+                  <td>${escapeHtml(formatCurrency(Number(row.quantity || 0) * Number(row.unitPrice || 0)))}</td>
                   <td>
                     ${escapeHtml(row.requestedBy || "")}
                     <small>${escapeHtml(formatDateTime(row.requestedAt))}</small>

@@ -70,6 +70,22 @@ const checks = [
   {
     name: "idx_standing_order_run_lines_driver_sheet_line",
     pattern: /create index if not exists idx_standing_order_run_lines_driver_sheet_line/i
+  },
+  {
+    name: "inventory_item_supplier_prices table",
+    pattern: /create table if not exists inventory_item_supplier_prices/i
+  },
+  {
+    name: "idx_inventory_item_supplier_prices_supplier",
+    pattern: /create index if not exists idx_inventory_item_supplier_prices_supplier/i
+  },
+  {
+    name: "order_requests.unit_price",
+    pattern: /unit_price\s+numeric\(12,2\)\s+constraint order_requests_unit_price_nonnegative/i
+  },
+  {
+    name: "supplier-specific report price resolution",
+    pattern: /resolved_price\.unit_price/i
   }
 ];
 

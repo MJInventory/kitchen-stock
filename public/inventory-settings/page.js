@@ -302,6 +302,13 @@ export function initInventorySettingsPage() {
         shelfSelect.value = "";
       }
     }
+    const supplierSelect = event.target.closest(".supplier-select");
+    if (supplierSelect) {
+      const item = items.find((entry) => entry.id === article.dataset.itemId);
+      const supplierPrice = (item?.supplierPrices || []).find((price) => price.supplierId === supplierSelect.value);
+      const priceInput = article.querySelector(".price-input");
+      if (priceInput) priceInput.value = formatPriceValue(supplierPrice?.unitPrice ?? 0);
+    }
     syncDirtyState(article);
   });
 

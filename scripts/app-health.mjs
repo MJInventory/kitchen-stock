@@ -101,6 +101,7 @@ async function checkResponsiveStyles() {
   assert(/\.roster-grid-wrap\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Kitchen roster is missing its mobile-safe horizontal scroll container.");
   assert(/\.standing-sheet-shell\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Standing-order tables are missing their mobile-safe horizontal scroll container.");
   assert(/:root\[data-theme=["']light["']\]\s+body\.order-app\.ordering-modern-app/is.test(styles), "Ordering modern theme is not specific enough to override the legacy light theme.");
+  assert(/\.install-app-button\[hidden\]\s*\{[^}]*display:\s*none/is.test(styles), "Installed-app controls can override their hidden state.");
 }
 
 async function checkPwaAssets() {
@@ -109,6 +110,8 @@ async function checkPwaAssets() {
   assert(manifest.name === "MJ Stock Magic", "PWA manifest has the wrong app name.");
   assert(manifest.start_url === "/", "PWA manifest must start at the app home screen.");
   assert(manifest.display === "standalone", "PWA manifest must use standalone display mode.");
+  assert(manifest.prefer_related_applications === false, "PWA manifest must keep direct web-app installation enabled.");
+  assert(Array.isArray(manifest.related_applications) && manifest.related_applications.some((app) => app.platform === "webapp" && app.url === "/manifest.webmanifest"), "PWA manifest cannot detect an existing installation of itself.");
   assert(Array.isArray(manifest.icons) && manifest.icons.some((icon) => icon.sizes === "192x192"), "PWA manifest is missing its 192px icon.");
   assert(Array.isArray(manifest.icons) && manifest.icons.some((icon) => icon.sizes === "512x512"), "PWA manifest is missing its 512px icon.");
   for (const asset of ["sw.js", "pwa-install.js", "mjstock-icon-192.png", "mjstock-icon-512.png", "mjstock-apple-touch.png"]) {

@@ -261,6 +261,10 @@ button:hover,
   white-space: nowrap;
 }
 
+.install-app-button[hidden] {
+  display: none;
+}
+
 .install-app-button:hover,
 .install-app-button:focus-visible {
   background: var(--accent);

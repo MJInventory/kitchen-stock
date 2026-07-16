@@ -5,6 +5,13 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.webmanifest"
+    }
+  ],
   "background_color": "#f5f7f8",
   "theme_color": "#0f766e",
   "icons": [

@@ -1,8 +1,4 @@
 (function () {
-  const APP_BUILD = document.querySelector('meta[name="app-build"]')?.getAttribute("content")
-    || document.querySelector('meta[name="app-version"]')?.getAttribute("content")
-    || "dev";
-
   function applyTheme() {
     const normalized = "light";
     document.documentElement.dataset.theme = normalized;
@@ -13,28 +9,8 @@
     }
   }
 
-  function registerUpdater() {
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register(`/sw.js?v=${APP_BUILD}`, { updateViaCache: "none" }).then((registration) => {
-      registration.update().catch(() => {});
-      if (registration.waiting) {
-        registration.waiting.postMessage({ type: "SKIP_WAITING" });
-      }
-      registration.addEventListener("updatefound", () => {
-        const worker = registration.installing;
-        if (!worker) return;
-        worker.addEventListener("statechange", () => {
-          if (worker.state === "installed" && registration.waiting) {
-            registration.waiting.postMessage({ type: "SKIP_WAITING" });
-          }
-        });
-      });
-    }).catch(() => {});
-  }
-
   window.applyKitchenTheme = applyTheme;
   applyTheme();
-  registerUpdater();
 }());
 
 

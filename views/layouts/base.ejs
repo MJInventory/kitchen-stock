@@ -9,6 +9,7 @@
       <header class="order-topbar<% if (typeof topbarClass !== "undefined" && topbarClass) { %> <%= topbarClass %><% } %>">
         <%- include("../partials/brand") %>
         <div class="top-actions">
+          <button type="button" class="install-app-button no-print" data-install-app hidden>Install app</button>
           <a id="currentUser" class="user-chip" href="/settings.html"></a>
           <%- typeof topbarActions !== "undefined" ? topbarActions : "" %>
         </div>
@@ -23,6 +24,12 @@
 
       <%- typeof body !== "undefined" ? body : "" %>
     </main>
+
+    <div class="ios-install-help no-print" data-ios-install-help hidden role="dialog" aria-modal="true" aria-labelledby="ios-install-title">
+      <strong id="ios-install-title">Install MJ Stock Magic</strong>
+      <span>In Safari, tap the Share button, then choose <b>Add to Home Screen</b>.</span>
+      <button type="button" data-install-close>Close</button>
+    </div>
 
     <footer class="app-version">Release v<%= typeof appVersion !== "undefined" ? appVersion : "" %><% if (typeof appReleaseLabel !== "undefined" && appReleaseLabel) { %> fix <%= appReleaseLabel %><% } %></footer>
     <%- include("../partials/footer-scripts") %>

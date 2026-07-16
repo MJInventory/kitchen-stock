@@ -74,6 +74,9 @@ function checkRenderedPageContract(route, html) {
   assert(/\/screen-access\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared screen-access behavior.`);
   assert(/\/menus\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared menu behavior.`);
   assert(/\/theme\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared theme behavior.`);
+  assert(/\/pwa-install\.js(?:\?|["'])/i.test(page), `Rendered page ${route.path} is missing shared install behavior.`);
+  assert(/\bdata-install-app\b/i.test(page), `Rendered page ${route.path} is missing the app install control.`);
+  assert(/\bdata-ios-install-help\b/i.test(page), `Rendered page ${route.path} is missing iOS install guidance.`);
   const duplicateIds = duplicateHtmlIds(page);
   assert(!duplicateIds.length, `Rendered page ${route.path} contains duplicate element ids: ${duplicateIds.join(", ")}`);
   if (route.path === "/ordering.html") {
@@ -98,6 +101,19 @@ async function checkResponsiveStyles() {
   assert(/\.roster-grid-wrap\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Kitchen roster is missing its mobile-safe horizontal scroll container.");
   assert(/\.standing-sheet-shell\s*\{[^}]*overflow-x:\s*auto/is.test(styles), "Standing-order tables are missing their mobile-safe horizontal scroll container.");
   assert(/:root\[data-theme=["']light["']\]\s+body\.order-app\.ordering-modern-app/is.test(styles), "Ordering modern theme is not specific enough to override the legacy light theme.");
+}
+
+async function checkPwaAssets() {
+  const manifestPath = path.join(publicDir, "manifest.webmanifest");
+  const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+  assert(manifest.name === "MJ Stock Magic", "PWA manifest has the wrong app name.");
+  assert(manifest.start_url === "/", "PWA manifest must start at the app home screen.");
+  assert(manifest.display === "standalone", "PWA manifest must use standalone display mode.");
+  assert(Array.isArray(manifest.icons) && manifest.icons.some((icon) => icon.sizes === "192x192"), "PWA manifest is missing its 192px icon.");
+  assert(Array.isArray(manifest.icons) && manifest.icons.some((icon) => icon.sizes === "512x512"), "PWA manifest is missing its 512px icon.");
+  for (const asset of ["sw.js", "pwa-install.js", "mjstock-icon-192.png", "mjstock-icon-512.png", "mjstock-apple-touch.png"]) {
+    assert(await fileExists(path.join(publicDir, asset)), `Missing required PWA asset: ${asset}`);
+  }
 }
 
 async function checkRouteDefinitionsAndAssets() {
@@ -205,6 +221,7 @@ async function main() {
   try {
     await checkCriticalExports();
     await checkResponsiveStyles();
+    await checkPwaAssets();
     await checkRouteDefinitionsAndAssets();
     await checkPostgresViews();
   } finally {

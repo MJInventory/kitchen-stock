@@ -249,6 +249,50 @@ button:hover,
   text-decoration: none;
 }
 
+.install-app-button {
+  width: auto;
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.install-app-button:hover,
+.install-app-button:focus-visible {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.ios-install-help {
+  position: fixed;
+  z-index: 1000;
+  top: 88px;
+  right: 18px;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100% - 36px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 18px 44px rgb(16 24 40 / 20%);
+}
+
+.ios-install-help[hidden] {
+  display: none;
+}
+
+.ios-install-help button {
+  justify-self: end;
+  width: auto;
+  min-width: 88px;
+}
+
 .helper-text,
 .item-info {
   margin: 0;
@@ -3921,6 +3965,19 @@ html.menus-loading .order-topbar > .top-actions {
     width: 100%;
     flex-direction: row;
     align-items: stretch;
+  }
+
+  .install-app-button {
+    width: auto;
+    min-height: 36px;
+    padding: 7px 12px;
+  }
+
+  .ios-install-help {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    width: calc(100% - 24px);
   }
 
   .row {

@@ -157,7 +157,10 @@ export function plainTextFileName(label) {
 export function buildPlainTextSheet(requests, supplierFilter = "") {
   const grouped = new Map();
   const orderedRequests = [...(requests || [])]
-    .filter((request) => !supplierFilter || String(request.supplierName || "Unassigned Supplier").trim() === supplierFilter)
+    .filter((request) =>
+      !request.ordered
+      && (!supplierFilter || String(request.supplierName || "Unassigned Supplier").trim() === supplierFilter)
+    )
     .sort((left, right) => {
       const supplier = String(left.supplierName || "").localeCompare(String(right.supplierName || ""), undefined, { sensitivity: "base" });
       if (supplier) return supplier;

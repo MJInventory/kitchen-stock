@@ -1666,6 +1666,30 @@ button:hover,
   resize: vertical;
 }
 
+.driver-supplier-memo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid #98a2b3;
+  border-top: 0;
+  background: #fff;
+}
+
+.driver-supplier-memo span {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.driver-supplier-memo-input {
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

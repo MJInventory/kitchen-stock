@@ -189,6 +189,34 @@ export function createDriverSheetActions({
     }
   }
 
+  async function saveSupplierMemo(input, currentSheet, date) {
+    const supplierName = String(input.dataset.supplierName || "").trim();
+    const memo = String(input.value || "").trim();
+    if (!supplierName || memo === String(input.dataset.savedValue || "").trim()) return;
+
+    input.disabled = true;
+    setMessage("Saving supplier memo...");
+    try {
+      const { note } = await api("/api/receiving-notes", {
+        method: "POST",
+        body: JSON.stringify({ date, supplierName, memo })
+      });
+      currentSheet.supplierNotes = [
+        ...(currentSheet.supplierNotes || []).filter(
+          (entry) => String(entry.supplierName || "").trim().toLowerCase() !== supplierName.toLowerCase()
+        ),
+        note
+      ];
+      input.value = note?.memo || "";
+      input.dataset.savedValue = note?.memo || "";
+      setMessage("Supplier memo saved.");
+    } catch (error) {
+      setMessage(error.message, true);
+    } finally {
+      input.disabled = false;
+    }
+  }
+
   return {
     toggleOrdered,
     markDelivered,
@@ -196,6 +224,7 @@ export function createDriverSheetActions({
     changeDeliveryDay,
     changeSupplier,
     changeUnit,
-    changeQuantity
+    changeQuantity,
+    saveSupplierMemo
   };
 }

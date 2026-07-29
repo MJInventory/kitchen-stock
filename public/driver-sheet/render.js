@@ -13,8 +13,15 @@ export function renderSheet(data, elements) {
   const currentSheet = {
     ...data,
     requests: (data.requests || []).filter((request) => !isStandingOrderRequest(request)),
-    units: data.units || []
+    units: data.units || [],
+    supplierNotes: data.supplierNotes || []
   };
+  const notesBySupplier = new Map(
+    currentSheet.supplierNotes.map((note) => [
+      String(note.supplierName || "").trim().toLowerCase(),
+      note
+    ])
+  );
 
   elements.driverName.value = formatUserDisplay(data.driverName || elements.driverName.value || "");
   elements.printDate.textContent = `Date: ${data.date}`;
@@ -28,12 +35,22 @@ export function renderSheet(data, elements) {
   const groups = groupRequests(currentSheet.requests);
   elements.sheetList.innerHTML = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, supplier]) => `
+    .map(([, supplier]) => {
+      const memo = notesBySupplier.get(String(supplier.supplier || "").trim().toLowerCase())?.memo || "";
+      return `
       <section class="sheet-group">
         <div class="supplier-heading supplier-text-trigger" role="button" tabindex="0" data-supplier-name="${escapeHtml(supplier.supplier)}" aria-label="Open text list for ${escapeHtml(supplier.supplier)}">
           <h2>${escapeHtml(supplier.supplier)}</h2>
           ${supplier.contact ? `<pre>${escapeHtml(supplier.contact)}</pre>` : ""}
         </div>
+        <label class="driver-supplier-memo">
+          <span>Memo</span>
+          <input class="driver-supplier-memo-input" type="text" maxlength="500"
+            data-supplier-name="${escapeHtml(supplier.supplier)}"
+            data-saved-value="${escapeHtml(memo)}"
+            value="${escapeHtml(memo)}"
+            placeholder="Small memo for this supplier">
+        </label>
         ${[...supplier.categories.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([, category]) => `
@@ -106,7 +123,8 @@ export function renderSheet(data, elements) {
           `)
           .join("")}
       </section>
-    `)
+    `;
+    })
     .join("");
 
   return currentSheet;

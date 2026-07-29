@@ -33,7 +33,7 @@ export function initDriverSheetPage() {
   let sessionToken = initialSession.token;
   let sessionUser = initialSession.user;
   let sessionPermissions = initialSession.permissions;
-  let currentSheet = { date: "", requests: [], suppliers: [], units: [] };
+  let currentSheet = { date: "", requests: [], suppliers: [], units: [], supplierNotes: [] };
   let unitOptionsLoaded = false;
 
   function setMessage(text, isError = false) {
@@ -305,6 +305,12 @@ export function initDriverSheetPage() {
       if (!row?.dataset.lineId) return;
       driverSheetActions.changeDeliveryDay(row, deliveryDayInput, currentSheet);
     }
+  });
+
+  sheetList.addEventListener("focusout", (event) => {
+    const memoInput = event.target.closest(".driver-supplier-memo-input");
+    if (!memoInput) return;
+    driverSheetActions.saveSupplierMemo(memoInput, currentSheet, sheetDate.value);
   });
 
   bindKitchenLogin({

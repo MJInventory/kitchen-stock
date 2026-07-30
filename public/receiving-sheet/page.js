@@ -124,6 +124,46 @@ export function initReceivingSheetPage() {
     }
   }
 
+  async function saveUnitPrice(row, input) {
+    const displayKey = row.dataset.displayKey || "";
+    const displayRow = currentSheet.displayRows?.get(displayKey);
+    const request = displayRow?.request?.id ? displayRow.request : null;
+    const unitPrice = Number(input.value);
+    if (!request?.id) {
+      setMessage("Could not find the receiving line to update.", true);
+      return;
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      setMessage("Price per unit must be zero or greater.", true);
+      input.value = input.dataset.savedValue || "0.00";
+      return;
+    }
+    const formattedPrice = unitPrice.toFixed(2);
+    if (formattedPrice === input.dataset.savedValue) {
+      input.value = formattedPrice;
+      return;
+    }
+
+    input.disabled = true;
+    setMessage("Saving price per unit...");
+    try {
+      const { request: saved } = await api(`/api/requests/${request.id}/unit-price`, {
+        method: "PATCH",
+        body: JSON.stringify({ unitPrice })
+      });
+      input.value = Number(saved?.unitPrice ?? unitPrice).toFixed(2);
+      input.dataset.savedValue = input.value;
+      request.unitPrice = Number(input.value);
+      displayRow.unitPrice = request.unitPrice;
+      setMessage("Price per unit saved.");
+    } catch (error) {
+      input.value = input.dataset.savedValue || "0.00";
+      setMessage(error.message, true);
+    } finally {
+      input.disabled = false;
+    }
+  }
+
   async function deleteReceivingRow(row, button) {
     const displayKey = row.dataset.displayKey || "";
     const displayRow = currentSheet.displayRows?.get(displayKey);
@@ -199,6 +239,14 @@ export function initReceivingSheetPage() {
       if (!row?.dataset.displayKey) return;
       deleteReceivingRow(row, deleteButton);
     }
+  });
+
+  receivingList.addEventListener("focusout", (event) => {
+    const priceInput = event.target.closest(".receive-price-input");
+    if (!priceInput) return;
+    const row = priceInput.closest("tr");
+    if (!row?.dataset.displayKey) return;
+    saveUnitPrice(row, priceInput);
   });
 
   bindKitchenLogin({

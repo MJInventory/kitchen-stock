@@ -101,6 +101,11 @@ function createMutationApiHarness(overrides = {}) {
     createOcrRule: noop,
     emailInvoicePicture: noop,
     ocrSpaceParseImage: noop,
+    updateRequest: noop,
+    updateRequestUnitPrice: async (...args) => {
+      calls.push(["updateRequestUnitPrice", ...args]);
+      return { id: args[0], unitPrice: args[1] };
+    },
     deliverRequest: async (...args) => {
       calls.push(["deliverRequest", ...args]);
       return { ok: true };
@@ -160,6 +165,24 @@ test("mutation api forwards optional received price when delivering a request", 
     { quantityReceived: 3, unitPrice: 18.75 }
   ]]);
   assert.equal(getSent()?.status, 200);
+});
+
+test("mutation api autosaves a receiving price without delivering the request", async () => {
+  const payload = { unitPrice: 74 };
+  const { handler, calls, getSent } = createMutationApiHarness({ payload });
+  const handled = await handler(
+    { method: "PATCH", url: "/api/requests/44444444-4444-4444-4444-444444444444/unit-price" },
+    {}
+  );
+  assert.equal(handled, true);
+  assert.deepEqual(calls, [[
+    "updateRequestUnitPrice",
+    "44444444-4444-4444-4444-444444444444",
+    74,
+    "Enno"
+  ]]);
+  assert.equal(getSent()?.status, 200);
+  assert.equal(getSent()?.body.request.unitPrice, 74);
 });
 
 test("mutation api routes standing-order run line quantity edits through updateStandingOrderRunLine", async () => {

@@ -137,3 +137,46 @@ test("receiving without a typed price preserves the selected supplier price", as
   const snapshotWrite = executed.find((entry) => entry.sql.includes("set unit_price = $2") && entry.params[0] === "request-1");
   assert.deepEqual(snapshotWrite?.params, ["request-1", 7.25]);
 });
+
+test("receiving price autosave updates the request and its selected supplier price", async () => {
+  const executed = [];
+  const query = async (sql, params = []) => {
+    const text = String(sql);
+    executed.push({ sql: text, params });
+    if (text.includes("from order_requests r") && text.includes("for update of r, i")) {
+      return { rows: [{
+        id: "request-1",
+        inventory_item_id: "item-1",
+        unit_price: "7.25",
+        item_name: "Coffee",
+        supplier_id: "supplier-1"
+      }] };
+    }
+    return { rows: [], rowCount: 1 };
+  };
+  const client = { query, release() {} };
+  const domain = createRequestDomain({
+    db: () => ({ query, connect: async () => client }),
+    cache: { items: { expiresAt: 1 }, requests: { expiresAt: 1 } },
+    allowedUnits: [],
+    isValidId: (value) => Boolean(value),
+    pgRequestFromRow: (row) => row,
+    pgNumber: Number,
+    pgRecordAuditEntry: async () => {},
+    pgAreasForInventoryItemIds: async () => [],
+    pgNotificationUsers: async () => [],
+    pgCreateNotificationsForUsers: async () => {},
+    presentUserName: (value) => value,
+    getPgCloseStandingOrderRunIfCompleteTx: () => null
+  });
+
+  const result = await domain.pgUpdateRequestUnitPrice("request-1", 74, "Enno");
+
+  assert.deepEqual(result, { id: "request-1", unitPrice: 74 });
+  const supplierPriceWrite = executed.find((entry) => entry.sql.includes("insert into inventory_item_supplier_prices"));
+  assert.deepEqual(supplierPriceWrite?.params, ["item-1", "supplier-1", 74, "Enno"]);
+  const requestPriceWrite = executed.find(
+    (entry) => entry.sql.includes("update order_requests") && entry.sql.includes("set unit_price = $2")
+  );
+  assert.deepEqual(requestPriceWrite?.params, ["request-1", 74]);
+});

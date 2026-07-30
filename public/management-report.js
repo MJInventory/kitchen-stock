@@ -1,6 +1,8 @@
 import { authPage } from "/page-auth.js";
 
 const modeSelect = document.querySelector("#managementMode");
+const anchorDateField = document.querySelector("#managementDateField");
+const anchorDateLabel = document.querySelector("#managementDateLabel");
 const anchorDateInput = document.querySelector("#managementDate");
 const customRange = document.querySelector("#managementCustomRange");
 const fromInput = document.querySelector("#managementFrom");
@@ -64,7 +66,23 @@ function formatPrice(value) {
 }
 
 function toggleCustomRange() {
-  customRange.hidden = modeSelect.value !== "custom";
+  const mode = modeSelect.value || "day";
+  const isCustom = mode === "custom";
+  customRange.hidden = !isCustom;
+  anchorDateField.hidden = isCustom;
+  anchorDateLabel.textContent = mode === "week"
+    ? "Week containing"
+    : mode === "month"
+      ? "Month containing"
+      : "Date";
+  if (isCustom) {
+    fromInput.value ||= anchorDateInput.value || isoTodayLocal();
+    toInput.value ||= fromInput.value;
+  }
+}
+
+function markSelectionChanged() {
+  setMessage("Selection changed. Click Load Management Report to refresh the results.");
 }
 
 function buildQuery() {
@@ -160,11 +178,12 @@ async function loadReport() {
 
 modeSelect.addEventListener("change", () => {
   toggleCustomRange();
-  if (modeSelect.value !== "custom") {
-    fromInput.value = "";
-    toInput.value = "";
-  }
+  markSelectionChanged();
 });
+
+anchorDateInput.addEventListener("change", markSelectionChanged);
+fromInput.addEventListener("change", markSelectionChanged);
+toInput.addEventListener("change", markSelectionChanged);
 
 loadButton.addEventListener("click", () => {
   loadReport().catch((error) => setMessage(error.message || "Could not load management report.", true));

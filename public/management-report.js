@@ -1,4 +1,5 @@
 import { authPage } from "/page-auth.js";
+import { initManagementItemHistory } from "/management-item-history.js";
 
 const modeSelect = document.querySelector("#managementMode");
 const anchorDateField = document.querySelector("#managementDateField");
@@ -199,5 +200,6 @@ auth.ready(async () => {
   fromInput.value = today;
   toInput.value = today;
   toggleCustomRange();
+  initManagementItemHistory({ api: auth.api });
   await loadReport();
 });

@@ -47,3 +47,37 @@
   <div id="managementSummary" class="report-summary report-summary-compact"></div>
   <div id="managementList" class="sheet-list"></div>
 </section>
+
+<section class="panel management-item-history-panel no-print">
+  <div class="management-history-heading">
+    <div>
+      <p class="eyebrow">Inventory Analysis</p>
+      <h2>Item Order &amp; Price History</h2>
+    </div>
+    <p>Search an inventory item to see every order and its daily, weekly, and monthly averages.</p>
+  </div>
+
+  <label class="management-item-search-label">
+    Search inventory item
+    <input id="managementItemSearch" type="search" autocomplete="off" placeholder="Type at least 2 letters...">
+  </label>
+  <div id="managementItemSearchResults" class="management-item-search-results" role="listbox"></div>
+  <p id="managementItemHistoryMessage" role="status"></p>
+
+  <div id="managementItemHistory" hidden>
+    <div class="management-history-title-row">
+      <h2 id="managementItemHistoryTitle"></h2>
+    </div>
+    <div id="managementItemHistorySummary" class="report-summary report-summary-compact"></div>
+
+    <div class="report-view-toggle management-history-toggle" aria-label="History average period">
+      <button class="report-view-button active" type="button" data-history-period="day">Daily averages</button>
+      <button class="report-view-button" type="button" data-history-period="week">Weekly averages</button>
+      <button class="report-view-button" type="button" data-history-period="month">Monthly averages</button>
+    </div>
+    <div id="managementItemAverageTable"></div>
+
+    <h3 class="management-history-subheading">Full order and price history</h3>
+    <div id="managementItemHistoryTable"></div>
+  </div>
+</section>

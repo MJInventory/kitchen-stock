@@ -2299,6 +2299,96 @@ html.menus-loading .order-topbar > .top-actions {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.management-item-history-panel {
+  margin-top: 22px;
+}
+
+.management-history-heading,
+.management-history-title-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.management-history-heading h2,
+.management-history-title-row h2 {
+  margin: 2px 0 0;
+}
+
+.management-history-heading > p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.management-item-search-label {
+  display: block;
+  margin-top: 18px;
+}
+
+.management-item-search-label input {
+  width: 100%;
+}
+
+.management-item-search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.management-item-search-results button {
+  width: 100%;
+  justify-content: flex-start;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.management-item-search-results button:hover,
+.management-item-search-results button:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.management-history-title-row {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.management-history-toggle {
+  margin-top: 18px;
+}
+
+.management-history-subheading {
+  margin: 24px 0 10px;
+}
+
+.management-history-table-scroll {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.management-history-table {
+  min-width: 760px;
+}
+
+.history-origin-chip {
+  display: inline-block;
+  margin-left: 4px;
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  background: #f5f3ff;
+  color: #5b21b6;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .report-view-toggle {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4377,6 +4467,15 @@ html.menus-loading .order-topbar > .top-actions {
   .report-summary,
   .report-summary-compact {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .management-history-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .management-history-toggle {
+    grid-template-columns: 1fr;
   }
 
   .order-app .user-chip {

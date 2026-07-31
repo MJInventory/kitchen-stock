@@ -39,12 +39,12 @@ export function buildManagementPeriodTable(rows = [], period = "day") {
         <tbody>
           ${rows.map((row) => `
             <tr>
-              <td>${escapeHtml(row.periodStart)}</td>
-              <td>${escapeHtml(row.orderCount)}</td>
-              <td>${escapeHtml(formatNumber(row.totalQuantity))}</td>
-              <td>${escapeHtml(formatNumber(row.averageOrderQuantity))}</td>
-              <td>${escapeHtml(formatNumber(row.averageUnitPrice))}</td>
-              <td>${escapeHtml(formatNumber(row.totalValue))}</td>
+              <td data-label="${label}">${escapeHtml(row.periodStart)}</td>
+              <td data-label="Orders">${escapeHtml(row.orderCount)}</td>
+              <td data-label="Total qty">${escapeHtml(formatNumber(row.totalQuantity))}</td>
+              <td data-label="Avg qty / order">${escapeHtml(formatNumber(row.averageOrderQuantity))}</td>
+              <td data-label="Avg price / unit">${escapeHtml(formatNumber(row.averageUnitPrice))}</td>
+              <td data-label="Total value">${escapeHtml(formatNumber(row.totalValue))}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -73,14 +73,14 @@ export function buildManagementHistoryTable(rows = []) {
         <tbody>
           ${rows.map((row) => `
             <tr>
-              <td>${escapeHtml(formatDateTime(row.requestedAt))}</td>
-              <td>${escapeHtml(row.supplierName)}</td>
-              <td>${escapeHtml(formatNumber(row.quantity))}</td>
-              <td>${escapeHtml(row.unit)}</td>
-              <td>${escapeHtml(formatNumber(row.unitPrice))}</td>
-              <td>${escapeHtml(formatNumber(row.totalValue))}</td>
-              <td>${escapeHtml(row.status)}${row.standingOrder ? ' <span class="history-origin-chip">Standing</span>' : ""}</td>
-              <td>${escapeHtml(row.requestedBy)}</td>
+              <td data-label="Ordered">${escapeHtml(formatDateTime(row.requestedAt))}</td>
+              <td data-label="Supplier">${escapeHtml(row.supplierName)}</td>
+              <td data-label="Quantity">${escapeHtml(formatNumber(row.quantity))}</td>
+              <td data-label="Unit">${escapeHtml(row.unit)}</td>
+              <td data-label="Price / unit">${escapeHtml(formatNumber(row.unitPrice))}</td>
+              <td data-label="Total value">${escapeHtml(formatNumber(row.totalValue))}</td>
+              <td data-label="Status">${escapeHtml(row.status)}${row.standingOrder ? ' <span class="history-origin-chip">Standing</span>' : ""}</td>
+              <td data-label="Requested by">${escapeHtml(row.requestedBy)}</td>
             </tr>
           `).join("")}
         </tbody>

@@ -121,7 +121,7 @@ function renderGroups(groups = []) {
   listHost.innerHTML = groups.map((group) => `
     <section class="sheet-group">
       <h2>${escapeHtml(group.categoryName)} <span>${group.rows.length} item(s)</span></h2>
-      <table class="order-report-table">
+      <table class="order-report-table management-report-data-table">
         <thead>
           <tr>
             <th>Item</th>
@@ -136,13 +136,13 @@ function renderGroups(groups = []) {
         <tbody>
           ${group.rows.map((row) => `
             <tr>
-              <td>${escapeHtml(row.itemName)}</td>
-              <td>${escapeHtml(row.supplierName)}</td>
-              <td>${escapeHtml(row.totalQuantity)}</td>
-              <td>${escapeHtml(row.unit)}</td>
-              <td>${escapeHtml(formatPrice(row.averageUnitPrice))}</td>
-              <td>${escapeHtml(formatPrice(row.totalValue))}</td>
-              <td>${escapeHtml(formatLeadTimeLabel(row.avgLeadTimeDays))}</td>
+              <td data-label="Item">${escapeHtml(row.itemName)}</td>
+              <td data-label="Supplier">${escapeHtml(row.supplierName)}</td>
+              <td data-label="Quantity">${escapeHtml(row.totalQuantity)}</td>
+              <td data-label="Unit">${escapeHtml(row.unit)}</td>
+              <td data-label="Avg price / unit">${escapeHtml(formatPrice(row.averageUnitPrice))}</td>
+              <td data-label="Total value">${escapeHtml(formatPrice(row.totalValue))}</td>
+              <td data-label="Avg lead time">${escapeHtml(formatLeadTimeLabel(row.avgLeadTimeDays))}</td>
             </tr>
           `).join("")}
         </tbody>

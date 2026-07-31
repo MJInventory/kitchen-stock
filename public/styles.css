@@ -4798,6 +4798,102 @@ html.menus-loading .order-topbar > .top-actions {
   }
 }
 
+@media screen and (max-width: 720px) {
+  .management-item-history-panel,
+  .management-period-panel,
+  .order-report-sheet {
+    padding: 14px;
+  }
+
+  .management-period-panel .sheet-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .management-period-panel .sheet-actions button {
+    width: 100%;
+  }
+
+  .management-history-heading > p {
+    max-width: none;
+  }
+
+  .management-history-title-row h2,
+  .management-history-subheading {
+    font-size: 18px;
+  }
+
+  .management-history-table-scroll {
+    overflow: visible;
+  }
+
+  .management-report-data-table,
+  .management-history-table {
+    display: block;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .management-report-data-table thead,
+  .management-history-table thead {
+    display: none;
+  }
+
+  .management-report-data-table tbody,
+  .management-history-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .management-report-data-table tr,
+  .management-history-table tr {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .management-report-data-table td,
+  .management-history-table td {
+    display: grid;
+    grid-template-columns: minmax(100px, 42%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    border: 0;
+    border-top: 1px solid var(--line);
+    padding: 9px 11px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .management-report-data-table td:first-child,
+  .management-history-table td:first-child {
+    border-top: 0;
+  }
+
+  .management-report-data-table td::before,
+  .management-history-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .order-report-sheet .sheet-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .order-report-sheet .sheet-meta {
+    text-align: left;
+  }
+}
+
 @media print {
   @page {
     size: letter;
